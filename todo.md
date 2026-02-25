@@ -1,7 +1,7 @@
 # Clarke & Associates CRM — Project TODO
 
 ## Core Infrastructure
-- [x] Database schema (11 tables: users, leads, webinars, landing_pages, activity_log, sms_messages, email_reminders, deals, availability, bookings, integrations)
+- [x] Database schema (12 tables: users, leads, webinars, webinar_sessions, landing_pages, activity_log, sms_messages, email_reminders, deals, availability, bookings, integrations)
 - [x] tRPC backend with 8 feature routers
 - [x] Authentication via Manus OAuth
 - [x] DashboardLayout with sidebar navigation
@@ -14,6 +14,12 @@
 - [x] Automatic lead tagging by source/campaign
 - [x] Public landing page renderer
 - [x] Accent color customization
+- [x] Configurable form fields (toggle which fields to show)
+- [x] Artwork/hero image upload per landing page
+- [x] Opt-in consent checkbox (configurable label)
+- [x] Body text / description field
+- [x] Confirmation email settings (subject, body, template variables)
+- [x] PDF attachment upload for confirmation emails
 
 ## Zoom Integration
 - [x] Connect company Zoom account (Settings page)
@@ -47,6 +53,7 @@
 - [x] 1 hour before webinar
 - [x] 10 minutes before webinar
 - [x] Automated no-show follow-up with replay link
+- [x] Confirmation email with PDF attachment support
 
 ## Analytics Dashboard
 - [x] Total leads KPI card
@@ -94,18 +101,39 @@
 - [x] Integration status display
 
 ## Testing
-- [x] Auth logout test
-- [x] CRM router structure test
-- [x] Leads CRUD tests (create, read, update stage, notes, activity, search)
-- [x] Deals CRUD tests (create, update, revenue metrics)
-- [x] Webinars tests (create, read, attendance stats)
-- [x] Landing pages tests (create, slug lookup, duplicate rejection, delete)
-- [x] Analytics tests (dashboard metrics, revenue data)
-- [x] Integrations tests (status, connect, disconnect)
-- [x] Scheduling tests (availability, bookings)
-- [x] SMS tests (send with consent, reject without consent)
+- [x] Auth logout test (1 test)
+- [x] CRM core tests (37 tests)
+- [x] Enhanced feature tests (12 tests)
+- [x] Total: 50 tests passing
 
 ## Branding Update
 - [x] Match branding and colors from altamortgagegroup.net
 - [x] Apply brand colors to global CSS design tokens
 - [x] Use brand fonts and visual style throughout the platform
+
+## Enhanced Webinar & Landing Page Flow (User Request)
+- [x] Webinar creation initiates calendar event and creates linked landing page
+- [x] Landing page builder: configurable form fields (toggle first name, last name, phone, email)
+- [x] Landing page builder: date/time picker for webinar sessions (multiple dates available)
+- [x] Landing page builder: opt-in consent checkbox (optional, configurable)
+- [x] Landing page builder: artwork/image upload for each webinar event
+- [x] Landing page: leads can select from available seminar dates
+- [x] Confirmation email sent automatically on lead signup
+- [x] Confirmation email supports PDF document attachment
+- [x] Webinar-to-landing-page linking (create LP from webinar screen)
+- [x] Email service with template variable rendering
+
+## Installation & Requirements Data Sheet
+- [x] Create comprehensive installation guide document
+- [x] Include server requirements (OS, Node.js, MySQL, RAM, CPU, disk)
+- [x] Include all environment variables with descriptions
+- [x] Include dependency list and versions
+- [x] Include step-by-step deployment instructions
+- [x] Include Zoom API setup instructions
+- [x] Include Google Calendar API setup instructions
+- [x] Include SMS provider (Twilio) setup instructions
+- [x] Include SSL/TLS and domain configuration
+- [x] Include backup and maintenance procedures
+- [x] Include file structure documentation
+- [x] Include troubleshooting guide
+- [x] Include security considerations

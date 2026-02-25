@@ -3,8 +3,11 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import {
   createLead, getLeads, getLeadById, updateLead, updateLeadStage,
   logActivity, getActivityByLeadId, updateLeadScore,
+  getLandingPageBySlug, getWebinarById, getWebinarSessionById,
+  createEmailReminder,
 } from "../db";
 import { invokeLLM } from "../_core/llm";
+import { notifyOwner } from "../_core/notification";
 
 const stageEnum = z.enum([
   "new_lead", "registered", "attended", "no_show",
@@ -119,6 +122,7 @@ Lead Data:
 - Pipeline Stage: ${lead.stage}
 - Attendance Status: ${lead.attendanceStatus ?? "not registered"}
 - SMS Consent: ${lead.smsConsent ? "yes" : "no"}
+- Contact Opt-In: ${lead.contactOptIn ? "yes" : "no"}
 - Deal Value: ${lead.dealValue ?? "none"}
 - Consultation Booked: ${lead.consultationBookedAt ? "yes" : "no"}
 - Activity Count: ${activity.length}
@@ -168,11 +172,14 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
       phone: z.string().optional(),
       slug: z.string(),
       smsConsent: z.boolean().optional(),
+      contactOptIn: z.boolean().optional(),
+      webinarSessionId: z.number().optional(),
     }))
     .mutation(async ({ input }) => {
-      const { getLandingPageBySlug } = await import("../db");
       const page = await getLandingPageBySlug(input.slug);
       if (!page || !page.isActive) throw new Error("Landing page not found");
+
+      // Create the lead
       const id = await createLead({
         firstName: input.firstName,
         lastName: input.lastName,
@@ -182,15 +189,93 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
         campaign: page.campaignTag,
         landingPageId: page.id,
         webinarId: page.webinarId ?? undefined,
+        webinarSessionId: input.webinarSessionId,
         smsConsent: input.smsConsent ?? false,
-        stage: "new_lead",
+        contactOptIn: input.contactOptIn ?? false,
+        stage: page.webinarId ? "registered" : "new_lead",
+        attendanceStatus: page.webinarId ? "registered" : undefined,
       });
+
       await logActivity({
         leadId: id,
         type: "system",
         title: "Lead captured from landing page",
         content: `Captured via landing page: ${page.title}`,
       });
-      return { id, webinarId: page.webinarId };
+
+      // If linked to webinar, get join URL from session or webinar
+      let joinUrl: string | undefined;
+      if (page.webinarId) {
+        const webinar = await getWebinarById(page.webinarId);
+        joinUrl = webinar?.zoomJoinUrl ?? undefined;
+        if (input.webinarSessionId) {
+          const session = await getWebinarSessionById(input.webinarSessionId);
+          if (session?.zoomJoinUrl) joinUrl = session.zoomJoinUrl;
+        }
+        if (joinUrl) {
+          await updateLead(id, { zoomJoinUrl: joinUrl });
+        }
+
+        // Log webinar registration activity
+        await logActivity({
+          leadId: id,
+          type: "webinar_registered",
+          title: `Registered for webinar: ${webinar?.title ?? "Unknown"}`,
+        });
+
+        // Schedule email reminders for the webinar
+        if (webinar) {
+          const webinarTime = webinar.scheduledAt.getTime();
+          const reminders = [
+            { type: "registration_confirmation" as const, offset: 0, subject: page.confirmationEmailSubject || `You're registered for ${webinar.title}!` },
+            { type: "reminder_24h" as const, offset: -24 * 60 * 60 * 1000, subject: `Reminder: ${webinar.title} is tomorrow` },
+            { type: "reminder_1h" as const, offset: -60 * 60 * 1000, subject: `Starting soon: ${webinar.title}` },
+            { type: "reminder_10min" as const, offset: -10 * 60 * 1000, subject: `Starting in 10 minutes: ${webinar.title}` },
+          ];
+          for (const r of reminders) {
+            const scheduledAt = r.type === "registration_confirmation"
+              ? new Date()
+              : new Date(webinarTime + r.offset);
+            if (scheduledAt > new Date() || r.type === "registration_confirmation") {
+              await createEmailReminder({
+                leadId: id,
+                webinarId: page.webinarId,
+                type: r.type,
+                scheduledAt,
+                subject: r.subject,
+                body: r.type === "registration_confirmation"
+                  ? (page.confirmationEmailBody || `Thank you for registering for ${webinar.title}!`)
+                  : `Join link: ${joinUrl ?? "TBD"}`,
+                attachmentUrl: r.type === "registration_confirmation" ? (page.confirmationPdfUrl ?? undefined) : undefined,
+              });
+            }
+          }
+        }
+      } else {
+        // Non-webinar landing page: send confirmation email
+        if (page.confirmationEmailSubject) {
+          await createEmailReminder({
+            leadId: id,
+            webinarId: 0,
+            type: "registration_confirmation",
+            scheduledAt: new Date(),
+            subject: page.confirmationEmailSubject,
+            body: page.confirmationEmailBody ?? "Thank you for your interest!",
+            attachmentUrl: page.confirmationPdfUrl ?? undefined,
+          });
+        }
+      }
+
+      // Notify owner about new lead
+      try {
+        await notifyOwner({
+          title: "New Lead Captured",
+          content: `${input.firstName} ${input.lastName} (${input.email}) signed up via ${page.title}`,
+        });
+      } catch (e) {
+        // Non-critical, don't fail the capture
+      }
+
+      return { id, webinarId: page.webinarId, joinUrl };
     }),
 });

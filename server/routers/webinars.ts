@@ -4,6 +4,8 @@ import {
   createWebinar, getWebinars, getWebinarById, updateWebinar,
   getWebinarAttendanceStats, logActivity, updateLead, getLeadById,
   createEmailReminder, getRemindersByLead,
+  createWebinarSession, getWebinarSessions, deleteWebinarSessions, getWebinarSessionById,
+  createLandingPage, getLandingPageBySlug, updateLandingPage,
 } from "../db";
 
 export const webinarsRouter = router({
@@ -14,29 +16,102 @@ export const webinarsRouter = router({
     .query(async ({ input }) => {
       const webinar = await getWebinarById(input.id);
       if (!webinar) return null;
-      const stats = await getWebinarAttendanceStats(input.id);
-      return { ...webinar, stats };
+      const [stats, sessions] = await Promise.all([
+        getWebinarAttendanceStats(input.id),
+        getWebinarSessions(input.id),
+      ]);
+      return { ...webinar, stats, sessions };
     }),
 
+  // Enhanced create: supports multiple sessions and auto-creates a landing page
   create: protectedProcedure
     .input(z.object({
       title: z.string().min(1),
       description: z.string().optional(),
-      scheduledAt: z.number(), // unix ms
+      scheduledAt: z.number(), // unix ms - primary date
       durationMinutes: z.number().default(60),
       zoomJoinUrl: z.string().url().optional(),
       zoomStartUrl: z.string().optional(),
       zoomWebinarId: z.string().optional(),
       replayUrl: z.string().optional(),
+      // Additional sessions (multiple dates)
+      additionalSessions: z.array(z.object({
+        sessionDate: z.number(), // unix ms
+        durationMinutes: z.number().default(60),
+        label: z.string().optional(),
+        zoomJoinUrl: z.string().optional(),
+      })).optional(),
+      // Auto-create landing page
+      createLandingPage: z.boolean().optional(),
+      landingPageSlug: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      const id = await createWebinar({
-        ...input,
+      // Create the webinar
+      const webinarId = await createWebinar({
+        title: input.title,
+        description: input.description,
         scheduledAt: new Date(input.scheduledAt),
+        durationMinutes: input.durationMinutes,
+        zoomJoinUrl: input.zoomJoinUrl,
+        zoomStartUrl: input.zoomStartUrl,
+        zoomWebinarId: input.zoomWebinarId,
+        replayUrl: input.replayUrl,
         createdBy: ctx.user.id,
         status: "scheduled",
       });
-      return { id };
+
+      // Create the primary session
+      await createWebinarSession({
+        webinarId,
+        sessionDate: new Date(input.scheduledAt),
+        durationMinutes: input.durationMinutes,
+        label: "Primary Session",
+        zoomJoinUrl: input.zoomJoinUrl,
+      });
+
+      // Create additional sessions
+      if (input.additionalSessions?.length) {
+        for (const s of input.additionalSessions) {
+          await createWebinarSession({
+            webinarId,
+            sessionDate: new Date(s.sessionDate),
+            durationMinutes: s.durationMinutes,
+            label: s.label,
+            zoomJoinUrl: s.zoomJoinUrl,
+          });
+        }
+      }
+
+      // Auto-create landing page if requested
+      let landingPageId: number | undefined;
+      if (input.createLandingPage) {
+        const baseSlug = input.landingPageSlug || input.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        let slug = baseSlug;
+        let attempt = 0;
+        while (await getLandingPageBySlug(slug)) {
+          attempt++;
+          slug = `${baseSlug}-${attempt}`;
+        }
+        landingPageId = await createLandingPage({
+          createdBy: ctx.user.id,
+          title: `${input.title} - Registration`,
+          slug,
+          headline: input.title,
+          subheadline: input.description ?? "Register for our upcoming webinar",
+          ctaText: "Register Now",
+          webinarId,
+          isActive: true,
+          enabledFields: ["firstName", "lastName", "email", "phone", "sessionSelect", "optIn"],
+          showOptIn: true,
+          optInLabel: "I agree to receive communications about this event and future opportunities",
+          confirmationEmailSubject: `You're registered for ${input.title}!`,
+          confirmationEmailBody: `Thank you for registering! We look forward to seeing you at ${input.title}.`,
+        });
+        // Link landing page back to webinar
+        await updateWebinar(webinarId, { landingPageId });
+      }
+
+      return { id: webinarId, landingPageId };
     }),
 
   update: protectedProcedure
@@ -61,18 +136,59 @@ export const webinarsRouter = router({
       return { success: true };
     }),
 
+  // Manage sessions for a webinar
+  setSessions: protectedProcedure
+    .input(z.object({
+      webinarId: z.number(),
+      sessions: z.array(z.object({
+        sessionDate: z.number(),
+        durationMinutes: z.number().default(60),
+        label: z.string().optional(),
+        zoomJoinUrl: z.string().optional(),
+        maxAttendees: z.number().optional(),
+      })),
+    }))
+    .mutation(async ({ input }) => {
+      await deleteWebinarSessions(input.webinarId);
+      for (const s of input.sessions) {
+        await createWebinarSession({
+          webinarId: input.webinarId,
+          sessionDate: new Date(s.sessionDate),
+          durationMinutes: s.durationMinutes,
+          label: s.label,
+          zoomJoinUrl: s.zoomJoinUrl,
+          maxAttendees: s.maxAttendees,
+        });
+      }
+      return { success: true };
+    }),
+
+  getSessions: protectedProcedure
+    .input(z.object({ webinarId: z.number() }))
+    .query(({ input }) => getWebinarSessions(input.webinarId)),
+
   registerLead: protectedProcedure
     .input(z.object({
       leadId: z.number(),
       webinarId: z.number(),
+      sessionId: z.number().optional(),
       zoomJoinUrl: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const webinar = await getWebinarById(input.webinarId);
       if (!webinar) throw new Error("Webinar not found");
+
+      // Get session join URL if a specific session was selected
+      let joinUrl = input.zoomJoinUrl ?? webinar.zoomJoinUrl ?? undefined;
+      if (input.sessionId) {
+        const session = await getWebinarSessionById(input.sessionId);
+        if (session?.zoomJoinUrl) joinUrl = session.zoomJoinUrl;
+      }
+
       await updateLead(input.leadId, {
         webinarId: input.webinarId,
-        zoomJoinUrl: input.zoomJoinUrl ?? webinar.zoomJoinUrl ?? undefined,
+        webinarSessionId: input.sessionId,
+        zoomJoinUrl: joinUrl,
         attendanceStatus: "registered",
         stage: "registered",
       });
@@ -84,7 +200,7 @@ export const webinarsRouter = router({
         content: `Webinar scheduled for ${webinar.scheduledAt.toISOString()}`,
       });
       // Schedule email reminders
-      const now = webinar.scheduledAt.getTime();
+      const webinarTime = webinar.scheduledAt.getTime();
       const reminders = [
         { type: "registration_confirmation" as const, offset: 0, subject: `You're registered for ${webinar.title}` },
         { type: "reminder_24h" as const, offset: -24 * 60 * 60 * 1000, subject: `Reminder: ${webinar.title} is tomorrow` },
@@ -94,7 +210,7 @@ export const webinarsRouter = router({
       for (const r of reminders) {
         const scheduledAt = r.type === "registration_confirmation"
           ? new Date()
-          : new Date(now + r.offset);
+          : new Date(webinarTime + r.offset);
         if (scheduledAt > new Date() || r.type === "registration_confirmation") {
           await createEmailReminder({
             leadId: input.leadId,
@@ -102,7 +218,7 @@ export const webinarsRouter = router({
             type: r.type,
             scheduledAt,
             subject: r.subject,
-            body: `Join link: ${input.zoomJoinUrl ?? webinar.zoomJoinUrl ?? "TBD"}`,
+            body: `Join link: ${joinUrl ?? "TBD"}`,
           });
         }
       }
@@ -140,7 +256,7 @@ export const webinarsRouter = router({
             leadId: input.leadId,
             webinarId: lead.webinarId,
             type: "no_show_followup",
-            scheduledAt: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2h after marking
+            scheduledAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
             subject: `We missed you at ${webinar.title} — Watch the replay`,
             body: `Replay link: ${webinar.replayUrl ?? "Coming soon"}`,
           });

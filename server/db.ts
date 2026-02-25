@@ -12,6 +12,7 @@ import {
   availability,
   bookings, InsertBooking,
   integrations,
+  webinarSessions, InsertWebinarSession,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -191,6 +192,35 @@ export async function getWebinarAttendanceStats(webinarId: number) {
   return stats;
 }
 
+// ─── Webinar Sessions ────────────────────────────────────────────────────────
+export async function createWebinarSession(data: InsertWebinarSession) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [r] = await db.insert(webinarSessions).values(data);
+  return (r as any).insertId as number;
+}
+
+export async function getWebinarSessions(webinarId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(webinarSessions)
+    .where(eq(webinarSessions.webinarId, webinarId))
+    .orderBy(webinarSessions.sessionDate);
+}
+
+export async function deleteWebinarSessions(webinarId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(webinarSessions).where(eq(webinarSessions.webinarId, webinarId));
+}
+
+export async function getWebinarSessionById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const r = await db.select().from(webinarSessions).where(eq(webinarSessions.id, id)).limit(1);
+  return r[0];
+}
+
 // ─── Landing Pages ────────────────────────────────────────────────────────────
 export async function createLandingPage(data: InsertLandingPage) {
   const db = await getDb();
@@ -271,6 +301,7 @@ export async function createEmailReminder(data: {
   scheduledAt: Date;
   subject: string;
   body: string;
+  attachmentUrl?: string;
 }) {
   const db = await getDb();
   if (!db) return;
@@ -422,6 +453,12 @@ export async function upsertIntegration(data: {
   } else {
     await db.insert(integrations).values(data as any);
   }
+}
+
+export async function deleteIntegration(userId: number, provider: "zoom" | "google_calendar") {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(integrations).where(and(eq(integrations.userId, userId), eq(integrations.provider, provider)));
 }
 
 // ─── Analytics ────────────────────────────────────────────────────────────────

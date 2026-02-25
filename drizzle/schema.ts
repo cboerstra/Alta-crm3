@@ -18,7 +18,6 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  // Scheduling slug for the built-in booking system
   schedulingSlug: varchar("schedulingSlug", { length: 64 }),
   avatarUrl: text("avatarUrl"),
   phone: varchar("phone", { length: 32 }),
@@ -60,6 +59,8 @@ export const webinars = mysqlTable("webinars", {
   zoomStartUrl: text("zoomStartUrl"),
   replayUrl: text("replayUrl"),
   googleCalendarEventId: varchar("googleCalendarEventId", { length: 256 }),
+  // Link to auto-created landing page
+  landingPageId: int("landingPageId"),
   status: mysqlEnum("status", ["draft", "scheduled", "live", "completed", "cancelled"]).default("draft").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -67,6 +68,22 @@ export const webinars = mysqlTable("webinars", {
 
 export type Webinar = typeof webinars.$inferSelect;
 export type InsertWebinar = typeof webinars.$inferInsert;
+
+// ─── Webinar Sessions (multiple dates for a webinar) ─────────────────────────
+export const webinarSessions = mysqlTable("webinar_sessions", {
+  id: int("id").autoincrement().primaryKey(),
+  webinarId: int("webinarId").notNull(),
+  sessionDate: timestamp("sessionDate").notNull(),
+  durationMinutes: int("durationMinutes").default(60),
+  maxAttendees: int("maxAttendees"),
+  zoomJoinUrl: text("zoomJoinUrl"),
+  zoomStartUrl: text("zoomStartUrl"),
+  label: varchar("label", { length: 256 }), // e.g. "Morning Session", "Evening Session"
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type WebinarSession = typeof webinarSessions.$inferSelect;
+export type InsertWebinarSession = typeof webinarSessions.$inferInsert;
 
 // ─── Landing Pages ────────────────────────────────────────────────────────────
 export const landingPages = mysqlTable("landing_pages", {
@@ -84,6 +101,22 @@ export const landingPages = mysqlTable("landing_pages", {
   customCss: text("customCss"),
   backgroundImageUrl: text("backgroundImageUrl"),
   accentColor: varchar("accentColor", { length: 16 }).default("#C9A84C"),
+  // NEW: Artwork / hero image uploaded by host
+  artworkUrl: text("artworkUrl"),
+  // NEW: Configurable form fields (JSON array of enabled fields)
+  // e.g. ["firstName","lastName","email","phone","sessionSelect","optIn"]
+  enabledFields: json("enabledFields"),
+  // NEW: Opt-in consent label text
+  optInLabel: text("optInLabel"),
+  // NEW: Whether opt-in checkbox is shown
+  showOptIn: boolean("showOptIn").default(true),
+  // NEW: Confirmation email settings
+  confirmationEmailSubject: varchar("confirmationEmailSubject", { length: 512 }),
+  confirmationEmailBody: text("confirmationEmailBody"),
+  // NEW: PDF attachment URL for confirmation email
+  confirmationPdfUrl: text("confirmationPdfUrl"),
+  // NEW: Body text / description for the landing page
+  bodyText: text("bodyText"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -102,7 +135,6 @@ export const leads = mysqlTable("leads", {
   campaign: varchar("campaign", { length: 128 }),
   landingPageId: int("landingPageId"),
   assignedTo: int("assignedTo"),
-  // Pipeline stage
   stage: mysqlEnum("stage", [
     "new_lead",
     "registered",
@@ -112,24 +144,22 @@ export const leads = mysqlTable("leads", {
     "under_contract",
     "closed",
   ]).default("new_lead").notNull(),
-  // Lead scoring (0–100)
   score: int("score").default(0),
   scoreReason: text("scoreReason"),
   scoredAt: timestamp("scoredAt"),
-  // SMS consent
   smsConsent: boolean("smsConsent").default(false),
-  // Webinar registration
+  // NEW: Opt-in / contact consent from landing page
+  contactOptIn: boolean("contactOptIn").default(false),
   webinarId: int("webinarId"),
+  // NEW: Selected webinar session
+  webinarSessionId: int("webinarSessionId"),
   zoomRegistrantId: varchar("zoomRegistrantId", { length: 256 }),
   zoomJoinUrl: text("zoomJoinUrl"),
   attendanceStatus: mysqlEnum("attendanceStatus", ["registered", "attended", "no_show"]),
-  // Scheduling
   consultationBookedAt: timestamp("consultationBookedAt"),
   googleCalendarEventId: varchar("googleCalendarEventId", { length: 256 }),
-  // Deal
   dealValue: decimal("dealValue", { precision: 12, scale: 2 }),
   dealClosedAt: timestamp("dealClosedAt"),
-  // Notes (quick note, full notes in activity log)
   quickNote: text("quickNote"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -157,6 +187,7 @@ export const activityLog = mysqlTable("activity_log", {
     "deal_updated",
     "score_updated",
     "call_logged",
+    "confirmation_email",
     "system",
   ]).notNull(),
   title: varchar("title", { length: 512 }).notNull(),
@@ -199,6 +230,8 @@ export const emailReminders = mysqlTable("email_reminders", {
   status: mysqlEnum("status", ["pending", "sent", "failed", "cancelled"]).default("pending").notNull(),
   subject: varchar("subject", { length: 512 }),
   body: text("body"),
+  // NEW: PDF attachment URL for confirmation emails
+  attachmentUrl: text("attachmentUrl"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -234,9 +267,9 @@ export type InsertDeal = typeof deals.$inferInsert;
 export const availability = mysqlTable("availability", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
-  dayOfWeek: int("dayOfWeek").notNull(), // 0=Sun, 6=Sat
-  startTime: varchar("startTime", { length: 8 }).notNull(), // "09:00"
-  endTime: varchar("endTime", { length: 8 }).notNull(),     // "17:00"
+  dayOfWeek: int("dayOfWeek").notNull(),
+  startTime: varchar("startTime", { length: 8 }).notNull(),
+  endTime: varchar("endTime", { length: 8 }).notNull(),
   isActive: boolean("isActive").default(true).notNull(),
 });
 

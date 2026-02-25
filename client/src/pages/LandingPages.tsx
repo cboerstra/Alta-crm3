@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,26 +6,76 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Plus, FileText, ExternalLink, Copy, Trash2, Edit } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import { Plus, FileText, ExternalLink, Copy, Trash2, Edit, Upload, Image, FileIcon, X, Eye } from "lucide-react";
 import { toast } from "sonner";
+
+const ALL_FORM_FIELDS = [
+  { key: "firstName", label: "First Name", required: true },
+  { key: "lastName", label: "Last Name", required: true },
+  { key: "email", label: "Email", required: true },
+  { key: "phone", label: "Phone Number", required: false },
+  { key: "sessionSelect", label: "Seminar Date Selection", required: false },
+  { key: "optIn", label: "Opt-In Consent Checkbox", required: false },
+];
+
+type FormState = {
+  title: string;
+  slug: string;
+  headline: string;
+  subheadline: string;
+  bodyText: string;
+  ctaText: string;
+  campaignTag: string;
+  sourceTag: string;
+  webinarId: number | undefined;
+  isActive: boolean;
+  accentColor: string;
+  enabledFields: string[];
+  optInLabel: string;
+  showOptIn: boolean;
+  confirmationEmailSubject: string;
+  confirmationEmailBody: string;
+};
+
+const defaultForm: FormState = {
+  title: "", slug: "", headline: "", subheadline: "", bodyText: "",
+  ctaText: "Register Now", campaignTag: "", sourceTag: "",
+  webinarId: undefined, isActive: true, accentColor: "#C9A84C",
+  enabledFields: ["firstName", "lastName", "email", "phone"],
+  optInLabel: "I agree to receive communications about this event and future opportunities",
+  showOptIn: true,
+  confirmationEmailSubject: "",
+  confirmationEmailBody: "",
+};
 
 export default function LandingPages() {
   const [showCreate, setShowCreate] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
-  const [form, setForm] = useState({
-    title: "", slug: "", headline: "", subheadline: "", ctaText: "Register Now",
-    campaignTag: "", sourceTag: "", webinarId: undefined as number | undefined,
-    isActive: true, accentColor: "#C9A84C",
-  });
+  const [form, setForm] = useState<FormState>({ ...defaultForm });
+  const [artworkPreview, setArtworkPreview] = useState<string | null>(null);
+  const [pdfName, setPdfName] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const artworkRef = useRef<HTMLInputElement>(null);
+  const pdfRef = useRef<HTMLInputElement>(null);
 
   const { data: pages, isLoading, refetch } = trpc.landingPages.list.useQuery();
   const { data: webinars } = trpc.webinars.list.useQuery();
 
   const createMutation = trpc.landingPages.create.useMutation({
-    onSuccess: () => { toast.success("Landing page created"); setShowCreate(false); resetForm(); refetch(); },
+    onSuccess: (data) => {
+      toast.success("Landing page created");
+      // If there are pending uploads, do them now
+      handlePostCreateUploads(data.id);
+      setShowCreate(false);
+      resetForm();
+      refetch();
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -39,24 +89,170 @@ export default function LandingPages() {
     onError: (e) => toast.error(e.message),
   });
 
+  const uploadArtwork = trpc.landingPages.uploadArtwork.useMutation({
+    onSuccess: () => { toast.success("Artwork uploaded"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const uploadPdf = trpc.landingPages.uploadPdf.useMutation({
+    onSuccess: () => { toast.success("PDF uploaded"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Pending file data for post-create upload
+  const [pendingArtwork, setPendingArtwork] = useState<{ base64: string; name: string; type: string } | null>(null);
+  const [pendingPdf, setPendingPdf] = useState<{ base64: string; name: string } | null>(null);
+
+  async function handlePostCreateUploads(pageId: number) {
+    if (pendingArtwork) {
+      uploadArtwork.mutate({
+        landingPageId: pageId,
+        fileBase64: pendingArtwork.base64,
+        fileName: pendingArtwork.name,
+        contentType: pendingArtwork.type,
+      });
+      setPendingArtwork(null);
+    }
+    if (pendingPdf) {
+      uploadPdf.mutate({
+        landingPageId: pageId,
+        fileBase64: pendingPdf.base64,
+        fileName: pendingPdf.name,
+      });
+      setPendingPdf(null);
+    }
+  }
+
   function resetForm() {
-    setForm({ title: "", slug: "", headline: "", subheadline: "", ctaText: "Register Now", campaignTag: "", sourceTag: "", webinarId: undefined, isActive: true, accentColor: "#C9A84C" });
+    setForm({ ...defaultForm });
+    setArtworkPreview(null);
+    setPdfName(null);
+    setPendingArtwork(null);
+    setPendingPdf(null);
   }
 
   function openEdit(page: any) {
     setForm({
-      title: page.title, slug: page.slug, headline: page.headline || "",
-      subheadline: page.subheadline || "", ctaText: page.ctaText || "Register Now",
-      campaignTag: page.campaignTag || "", sourceTag: page.sourceTag || "",
-      webinarId: page.webinarId || undefined, isActive: page.isActive,
+      title: page.title,
+      slug: page.slug,
+      headline: page.headline || "",
+      subheadline: page.subheadline || "",
+      bodyText: page.bodyText || "",
+      ctaText: page.ctaText || "Register Now",
+      campaignTag: page.campaignTag || "",
+      sourceTag: page.sourceTag || "",
+      webinarId: page.webinarId || undefined,
+      isActive: page.isActive,
       accentColor: page.accentColor || "#C9A84C",
+      enabledFields: (page.enabledFields as string[]) || ["firstName", "lastName", "email", "phone"],
+      optInLabel: page.optInLabel || "I agree to receive communications about this event and future opportunities",
+      showOptIn: page.showOptIn ?? true,
+      confirmationEmailSubject: page.confirmationEmailSubject || "",
+      confirmationEmailBody: page.confirmationEmailBody || "",
     });
+    setArtworkPreview(page.artworkUrl || null);
+    setPdfName(page.confirmationPdfUrl ? "Attached PDF" : null);
     setEditId(page.id);
   }
+
+  const handleArtworkSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast.error("Image must be under 10MB"); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(",")[1];
+      setArtworkPreview(URL.createObjectURL(file));
+      if (editId) {
+        setUploading(true);
+        uploadArtwork.mutate(
+          { landingPageId: editId, fileBase64: base64, fileName: file.name, contentType: file.type },
+          { onSettled: () => setUploading(false) }
+        );
+      } else {
+        setPendingArtwork({ base64, name: file.name, type: file.type });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePdfSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) { toast.error("PDF must be under 25MB"); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(",")[1];
+      setPdfName(file.name);
+      if (editId) {
+        setUploading(true);
+        uploadPdf.mutate(
+          { landingPageId: editId, fileBase64: base64, fileName: file.name },
+          { onSettled: () => setUploading(false) }
+        );
+      } else {
+        setPendingPdf({ base64, name: file.name });
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const toggleField = (key: string) => {
+    const field = ALL_FORM_FIELDS.find(f => f.key === key);
+    if (field?.required) return;
+    setForm(prev => ({
+      ...prev,
+      enabledFields: prev.enabledFields.includes(key)
+        ? prev.enabledFields.filter(f => f !== key)
+        : [...prev.enabledFields, key],
+    }));
+  };
 
   const copyUrl = (slug: string) => {
     navigator.clipboard.writeText(`${window.location.origin}/lp/${slug}`);
     toast.success("URL copied to clipboard");
+  };
+
+  const handleSubmit = () => {
+    if (editId) {
+      updateMutation.mutate({
+        id: editId,
+        title: form.title,
+        headline: form.headline || undefined,
+        subheadline: form.subheadline || undefined,
+        bodyText: form.bodyText || undefined,
+        ctaText: form.ctaText || undefined,
+        campaignTag: form.campaignTag || undefined,
+        sourceTag: form.sourceTag || undefined,
+        webinarId: form.webinarId ?? null,
+        isActive: form.isActive,
+        accentColor: form.accentColor || undefined,
+        enabledFields: form.enabledFields,
+        optInLabel: form.optInLabel || undefined,
+        showOptIn: form.showOptIn,
+        confirmationEmailSubject: form.confirmationEmailSubject || undefined,
+        confirmationEmailBody: form.confirmationEmailBody || undefined,
+      });
+    } else {
+      createMutation.mutate({
+        title: form.title,
+        slug: form.slug,
+        headline: form.headline || undefined,
+        subheadline: form.subheadline || undefined,
+        bodyText: form.bodyText || undefined,
+        ctaText: form.ctaText || undefined,
+        campaignTag: form.campaignTag || undefined,
+        sourceTag: form.sourceTag || undefined,
+        webinarId: form.webinarId,
+        isActive: form.isActive,
+        accentColor: form.accentColor || undefined,
+        enabledFields: form.enabledFields,
+        optInLabel: form.optInLabel || undefined,
+        showOptIn: form.showOptIn,
+        confirmationEmailSubject: form.confirmationEmailSubject || undefined,
+        confirmationEmailBody: form.confirmationEmailBody || undefined,
+      });
+    }
   };
 
   return (
@@ -64,7 +260,7 @@ export default function LandingPages() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ fontFamily: "Raleway, sans-serif" }}>Landing Pages</h1>
-          <p className="text-muted-foreground text-sm mt-1">Create and manage lead capture pages</p>
+          <p className="text-muted-foreground text-sm mt-1">Create and manage lead capture pages with configurable forms</p>
         </div>
         <Dialog open={showCreate || editId !== null} onOpenChange={(v) => { if (!v) { setShowCreate(false); setEditId(null); resetForm(); } else setShowCreate(true); }}>
           <DialogTrigger asChild>
@@ -72,76 +268,238 @@ export default function LandingPages() {
               <Plus className="h-4 w-4" /> Create Page
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle style={{ fontFamily: "Raleway, sans-serif" }}>
                 {editId ? "Edit Landing Page" : "Create Landing Page"}
               </DialogTitle>
             </DialogHeader>
-            <div className="grid gap-4 py-2">
-              <div>
-                <Label>Title *</Label>
-                <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-              </div>
-              {!editId && (
+
+            <Tabs defaultValue="content" className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="content">Content</TabsTrigger>
+                <TabsTrigger value="fields">Form Fields</TabsTrigger>
+                <TabsTrigger value="media">Media</TabsTrigger>
+                <TabsTrigger value="email">Email</TabsTrigger>
+              </TabsList>
+
+              {/* ─── Content Tab ─── */}
+              <TabsContent value="content" className="space-y-4 mt-4">
                 <div>
-                  <Label>URL Slug *</Label>
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground mb-1">
-                    <span>{window.location.origin}/lp/</span>
+                  <Label>Title *</Label>
+                  <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Spring Homebuyer Webinar" />
+                </div>
+                {!editId && (
+                  <div>
+                    <Label>URL Slug *</Label>
+                    <div className="text-xs text-muted-foreground mb-1">{window.location.origin}/lp/<span className="font-medium">{form.slug || "your-slug"}</span></div>
+                    <Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })} placeholder="spring-webinar-2026" />
                   </div>
-                  <Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })} placeholder="spring-webinar-2026" />
-                </div>
-              )}
-              <div>
-                <Label>Headline</Label>
-                <Input value={form.headline} onChange={(e) => setForm({ ...form, headline: e.target.value })} placeholder="Join Our Free Webinar" />
-              </div>
-              <div>
-                <Label>Subheadline</Label>
-                <Textarea value={form.subheadline} onChange={(e) => setForm({ ...form, subheadline: e.target.value })} placeholder="Learn the secrets to..." />
-              </div>
-              <div>
-                <Label>CTA Button Text</Label>
-                <Input value={form.ctaText} onChange={(e) => setForm({ ...form, ctaText: e.target.value })} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+                )}
                 <div>
-                  <Label>Source Tag</Label>
-                  <Input value={form.sourceTag} onChange={(e) => setForm({ ...form, sourceTag: e.target.value })} placeholder="facebook" />
+                  <Label>Headline</Label>
+                  <Input value={form.headline} onChange={(e) => setForm({ ...form, headline: e.target.value })} placeholder="Join Our Free Webinar" />
                 </div>
                 <div>
-                  <Label>Campaign Tag</Label>
-                  <Input value={form.campaignTag} onChange={(e) => setForm({ ...form, campaignTag: e.target.value })} placeholder="spring-2026" />
+                  <Label>Subheadline</Label>
+                  <Textarea value={form.subheadline} onChange={(e) => setForm({ ...form, subheadline: e.target.value })} placeholder="Learn the secrets to..." rows={2} />
                 </div>
-              </div>
-              <div>
-                <Label>Link to Webinar</Label>
-                <Select value={form.webinarId?.toString() ?? "none"} onValueChange={(v) => setForm({ ...form, webinarId: v === "none" ? undefined : Number(v) })}>
-                  <SelectTrigger><SelectValue placeholder="Select webinar..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No webinar</SelectItem>
-                    {webinars?.map((w) => (
-                      <SelectItem key={w.id} value={w.id.toString()}>{w.title}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Active</Label>
-                <Switch checked={form.isActive} onCheckedChange={(v) => setForm({ ...form, isActive: v })} />
-              </div>
+                <div>
+                  <Label>Body Text / Description</Label>
+                  <Textarea value={form.bodyText} onChange={(e) => setForm({ ...form, bodyText: e.target.value })} placeholder="Detailed description of the event..." rows={4} />
+                </div>
+                <div>
+                  <Label>CTA Button Text</Label>
+                  <Input value={form.ctaText} onChange={(e) => setForm({ ...form, ctaText: e.target.value })} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Source Tag</Label>
+                    <Input value={form.sourceTag} onChange={(e) => setForm({ ...form, sourceTag: e.target.value })} placeholder="facebook" />
+                  </div>
+                  <div>
+                    <Label>Campaign Tag</Label>
+                    <Input value={form.campaignTag} onChange={(e) => setForm({ ...form, campaignTag: e.target.value })} placeholder="spring-2026" />
+                  </div>
+                </div>
+                <div>
+                  <Label>Link to Webinar</Label>
+                  <Select value={form.webinarId?.toString() ?? "none"} onValueChange={(v) => setForm({ ...form, webinarId: v === "none" ? undefined : Number(v) })}>
+                    <SelectTrigger><SelectValue placeholder="Select webinar..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No webinar</SelectItem>
+                      {webinars?.map((w) => (
+                        <SelectItem key={w.id} value={w.id.toString()}>{w.title}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Accent Color</Label>
+                  <div className="flex items-center gap-2">
+                    <input type="color" value={form.accentColor} onChange={(e) => setForm({ ...form, accentColor: e.target.value })} className="h-8 w-12 rounded cursor-pointer" />
+                    <Input value={form.accentColor} onChange={(e) => setForm({ ...form, accentColor: e.target.value })} className="w-28" />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label>Active</Label>
+                  <Switch checked={form.isActive} onCheckedChange={(v) => setForm({ ...form, isActive: v })} />
+                </div>
+              </TabsContent>
+
+              {/* ─── Form Fields Tab ─── */}
+              <TabsContent value="fields" className="space-y-4 mt-4">
+                <p className="text-sm text-muted-foreground">Select which fields appear on the lead capture form. Required fields cannot be disabled.</p>
+                <div className="space-y-3">
+                  {ALL_FORM_FIELDS.map((field) => (
+                    <div key={field.key} className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                      <div className="flex items-center gap-3">
+                        <Checkbox
+                          checked={form.enabledFields.includes(field.key)}
+                          onCheckedChange={() => toggleField(field.key)}
+                          disabled={field.required}
+                        />
+                        <div>
+                          <span className="text-sm font-medium">{field.label}</span>
+                          {field.required && <Badge variant="secondary" className="ml-2 text-[10px]">Required</Badge>}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Show Opt-In Consent Checkbox</Label>
+                    <Switch checked={form.showOptIn} onCheckedChange={(v) => setForm({ ...form, showOptIn: v })} />
+                  </div>
+                  {form.showOptIn && (
+                    <div>
+                      <Label>Opt-In Label Text</Label>
+                      <Textarea
+                        value={form.optInLabel}
+                        onChange={(e) => setForm({ ...form, optInLabel: e.target.value })}
+                        placeholder="I agree to receive communications..."
+                        rows={2}
+                      />
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* ─── Media Tab ─── */}
+              <TabsContent value="media" className="space-y-4 mt-4">
+                <div>
+                  <Label className="mb-2 block">Artwork / Hero Image</Label>
+                  <p className="text-xs text-muted-foreground mb-3">Upload a banner or hero image for this landing page. Recommended: 1200x630px, JPG or PNG.</p>
+                  {artworkPreview ? (
+                    <div className="relative rounded-lg overflow-hidden border">
+                      <img src={artworkPreview} alt="Artwork preview" className="w-full h-48 object-cover" />
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="absolute top-2 right-2"
+                        onClick={() => {
+                          setArtworkPreview(null);
+                          setPendingArtwork(null);
+                          if (editId) {
+                            updateMutation.mutate({ id: editId, artworkUrl: null });
+                          }
+                        }}
+                      >
+                        <X className="h-3 w-3 mr-1" /> Remove
+                      </Button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => artworkRef.current?.click()}
+                      className="w-full h-40 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-brand-green/50 hover:text-brand-green transition-colors cursor-pointer"
+                    >
+                      <Image className="h-8 w-8" />
+                      <span className="text-sm">Click to upload artwork</span>
+                      <span className="text-xs">JPG, PNG up to 10MB</span>
+                    </button>
+                  )}
+                  <input ref={artworkRef} type="file" accept="image/*" className="hidden" onChange={handleArtworkSelect} />
+                </div>
+
+                <Separator />
+
+                <div>
+                  <Label className="mb-2 block">PDF Attachment for Confirmation Email</Label>
+                  <p className="text-xs text-muted-foreground mb-3">Upload a PDF document that will be attached to the confirmation email sent to leads upon signup.</p>
+                  {pdfName ? (
+                    <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+                      <FileIcon className="h-5 w-5 text-red-500" />
+                      <span className="text-sm font-medium flex-1">{pdfName}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setPdfName(null);
+                          setPendingPdf(null);
+                          if (editId) {
+                            updateMutation.mutate({ id: editId, confirmationPdfUrl: null });
+                          }
+                        }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => pdfRef.current?.click()}
+                      className="w-full p-4 border-2 border-dashed rounded-lg flex items-center justify-center gap-2 text-muted-foreground hover:border-brand-green/50 hover:text-brand-green transition-colors cursor-pointer"
+                    >
+                      <Upload className="h-5 w-5" />
+                      <span className="text-sm">Click to upload PDF (up to 25MB)</span>
+                    </button>
+                  )}
+                  <input ref={pdfRef} type="file" accept=".pdf" className="hidden" onChange={handlePdfSelect} />
+                </div>
+              </TabsContent>
+
+              {/* ─── Email Tab ─── */}
+              <TabsContent value="email" className="space-y-4 mt-4">
+                <p className="text-sm text-muted-foreground">Configure the confirmation email sent to leads upon registration. If left blank, a default confirmation will be sent.</p>
+                <div>
+                  <Label>Email Subject</Label>
+                  <Input
+                    value={form.confirmationEmailSubject}
+                    onChange={(e) => setForm({ ...form, confirmationEmailSubject: e.target.value })}
+                    placeholder="You're registered for our webinar!"
+                  />
+                </div>
+                <div>
+                  <Label>Email Body</Label>
+                  <Textarea
+                    value={form.confirmationEmailBody}
+                    onChange={(e) => setForm({ ...form, confirmationEmailBody: e.target.value })}
+                    placeholder="Thank you for registering! Here are the details..."
+                    rows={6}
+                  />
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground">
+                  <p className="font-medium mb-1">Available placeholders:</p>
+                  <p>{"{{firstName}}"} — Lead's first name</p>
+                  <p>{"{{lastName}}"} — Lead's last name</p>
+                  <p>{"{{webinarTitle}}"} — Webinar title</p>
+                  <p>{"{{joinUrl}}"} — Zoom join link</p>
+                  <p>{"{{date}}"} — Webinar date</p>
+                </div>
+              </TabsContent>
+            </Tabs>
+
+            <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+              <Button variant="outline" onClick={() => { setShowCreate(false); setEditId(null); resetForm(); }}>Cancel</Button>
               <Button
                 className="bg-brand-green hover:bg-brand-green-dark text-white"
-                disabled={!form.title || (!editId && !form.slug)}
-                onClick={() => {
-                  if (editId) {
-                    updateMutation.mutate({ id: editId, ...form, webinarId: form.webinarId });
-                  } else {
-                    createMutation.mutate(form);
-                  }
-                }}
+                disabled={!form.title || (!editId && !form.slug) || uploading || createMutation.isPending || updateMutation.isPending}
+                onClick={handleSubmit}
               >
-                {editId ? "Update Page" : "Create Page"}
+                {uploading ? "Uploading..." : editId ? "Update Page" : "Create Page"}
               </Button>
             </div>
           </DialogContent>
@@ -154,39 +512,48 @@ export default function LandingPages() {
         <Card className="border-0 shadow-sm">
           <CardContent className="p-12 text-center">
             <FileText className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-muted-foreground">No landing pages yet</p>
+            <p className="text-muted-foreground">No landing pages yet. Create your first one to start capturing leads.</p>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4">
           {pages.map((page) => (
-            <Card key={page.id} className="border-0 shadow-sm">
+            <Card key={page.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
               <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div>
+                <div className="flex items-start gap-4">
+                  {/* Artwork thumbnail */}
+                  {page.artworkUrl && (
+                    <div className="w-20 h-14 rounded-md overflow-hidden flex-shrink-0 border">
+                      <img src={page.artworkUrl} alt="" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="text-base font-semibold" style={{ fontFamily: "Raleway, sans-serif" }}>{page.title}</h3>
                       <Badge variant={page.isActive ? "default" : "secondary"} className={page.isActive ? "bg-brand-green text-white" : ""}>
                         {page.isActive ? "Active" : "Inactive"}
                       </Badge>
+                      {page.webinarId && <Badge variant="outline" className="text-[10px]">Webinar Linked</Badge>}
+                      {page.confirmationPdfUrl && <Badge variant="outline" className="text-[10px]">PDF Attached</Badge>}
                     </div>
                     <p className="text-sm text-muted-foreground">/lp/{page.slug}</p>
                     <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
                       {page.sourceTag && <span>Source: {page.sourceTag}</span>}
                       {page.campaignTag && <span>Campaign: {page.campaignTag}</span>}
+                      {Array.isArray(page.enabledFields) && <span>{page.enabledFields.length} fields</span>}
                     </div>
                   </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => copyUrl(page.slug)}>
+                  <div className="flex gap-1 flex-shrink-0">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => copyUrl(page.slug)} title="Copy URL">
                       <Copy className="h-4 w-4" />
                     </Button>
                     <a href={`/lp/${page.slug}`} target="_blank" rel="noopener noreferrer">
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0"><ExternalLink className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Preview"><Eye className="h-4 w-4" /></Button>
                     </a>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openEdit(page)}>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openEdit(page)} title="Edit">
                       <Edit className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => deleteMutation.mutate({ id: page.id })}>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => deleteMutation.mutate({ id: page.id })} title="Delete">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
