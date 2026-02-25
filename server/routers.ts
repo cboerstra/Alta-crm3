@@ -11,6 +11,7 @@ import { analyticsRouter } from "./routers/analytics";
 import { schedulingRouter } from "./routers/scheduling";
 import { integrationsRouter } from "./routers/integrations";
 import { mediaRouter } from "./routers/media";
+import { userManagementRouter } from "./routers/userManagement";
 
 export const appRouter = router({
   system: systemRouter,
@@ -31,6 +32,7 @@ export const appRouter = router({
   scheduling: schedulingRouter,
   integrations: integrationsRouter,
   media: mediaRouter,
+  userManagement: userManagementRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import { adminProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { mediaLibrary, landingPageMedia } from "../../drizzle/schema";
 import { storagePut } from "../storage";
@@ -8,7 +8,7 @@ import { eq, desc, inArray } from "drizzle-orm";
 
 export const mediaRouter = router({
   // List all media items
-  list: protectedProcedure
+  list: adminProcedure
     .input(z.object({
       fileType: z.enum(["logo", "image", "background", "other"]).optional(),
     }).optional())
@@ -24,7 +24,7 @@ export const mediaRouter = router({
     }),
 
   // Upload a new media item
-  upload: protectedProcedure
+  upload: adminProcedure
     .input(z.object({
       fileBase64: z.string(),
       fileName: z.string(),
@@ -53,7 +53,7 @@ export const mediaRouter = router({
     }),
 
   // Update media item label/type
-  update: protectedProcedure
+  update: adminProcedure
     .input(z.object({
       id: z.number(),
       label: z.string().optional(),
@@ -73,7 +73,7 @@ export const mediaRouter = router({
     }),
 
   // Delete a media item
-  delete: protectedProcedure
+  delete: adminProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
@@ -105,7 +105,7 @@ export const mediaRouter = router({
     }),
 
   // Set media items for a landing page (replace all)
-  setForLandingPage: protectedProcedure
+  setForLandingPage: adminProcedure
     .input(z.object({
       landingPageId: z.number(),
       items: z.array(z.object({

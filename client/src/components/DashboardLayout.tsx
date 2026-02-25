@@ -1,5 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,22 +36,34 @@ import {
   Settings,
   BarChart3,
   Building2,
+  UserCog,
+  ShieldCheck,
+  Shield,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { Button } from "./ui/button";
 
-const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-  { icon: Users, label: "Leads", path: "/leads" },
-  { icon: Columns3, label: "Pipeline", path: "/pipeline" },
-  { icon: Video, label: "Webinars", path: "/webinars" },
-  { icon: FileText, label: "Landing Pages", path: "/landing-pages" },
-  { icon: Calendar, label: "Scheduling", path: "/scheduling" },
-  { icon: DollarSign, label: "Deals", path: "/deals" },
-  { icon: BarChart3, label: "Revenue", path: "/revenue" },
-  { icon: Settings, label: "Settings", path: "/settings" },
+type MenuItem = {
+  icon: any;
+  label: string;
+  path: string;
+  adminOnly?: boolean;
+  section?: string;
+};
+
+const menuItems: MenuItem[] = [
+  { icon: LayoutDashboard, label: "Dashboard", path: "/", section: "main" },
+  { icon: Users, label: "Leads", path: "/leads", section: "main" },
+  { icon: Columns3, label: "Pipeline", path: "/pipeline", section: "main" },
+  { icon: Video, label: "Webinars", path: "/webinars", section: "main" },
+  { icon: FileText, label: "Landing Pages", path: "/landing-pages", section: "main" },
+  { icon: Calendar, label: "Scheduling", path: "/scheduling", section: "main" },
+  { icon: DollarSign, label: "Deals", path: "/deals", section: "main" },
+  { icon: BarChart3, label: "Revenue", path: "/revenue", section: "main" },
+  { icon: UserCog, label: "User Management", path: "/users", adminOnly: true, section: "admin" },
+  { icon: Settings, label: "Settings", path: "/settings", adminOnly: true, section: "admin" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -143,8 +156,16 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find((item) => item.path === location);
   const isMobile = useIsMobile();
+
+  const isAdmin = user?.role === "admin";
+
+  // Filter menu items based on role
+  const visibleItems = menuItems.filter((item) => !item.adminOnly || isAdmin);
+  const mainItems = visibleItems.filter((item) => item.section === "main" || !item.section);
+  const adminItems = visibleItems.filter((item) => item.section === "admin");
+
+  const activeMenuItem = visibleItems.find((item) => item.path === location);
 
   useEffect(() => {
     if (isCollapsed) setIsResizing(false);
@@ -202,8 +223,9 @@ function DashboardLayoutContent({
           </SidebarHeader>
 
           <SidebarContent className="gap-0 pt-2">
+            {/* Main Navigation */}
             <SidebarMenu className="px-2 py-1 space-y-0.5">
-              {menuItems.map((item) => {
+              {mainItems.map((item) => {
                 const isActive = location === item.path;
                 return (
                   <SidebarMenuItem key={item.path}>
@@ -224,6 +246,41 @@ function DashboardLayoutContent({
                 );
               })}
             </SidebarMenu>
+
+            {/* Admin Section */}
+            {adminItems.length > 0 && (
+              <>
+                <div className="px-4 pt-4 pb-1">
+                  {!isCollapsed && (
+                    <p className="text-[10px] font-semibold text-sidebar-foreground/40 uppercase tracking-widest">
+                      Administration
+                    </p>
+                  )}
+                </div>
+                <SidebarMenu className="px-2 py-1 space-y-0.5">
+                  {adminItems.map((item) => {
+                    const isActive = location === item.path;
+                    return (
+                      <SidebarMenuItem key={item.path}>
+                        <SidebarMenuButton
+                          isActive={isActive}
+                          onClick={() => setLocation(item.path)}
+                          tooltip={item.label}
+                          className={`h-10 transition-all font-medium text-[13px] ${
+                            isActive
+                              ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                              : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/50"
+                          }`}
+                        >
+                          <item.icon className={`h-4 w-4 ${isActive ? "text-brand-gold" : ""}`} />
+                          <span>{item.label}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </>
+            )}
           </SidebarContent>
 
           <SidebarFooter className="p-3 border-t border-sidebar-border/50">
@@ -236,24 +293,64 @@ function DashboardLayoutContent({
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-                    <p className="text-sm font-medium truncate leading-none text-sidebar-foreground">
-                      {user?.name || "-"}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium truncate leading-none text-sidebar-foreground">
+                        {user?.name || "-"}
+                      </p>
+                      {isAdmin ? (
+                        <Badge className="h-4 px-1.5 text-[9px] bg-brand-gold/15 text-brand-gold-dark border-brand-gold/30 hover:bg-brand-gold/20">
+                          Admin
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="h-4 px-1.5 text-[9px]">
+                          User
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-xs text-sidebar-foreground/50 truncate mt-1.5">
                       {user?.email || "-"}
                     </p>
                   </div>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onClick={() => setLocation("/settings")}
-                  className="cursor-pointer"
-                >
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
+              <DropdownMenuContent align="end" className="w-52">
+                <div className="px-2 py-1.5">
+                  <p className="text-sm font-medium">{user?.name}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    {isAdmin ? (
+                      <Badge className="h-5 px-2 text-[10px] bg-brand-gold/15 text-brand-gold-dark border-brand-gold/30">
+                        <ShieldCheck className="h-3 w-3 mr-1" />
+                        Admin
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="h-5 px-2 text-[10px]">
+                        <Shield className="h-3 w-3 mr-1" />
+                        User
+                      </Badge>
+                    )}
+                  </div>
+                </div>
                 <DropdownMenuSeparator />
+                {isAdmin && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => setLocation("/users")}
+                      className="cursor-pointer"
+                    >
+                      <UserCog className="mr-2 h-4 w-4" />
+                      <span>Manage Users</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setLocation("/settings")}
+                      className="cursor-pointer"
+                    >
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <DropdownMenuItem
                   onClick={logout}
                   className="cursor-pointer text-destructive focus:text-destructive"

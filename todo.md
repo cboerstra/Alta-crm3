@@ -104,7 +104,8 @@
 - [x] Auth logout test (1 test)
 - [x] CRM core tests (37 tests)
 - [x] Enhanced feature tests (12 tests)
-- [x] Total: 50 tests passing
+- [x] RBAC tests (21 tests)
+- [x] Total: 71 tests passing
 
 ## Branding Update
 - [x] Match branding and colors from altamortgagegroup.net
@@ -163,3 +164,15 @@
 - [x] Form fields displayed in foreground overlay on top of background
 - [x] Corporate logos/images from media library shown in foreground
 - [x] Landing page builder: add media picker to select foreground images from library
+
+## Role-Based Access Control (User Request)
+- [x] Owner automatically assigned admin role on login
+- [x] Admin can view all users in a User Management page
+- [x] Admin can assign admin or user roles to any user
+- [x] Admin can deactivate/activate user accounts (via role management)
+- [x] Protected backend procedures: admin-only operations gated by role check (integrations, media, userManagement)
+- [x] Protected frontend routes: admin-only pages hidden from regular users (AdminRoute wrapper)
+- [x] User Management page in sidebar (admin only, under ADMINISTRATION section)
+- [x] Role badges displayed on user list and sidebar footer
+- [x] Regular users see limited sidebar (no Settings, no User Management)
+- [x] RBAC tests: 21 tests covering admin/user/public access to all routers

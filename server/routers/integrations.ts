@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc";
+import { adminProcedure, router } from "../_core/trpc";
 import { getIntegration, upsertIntegration } from "../db";
 
 export const integrationsRouter = router({
-  getStatus: protectedProcedure.query(async ({ ctx }) => {
+  getStatus: adminProcedure.query(async ({ ctx }) => {
     const [zoom, google] = await Promise.all([
       getIntegration(ctx.user.id, "zoom"),
       getIntegration(ctx.user.id, "google_calendar"),
@@ -14,7 +14,7 @@ export const integrationsRouter = router({
     };
   }),
 
-  connectZoom: protectedProcedure
+  connectZoom: adminProcedure
     .input(z.object({
       accessToken: z.string(),
       refreshToken: z.string().optional(),
@@ -33,7 +33,7 @@ export const integrationsRouter = router({
       return { success: true };
     }),
 
-  connectGoogle: protectedProcedure
+  connectGoogle: adminProcedure
     .input(z.object({
       accessToken: z.string(),
       refreshToken: z.string().optional(),
@@ -50,7 +50,7 @@ export const integrationsRouter = router({
       return { success: true };
     }),
 
-  disconnect: protectedProcedure
+  disconnect: adminProcedure
     .input(z.object({ provider: z.enum(["zoom", "google_calendar"]) }))
     .mutation(async ({ input, ctx }) => {
       const { getDb } = await import("../db");
@@ -66,7 +66,7 @@ export const integrationsRouter = router({
     }),
 
   // Simulate creating a Zoom webinar (in production, call Zoom API)
-  createZoomWebinar: protectedProcedure
+  createZoomWebinar: adminProcedure
     .input(z.object({
       title: z.string(),
       scheduledAt: z.number(),
