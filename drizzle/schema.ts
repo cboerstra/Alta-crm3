@@ -292,3 +292,32 @@ export const bookings = mysqlTable("bookings", {
 
 export type Booking = typeof bookings.$inferSelect;
 export type InsertBooking = typeof bookings.$inferInsert;
+
+// ─── Media Library (Corporate Logos & Images) ───────────────────────────────
+export const mediaLibrary = mysqlTable("media_library", {
+  id: int("id").autoincrement().primaryKey(),
+  uploadedBy: int("uploadedBy").notNull(),
+  fileName: varchar("fileName", { length: 512 }).notNull(),
+  fileUrl: text("fileUrl").notNull(),
+  fileKey: text("fileKey").notNull(),
+  fileType: mysqlEnum("fileType", ["logo", "image", "background", "other"]).default("image").notNull(),
+  mimeType: varchar("mimeType", { length: 128 }),
+  fileSize: int("fileSize"),
+  label: varchar("label", { length: 256 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type MediaItem = typeof mediaLibrary.$inferSelect;
+export type InsertMediaItem = typeof mediaLibrary.$inferInsert;
+
+// ─── Landing Page Media (many-to-many: foreground logos/images per landing page) ─
+export const landingPageMedia = mysqlTable("landing_page_media", {
+  id: int("id").autoincrement().primaryKey(),
+  landingPageId: int("landingPageId").notNull(),
+  mediaId: int("mediaId").notNull(),
+  placement: mysqlEnum("placement", ["foreground_logo", "foreground_image", "background"]).default("foreground_logo").notNull(),
+  sortOrder: int("sortOrder").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type LandingPageMedia = typeof landingPageMedia.$inferSelect;

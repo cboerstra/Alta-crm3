@@ -143,3 +143,23 @@
 - [x] Show validation errors clearly before allowing form submission
 - [x] Display webinar event date and time on each landing page card in the list view
 - [x] Display full clickable URL on each landing page card
+
+## Landing Page Background & Media Library (User Request)
+- [x] Uploaded artwork fills entire background of public landing page
+- [x] Text inputs and form appear in the foreground over the background
+- [x] Corporate logos and artwork displayed in the foreground
+- [x] Media Library in Settings: upload multiple logos and images
+- [x] Landing page builder: select multiple foreground logos/images from media library
+- [x] Public landing page renders selected foreground logos over background
+
+## AWS CloudFormation Template (User Request)
+- [x] Generate comprehensive CloudFormation template for full AWS infrastructure
+- [x] Create Dockerfile for production container builds
+- [x] Create AWS Deployment Guide with step-by-step instructions
+
+## Landing Page Redesign (User Clarification)
+- [x] Remove split-image layout from public landing page
+- [x] Full-bleed uploaded artwork as background covering entire page
+- [x] Form fields displayed in foreground overlay on top of background
+- [x] Corporate logos/images from media library shown in foreground
+- [x] Landing page builder: add media picker to select foreground images from library

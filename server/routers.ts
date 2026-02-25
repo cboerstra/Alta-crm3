@@ -10,6 +10,7 @@ import { smsRouter } from "./routers/sms";
 import { analyticsRouter } from "./routers/analytics";
 import { schedulingRouter } from "./routers/scheduling";
 import { integrationsRouter } from "./routers/integrations";
+import { mediaRouter } from "./routers/media";
 
 export const appRouter = router({
   system: systemRouter,
@@ -29,6 +30,7 @@ export const appRouter = router({
   analytics: analyticsRouter,
   scheduling: schedulingRouter,
   integrations: integrationsRouter,
+  media: mediaRouter,
 });
 
 export type AppRouter = typeof appRouter;

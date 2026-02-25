@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { Plus, FileText, Copy, Trash2, Edit, Upload, Image, FileIcon, X, Eye, Calendar, Clock, AlertCircle, Link as LinkIcon } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Plus, FileText, Copy, Trash2, Edit, Upload, Image, FileIcon, X, Eye, Calendar, Clock, AlertCircle, Link as LinkIcon, Check, ImagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -42,6 +43,12 @@ type FormState = {
   showOptIn: boolean;
   confirmationEmailSubject: string;
   confirmationEmailBody: string;
+};
+
+type MediaSelection = {
+  mediaId: number;
+  placement: "foreground_logo" | "foreground_image" | "background";
+  sortOrder: number;
 };
 
 const defaultForm: FormState = {
@@ -77,11 +84,13 @@ export default function LandingPages() {
   const [uploading, setUploading] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<MediaSelection[]>([]);
   const artworkRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
 
   const { data: pages, isLoading, refetch } = trpc.landingPages.list.useQuery();
   const { data: webinars } = trpc.webinars.list.useQuery();
+  const { data: mediaLibraryItems } = trpc.media.list.useQuery();
 
   const webinarMap = useMemo(() => {
     const map = new Map<number, { title: string; scheduledAt: Date; durationMinutes: number | null; status: string }>();
@@ -97,6 +106,10 @@ export default function LandingPages() {
     onSuccess: (data) => {
       toast.success("Landing page created");
       handlePostCreateUploads(data.id);
+      // Save media selections
+      if (selectedMedia.length > 0) {
+        setMediaMutation.mutate({ landingPageId: data.id, items: selectedMedia });
+      }
       setShowCreate(false);
       resetForm();
       refetch();
@@ -105,7 +118,16 @@ export default function LandingPages() {
   });
 
   const updateMutation = trpc.landingPages.update.useMutation({
-    onSuccess: () => { toast.success("Landing page updated"); setEditId(null); resetForm(); refetch(); },
+    onSuccess: () => {
+      toast.success("Landing page updated");
+      // Save media selections on update
+      if (editId) {
+        setMediaMutation.mutate({ landingPageId: editId, items: selectedMedia });
+      }
+      setEditId(null);
+      resetForm();
+      refetch();
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -124,8 +146,28 @@ export default function LandingPages() {
     onError: (e) => toast.error(e.message),
   });
 
+  const setMediaMutation = trpc.media.setForLandingPage.useMutation({
+    onError: (e) => toast.error("Failed to save media: " + e.message),
+  });
+
   const [pendingArtwork, setPendingArtwork] = useState<{ base64: string; name: string; type: string } | null>(null);
   const [pendingPdf, setPendingPdf] = useState<{ base64: string; name: string } | null>(null);
+
+  // Load existing media selections when editing
+  const { data: existingMedia } = trpc.media.getForLandingPage.useQuery(
+    { landingPageId: editId! },
+    { enabled: editId !== null }
+  );
+
+  useEffect(() => {
+    if (existingMedia && editId) {
+      setSelectedMedia(existingMedia.map(m => ({
+        mediaId: m.mediaId,
+        placement: (m.placement === "background" ? "foreground_image" : m.placement) as "foreground_logo" | "foreground_image",
+        sortOrder: m.sortOrder ?? 0,
+      })));
+    }
+  }, [existingMedia, editId]);
 
   async function handlePostCreateUploads(pageId: number) {
     if (pendingArtwork) {
@@ -146,6 +188,7 @@ export default function LandingPages() {
     setPendingPdf(null);
     setTouched({});
     setSubmitAttempted(false);
+    setSelectedMedia([]);
   }
 
   function openEdit(page: any) {
@@ -222,6 +265,25 @@ export default function LandingPages() {
     toast.success("URL copied to clipboard");
   };
 
+  // ─── Media Selection Helpers ───
+  const toggleMediaSelection = (mediaId: number, placement: "foreground_logo" | "foreground_image") => {
+    setSelectedMedia(prev => {
+      const exists = prev.find(m => m.mediaId === mediaId);
+      if (exists) {
+        return prev.filter(m => m.mediaId !== mediaId);
+      }
+      return [...prev, { mediaId, placement, sortOrder: prev.length }];
+    });
+  };
+
+  const isMediaSelected = (mediaId: number) => selectedMedia.some(m => m.mediaId === mediaId);
+
+  const getMediaPlacement = (mediaId: number) => selectedMedia.find(m => m.mediaId === mediaId)?.placement;
+
+  const changePlacement = (mediaId: number, placement: "foreground_logo" | "foreground_image") => {
+    setSelectedMedia(prev => prev.map(m => m.mediaId === mediaId ? { ...m, placement } : m));
+  };
+
   // ─── Validation ───
   const validationErrors = useMemo(() => {
     const errors: Record<string, string> = {};
@@ -276,6 +338,10 @@ export default function LandingPages() {
 
   const getFullUrl = (slug: string) => `${window.location.origin}/lp/${slug}`;
 
+  // Split media library into logos and images
+  const logos = useMemo(() => mediaLibraryItems?.filter(m => m.fileType === "logo") || [], [mediaLibraryItems]);
+  const images = useMemo(() => mediaLibraryItems?.filter(m => m.fileType === "image" || m.fileType === "other") || [], [mediaLibraryItems]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -328,7 +394,14 @@ export default function LandingPages() {
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="fields">Form Fields</TabsTrigger>
-                <TabsTrigger value="media">Media</TabsTrigger>
+                <TabsTrigger value="media" className="relative">
+                  Media
+                  {selectedMedia.length > 0 && (
+                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-brand-green text-white text-[9px] flex items-center justify-center border-2 border-background">
+                      {selectedMedia.length}
+                    </span>
+                  )}
+                </TabsTrigger>
                 <TabsTrigger value="email">Email</TabsTrigger>
               </TabsList>
 
@@ -471,13 +544,17 @@ export default function LandingPages() {
               </TabsContent>
 
               {/* ─── Media Tab ─── */}
-              <TabsContent value="media" className="space-y-4 mt-4">
+              <TabsContent value="media" className="space-y-5 mt-4">
+                {/* Background Image Upload */}
                 <div>
-                  <Label className="mb-2 block">Artwork / Hero Image</Label>
-                  <p className="text-xs text-muted-foreground mb-3">Upload a banner or hero image for this landing page. Recommended: 1200x630px, JPG or PNG.</p>
+                  <Label className="mb-2 block font-semibold">Background Image</Label>
+                  <p className="text-xs text-muted-foreground mb-3">This image fills the entire landing page background. Recommended: 1920x1080px or larger, JPG or PNG.</p>
                   {artworkPreview ? (
                     <div className="relative rounded-lg overflow-hidden border">
-                      <img src={artworkPreview} alt="Artwork preview" className="w-full h-48 object-cover" />
+                      <img src={artworkPreview} alt="Background preview" className="w-full h-48 object-cover" />
+                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                        <span className="text-white text-sm font-medium">Full-bleed background</span>
+                      </div>
                       <Button variant="secondary" size="sm" className="absolute top-2 right-2" onClick={() => { setArtworkPreview(null); setPendingArtwork(null); if (editId) updateMutation.mutate({ id: editId, artworkUrl: null }); }}>
                         <X className="h-3 w-3 mr-1" /> Remove
                       </Button>
@@ -485,15 +562,137 @@ export default function LandingPages() {
                   ) : (
                     <button onClick={() => artworkRef.current?.click()} className="w-full h-40 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-brand-green/50 hover:text-brand-green transition-colors cursor-pointer">
                       <Image className="h-8 w-8" />
-                      <span className="text-sm">Click to upload artwork</span>
-                      <span className="text-xs">JPG, PNG up to 10MB</span>
+                      <span className="text-sm font-medium">Upload background image</span>
+                      <span className="text-xs">JPG, PNG up to 10MB — fills entire page</span>
                     </button>
                   )}
                   <input ref={artworkRef} type="file" accept="image/*" className="hidden" onChange={handleArtworkSelect} />
                 </div>
+
                 <Separator />
+
+                {/* Corporate Logos & Images from Media Library */}
                 <div>
-                  <Label className="mb-2 block">PDF Attachment for Confirmation Email</Label>
+                  <Label className="mb-2 block font-semibold">Foreground Logos & Images</Label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Select corporate logos and images from your media library to display in the foreground of the landing page.
+                    Upload new items in <span className="font-medium text-foreground">Settings → Media Library</span>.
+                  </p>
+
+                  {(!mediaLibraryItems || mediaLibraryItems.length === 0) ? (
+                    <div className="text-center p-6 border-2 border-dashed rounded-lg text-muted-foreground">
+                      <ImagePlus className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No media items yet.</p>
+                      <p className="text-xs mt-1">Go to <span className="font-medium">Settings → Media Library</span> to upload logos and images first.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Logos Section */}
+                      {logos.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Logos</p>
+                          <ScrollArea className="w-full">
+                            <div className="flex gap-3 pb-2">
+                              {logos.map((item) => (
+                                <button
+                                  key={item.id}
+                                  onClick={() => toggleMediaSelection(item.id, "foreground_logo")}
+                                  className={`relative flex-shrink-0 w-24 h-24 rounded-lg border-2 overflow-hidden transition-all ${
+                                    isMediaSelected(item.id)
+                                      ? "border-brand-green ring-2 ring-brand-green/30 shadow-md"
+                                      : "border-muted hover:border-brand-green/40"
+                                  }`}
+                                >
+                                  <img src={item.fileUrl} alt={item.label || ""} className="w-full h-full object-contain p-2 bg-white" />
+                                  {isMediaSelected(item.id) && (
+                                    <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-brand-green flex items-center justify-center">
+                                      <Check className="h-3 w-3 text-white" />
+                                    </div>
+                                  )}
+                                  <div className="absolute bottom-0 inset-x-0 bg-black/60 px-1 py-0.5">
+                                    <p className="text-[9px] text-white truncate text-center">{item.label}</p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        </div>
+                      )}
+
+                      {/* Images Section */}
+                      {images.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Images</p>
+                          <ScrollArea className="w-full">
+                            <div className="flex gap-3 pb-2">
+                              {images.map((item) => (
+                                <button
+                                  key={item.id}
+                                  onClick={() => toggleMediaSelection(item.id, "foreground_image")}
+                                  className={`relative flex-shrink-0 w-28 h-20 rounded-lg border-2 overflow-hidden transition-all ${
+                                    isMediaSelected(item.id)
+                                      ? "border-brand-green ring-2 ring-brand-green/30 shadow-md"
+                                      : "border-muted hover:border-brand-green/40"
+                                  }`}
+                                >
+                                  <img src={item.fileUrl} alt={item.label || ""} className="w-full h-full object-cover" />
+                                  {isMediaSelected(item.id) && (
+                                    <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-brand-green flex items-center justify-center">
+                                      <Check className="h-3 w-3 text-white" />
+                                    </div>
+                                  )}
+                                  <div className="absolute bottom-0 inset-x-0 bg-black/60 px-1 py-0.5">
+                                    <p className="text-[9px] text-white truncate text-center">{item.label}</p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        </div>
+                      )}
+
+                      {/* Selected Media Summary */}
+                      {selectedMedia.length > 0 && (
+                        <div className="p-3 rounded-lg bg-brand-green/5 border border-brand-green/15">
+                          <p className="text-xs font-semibold text-brand-green mb-2">{selectedMedia.length} item{selectedMedia.length > 1 ? "s" : ""} selected for foreground</p>
+                          <div className="space-y-1.5">
+                            {selectedMedia.map((sel) => {
+                              const item = mediaLibraryItems?.find(m => m.id === sel.mediaId);
+                              if (!item) return null;
+                              return (
+                                <div key={sel.mediaId} className="flex items-center gap-2 text-xs">
+                                  <img src={item.fileUrl} alt="" className="h-6 w-6 rounded object-cover border" />
+                                  <span className="flex-1 truncate">{item.label}</span>
+                                  <Select
+                                    value={sel.placement}
+                                    onValueChange={(v) => changePlacement(sel.mediaId, v as "foreground_logo" | "foreground_image")}
+                                  >
+                                    <SelectTrigger className="h-6 w-28 text-[10px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="foreground_logo">Logo</SelectItem>
+                                      <SelectItem value="foreground_image">Image</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <button onClick={() => toggleMediaSelection(sel.mediaId, sel.placement as "foreground_logo" | "foreground_image")} className="text-muted-foreground hover:text-destructive">
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* PDF Attachment */}
+                <div>
+                  <Label className="mb-2 block font-semibold">PDF Attachment for Confirmation Email</Label>
                   <p className="text-xs text-muted-foreground mb-3">Upload a PDF document that will be attached to the confirmation email sent to leads upon signup.</p>
                   {pdfName ? (
                     <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
