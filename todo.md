@@ -137,3 +137,9 @@
 - [x] Include file structure documentation
 - [x] Include troubleshooting guide
 - [x] Include security considerations
+
+## Landing Page UX Improvements (User Request)
+- [x] Add required field indicators (red asterisk) on landing page creation form
+- [x] Show validation errors clearly before allowing form submission
+- [x] Display webinar event date and time on each landing page card in the list view
+- [x] Display full clickable URL on each landing page card
