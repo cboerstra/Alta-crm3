@@ -1,22 +1,27 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import {
+  int,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  varchar,
+  boolean,
+  decimal,
+  json,
+} from "drizzle-orm/mysql-core";
 
-/**
- * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
- */
+// ─── Users ───────────────────────────────────────────────────────────────────
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  // Scheduling slug for the built-in booking system
+  schedulingSlug: varchar("schedulingSlug", { length: 64 }),
+  avatarUrl: text("avatarUrl"),
+  phone: varchar("phone", { length: 32 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -25,4 +30,232 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+// ─── Integrations (Zoom, Google Calendar) ────────────────────────────────────
+export const integrations = mysqlTable("integrations", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  provider: mysqlEnum("provider", ["zoom", "google_calendar"]).notNull(),
+  accessToken: text("accessToken"),
+  refreshToken: text("refreshToken"),
+  tokenExpiresAt: timestamp("tokenExpiresAt"),
+  accountId: varchar("accountId", { length: 256 }),
+  accountEmail: varchar("accountEmail", { length: 320 }),
+  metadata: json("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Integration = typeof integrations.$inferSelect;
+
+// ─── Webinars ─────────────────────────────────────────────────────────────────
+export const webinars = mysqlTable("webinars", {
+  id: int("id").autoincrement().primaryKey(),
+  createdBy: int("createdBy").notNull(),
+  title: varchar("title", { length: 512 }).notNull(),
+  description: text("description"),
+  scheduledAt: timestamp("scheduledAt").notNull(),
+  durationMinutes: int("durationMinutes").default(60),
+  zoomWebinarId: varchar("zoomWebinarId", { length: 256 }),
+  zoomJoinUrl: text("zoomJoinUrl"),
+  zoomStartUrl: text("zoomStartUrl"),
+  replayUrl: text("replayUrl"),
+  googleCalendarEventId: varchar("googleCalendarEventId", { length: 256 }),
+  status: mysqlEnum("status", ["draft", "scheduled", "live", "completed", "cancelled"]).default("draft").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Webinar = typeof webinars.$inferSelect;
+export type InsertWebinar = typeof webinars.$inferInsert;
+
+// ─── Landing Pages ────────────────────────────────────────────────────────────
+export const landingPages = mysqlTable("landing_pages", {
+  id: int("id").autoincrement().primaryKey(),
+  createdBy: int("createdBy").notNull(),
+  title: varchar("title", { length: 512 }).notNull(),
+  slug: varchar("slug", { length: 128 }).notNull().unique(),
+  headline: text("headline"),
+  subheadline: text("subheadline"),
+  ctaText: varchar("ctaText", { length: 256 }),
+  campaignTag: varchar("campaignTag", { length: 128 }),
+  sourceTag: varchar("sourceTag", { length: 128 }),
+  webinarId: int("webinarId"),
+  isActive: boolean("isActive").default(true).notNull(),
+  customCss: text("customCss"),
+  backgroundImageUrl: text("backgroundImageUrl"),
+  accentColor: varchar("accentColor", { length: 16 }).default("#C9A84C"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type LandingPage = typeof landingPages.$inferSelect;
+export type InsertLandingPage = typeof landingPages.$inferInsert;
+
+// ─── Leads ────────────────────────────────────────────────────────────────────
+export const leads = mysqlTable("leads", {
+  id: int("id").autoincrement().primaryKey(),
+  firstName: varchar("firstName", { length: 128 }).notNull(),
+  lastName: varchar("lastName", { length: 128 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 32 }),
+  source: varchar("source", { length: 128 }),
+  campaign: varchar("campaign", { length: 128 }),
+  landingPageId: int("landingPageId"),
+  assignedTo: int("assignedTo"),
+  // Pipeline stage
+  stage: mysqlEnum("stage", [
+    "new_lead",
+    "registered",
+    "attended",
+    "no_show",
+    "consultation_booked",
+    "under_contract",
+    "closed",
+  ]).default("new_lead").notNull(),
+  // Lead scoring (0–100)
+  score: int("score").default(0),
+  scoreReason: text("scoreReason"),
+  scoredAt: timestamp("scoredAt"),
+  // SMS consent
+  smsConsent: boolean("smsConsent").default(false),
+  // Webinar registration
+  webinarId: int("webinarId"),
+  zoomRegistrantId: varchar("zoomRegistrantId", { length: 256 }),
+  zoomJoinUrl: text("zoomJoinUrl"),
+  attendanceStatus: mysqlEnum("attendanceStatus", ["registered", "attended", "no_show"]),
+  // Scheduling
+  consultationBookedAt: timestamp("consultationBookedAt"),
+  googleCalendarEventId: varchar("googleCalendarEventId", { length: 256 }),
+  // Deal
+  dealValue: decimal("dealValue", { precision: 12, scale: 2 }),
+  dealClosedAt: timestamp("dealClosedAt"),
+  // Notes (quick note, full notes in activity log)
+  quickNote: text("quickNote"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Lead = typeof leads.$inferSelect;
+export type InsertLead = typeof leads.$inferInsert;
+
+// ─── Activity Log ─────────────────────────────────────────────────────────────
+export const activityLog = mysqlTable("activity_log", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  userId: int("userId"),
+  type: mysqlEnum("type", [
+    "note",
+    "stage_change",
+    "email_sent",
+    "sms_sent",
+    "sms_received",
+    "webinar_registered",
+    "webinar_attended",
+    "webinar_no_show",
+    "consultation_booked",
+    "deal_created",
+    "deal_updated",
+    "score_updated",
+    "call_logged",
+    "system",
+  ]).notNull(),
+  title: varchar("title", { length: 512 }).notNull(),
+  content: text("content"),
+  metadata: json("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ActivityLog = typeof activityLog.$inferSelect;
+export type InsertActivityLog = typeof activityLog.$inferInsert;
+
+// ─── SMS Messages ─────────────────────────────────────────────────────────────
+export const smsMessages = mysqlTable("sms_messages", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  direction: mysqlEnum("direction", ["outbound", "inbound"]).notNull(),
+  body: text("body").notNull(),
+  status: mysqlEnum("status", ["queued", "sent", "delivered", "failed", "received"]).default("queued").notNull(),
+  externalId: varchar("externalId", { length: 256 }),
+  sentBy: int("sentBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SmsMessage = typeof smsMessages.$inferSelect;
+
+// ─── Email Reminders ──────────────────────────────────────────────────────────
+export const emailReminders = mysqlTable("email_reminders", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  webinarId: int("webinarId").notNull(),
+  type: mysqlEnum("type", [
+    "registration_confirmation",
+    "reminder_24h",
+    "reminder_1h",
+    "reminder_10min",
+    "no_show_followup",
+  ]).notNull(),
+  scheduledAt: timestamp("scheduledAt").notNull(),
+  sentAt: timestamp("sentAt"),
+  status: mysqlEnum("status", ["pending", "sent", "failed", "cancelled"]).default("pending").notNull(),
+  subject: varchar("subject", { length: 512 }),
+  body: text("body"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type EmailReminder = typeof emailReminders.$inferSelect;
+
+// ─── Deals ────────────────────────────────────────────────────────────────────
+export const deals = mysqlTable("deals", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  assignedTo: int("assignedTo"),
+  title: varchar("title", { length: 512 }).notNull(),
+  value: decimal("value", { precision: 12, scale: 2 }).notNull(),
+  stage: mysqlEnum("stage", [
+    "prospect",
+    "qualified",
+    "proposal",
+    "negotiation",
+    "closed_won",
+    "closed_lost",
+  ]).default("prospect").notNull(),
+  propertyAddress: text("propertyAddress"),
+  expectedCloseDate: timestamp("expectedCloseDate"),
+  actualCloseDate: timestamp("actualCloseDate"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Deal = typeof deals.$inferSelect;
+export type InsertDeal = typeof deals.$inferInsert;
+
+// ─── Scheduling: Availability ─────────────────────────────────────────────────
+export const availability = mysqlTable("availability", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  dayOfWeek: int("dayOfWeek").notNull(), // 0=Sun, 6=Sat
+  startTime: varchar("startTime", { length: 8 }).notNull(), // "09:00"
+  endTime: varchar("endTime", { length: 8 }).notNull(),     // "17:00"
+  isActive: boolean("isActive").default(true).notNull(),
+});
+
+// ─── Scheduling: Bookings ─────────────────────────────────────────────────────
+export const bookings = mysqlTable("bookings", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  leadId: int("leadId"),
+  guestName: varchar("guestName", { length: 256 }).notNull(),
+  guestEmail: varchar("guestEmail", { length: 320 }).notNull(),
+  guestPhone: varchar("guestPhone", { length: 32 }),
+  scheduledAt: timestamp("scheduledAt").notNull(),
+  durationMinutes: int("durationMinutes").default(30),
+  notes: text("notes"),
+  googleCalendarEventId: varchar("googleCalendarEventId", { length: 256 }),
+  status: mysqlEnum("status", ["confirmed", "cancelled", "completed"]).default("confirmed").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Booking = typeof bookings.$inferSelect;
+export type InsertBooking = typeof bookings.$inferInsert;

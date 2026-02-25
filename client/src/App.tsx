@@ -4,34 +4,60 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import DashboardLayout from "./components/DashboardLayout";
 import Home from "./pages/Home";
+import Leads from "./pages/Leads";
+import LeadProfile from "./pages/LeadProfile";
+import Pipeline from "./pages/Pipeline";
+import Webinars from "./pages/Webinars";
+import WebinarDetail from "./pages/WebinarDetail";
+import LandingPages from "./pages/LandingPages";
+import Scheduling from "./pages/Scheduling";
+import Deals from "./pages/Deals";
+import Revenue from "./pages/Revenue";
+import SettingsPage from "./pages/Settings";
+import PublicLandingPage from "./pages/PublicLandingPage";
+import PublicBooking from "./pages/PublicBooking";
+
+function CRMRoutes() {
+  return (
+    <DashboardLayout>
+      <Switch>
+        <Route path="/" component={Home} />
+        <Route path="/leads" component={Leads} />
+        <Route path="/leads/:id" component={LeadProfile} />
+        <Route path="/pipeline" component={Pipeline} />
+        <Route path="/webinars" component={Webinars} />
+        <Route path="/webinars/:id" component={WebinarDetail} />
+        <Route path="/landing-pages" component={LandingPages} />
+        <Route path="/scheduling" component={Scheduling} />
+        <Route path="/deals" component={Deals} />
+        <Route path="/revenue" component={Revenue} />
+        <Route path="/settings" component={SettingsPage} />
+        <Route component={NotFound} />
+      </Switch>
+    </DashboardLayout>
+  );
+}
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
-      <Route component={NotFound} />
+      {/* Public routes */}
+      <Route path="/lp/:slug" component={PublicLandingPage} />
+      <Route path="/schedule/:slug" component={PublicBooking} />
+      {/* CRM routes (protected via DashboardLayout) */}
+      <Route component={CRMRoutes} />
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="light">
         <TooltipProvider>
-          <Toaster />
+          <Toaster richColors position="top-right" />
           <Router />
         </TooltipProvider>
       </ThemeProvider>

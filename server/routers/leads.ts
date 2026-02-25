@@ -1,0 +1,196 @@
+import { z } from "zod";
+import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
+import {
+  createLead, getLeads, getLeadById, updateLead, updateLeadStage,
+  logActivity, getActivityByLeadId, updateLeadScore,
+} from "../db";
+import { invokeLLM } from "../_core/llm";
+
+const stageEnum = z.enum([
+  "new_lead", "registered", "attended", "no_show",
+  "consultation_booked", "under_contract", "closed",
+]);
+
+export const leadsRouter = router({
+  list: protectedProcedure
+    .input(z.object({
+      stage: z.string().optional(),
+      source: z.string().optional(),
+      search: z.string().optional(),
+      limit: z.number().default(50),
+      offset: z.number().default(0),
+    }))
+    .query(({ input }) => getLeads(input)),
+
+  getById: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(({ input }) => getLeadById(input.id)),
+
+  create: protectedProcedure
+    .input(z.object({
+      firstName: z.string().min(1),
+      lastName: z.string().min(1),
+      email: z.string().email(),
+      phone: z.string().optional(),
+      source: z.string().optional(),
+      campaign: z.string().optional(),
+      landingPageId: z.number().optional(),
+      webinarId: z.number().optional(),
+      smsConsent: z.boolean().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const id = await createLead({ ...input, stage: "new_lead" });
+      await logActivity({
+        leadId: id,
+        userId: ctx.user.id,
+        type: "system",
+        title: "Lead created",
+        content: `Lead created from ${input.source ?? "direct entry"}`,
+      });
+      return { id };
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      firstName: z.string().optional(),
+      lastName: z.string().optional(),
+      email: z.string().email().optional(),
+      phone: z.string().optional(),
+      source: z.string().optional(),
+      campaign: z.string().optional(),
+      quickNote: z.string().optional(),
+      smsConsent: z.boolean().optional(),
+      assignedTo: z.number().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const { id, ...data } = input;
+      await updateLead(id, data);
+      await logActivity({ leadId: id, userId: ctx.user.id, type: "system", title: "Lead updated" });
+      return { success: true };
+    }),
+
+  updateStage: protectedProcedure
+    .input(z.object({ id: z.number(), stage: stageEnum }))
+    .mutation(async ({ input, ctx }) => {
+      const prev = await getLeadById(input.id);
+      await updateLeadStage(input.id, input.stage);
+      await logActivity({
+        leadId: input.id,
+        userId: ctx.user.id,
+        type: "stage_change",
+        title: `Stage changed to ${input.stage.replace(/_/g, " ")}`,
+        content: `Previous stage: ${prev?.stage ?? "unknown"}`,
+      });
+      return { success: true };
+    }),
+
+  addNote: protectedProcedure
+    .input(z.object({ leadId: z.number(), content: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      await logActivity({
+        leadId: input.leadId,
+        userId: ctx.user.id,
+        type: "note",
+        title: "Note added",
+        content: input.content,
+      });
+      return { success: true };
+    }),
+
+  getActivity: protectedProcedure
+    .input(z.object({ leadId: z.number() }))
+    .query(({ input }) => getActivityByLeadId(input.leadId)),
+
+  scoreWithLLM: protectedProcedure
+    .input(z.object({ leadId: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const lead = await getLeadById(input.leadId);
+      if (!lead) throw new Error("Lead not found");
+      const activity = await getActivityByLeadId(input.leadId);
+      const prompt = `You are a real estate CRM lead scoring expert. Analyze this lead and return a JSON score.
+
+Lead Data:
+- Name: ${lead.firstName} ${lead.lastName}
+- Email: ${lead.email}
+- Phone: ${lead.phone ?? "not provided"}
+- Source: ${lead.source ?? "unknown"}
+- Campaign: ${lead.campaign ?? "unknown"}
+- Pipeline Stage: ${lead.stage}
+- Attendance Status: ${lead.attendanceStatus ?? "not registered"}
+- SMS Consent: ${lead.smsConsent ? "yes" : "no"}
+- Deal Value: ${lead.dealValue ?? "none"}
+- Consultation Booked: ${lead.consultationBookedAt ? "yes" : "no"}
+- Activity Count: ${activity.length}
+- Recent Activities: ${activity.slice(0, 5).map((a) => a.title).join(", ")}
+
+Score the lead 0-100 based on engagement, intent signals, and pipeline progress. Return JSON: {"score": number, "reason": "brief explanation"}`;
+
+      const response = await invokeLLM({
+        messages: [{ role: "user", content: prompt }],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "lead_score",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                score: { type: "integer" },
+                reason: { type: "string" },
+              },
+              required: ["score", "reason"],
+              additionalProperties: false,
+            },
+          },
+        },
+      });
+      const content = response.choices[0]?.message?.content;
+      const parsed = typeof content === "string" ? JSON.parse(content) : content;
+      const score = Math.min(100, Math.max(0, parsed.score));
+      await updateLeadScore(input.leadId, score, parsed.reason);
+      await logActivity({
+        leadId: input.leadId,
+        userId: ctx.user.id,
+        type: "score_updated",
+        title: `Lead score updated to ${score}/100`,
+        content: parsed.reason,
+      });
+      return { score, reason: parsed.reason };
+    }),
+
+  // Public endpoint for landing page form submissions
+  captureFromLandingPage: publicProcedure
+    .input(z.object({
+      firstName: z.string().min(1),
+      lastName: z.string().min(1),
+      email: z.string().email(),
+      phone: z.string().optional(),
+      slug: z.string(),
+      smsConsent: z.boolean().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const { getLandingPageBySlug } = await import("../db");
+      const page = await getLandingPageBySlug(input.slug);
+      if (!page || !page.isActive) throw new Error("Landing page not found");
+      const id = await createLead({
+        firstName: input.firstName,
+        lastName: input.lastName,
+        email: input.email,
+        phone: input.phone,
+        source: page.sourceTag ?? "landing_page",
+        campaign: page.campaignTag,
+        landingPageId: page.id,
+        webinarId: page.webinarId ?? undefined,
+        smsConsent: input.smsConsent ?? false,
+        stage: "new_lead",
+      });
+      await logActivity({
+        leadId: id,
+        type: "system",
+        title: "Lead captured from landing page",
+        content: `Captured via landing page: ${page.title}`,
+      });
+      return { id, webinarId: page.webinarId };
+    }),
+});
