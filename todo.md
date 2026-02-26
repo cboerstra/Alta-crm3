@@ -176,3 +176,6 @@
 - [x] Role badges displayed on user list and sidebar footer
 - [x] Regular users see limited sidebar (no Settings, no User Management)
 - [x] RBAC tests: 21 tests covering admin/user/public access to all routers
+
+## Railway Deployment Guide (User Request)
+- [x] Add RAILWAY_DEPLOYMENT_GUIDE.md with step-by-step deployment instructions
