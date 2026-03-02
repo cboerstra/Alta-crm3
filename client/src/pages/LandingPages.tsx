@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Copy, Trash2, Edit, Upload, Image, FileIcon, X, Eye, Calendar, Clock, AlertCircle, Link as LinkIcon, Check, ImagePlus } from "lucide-react";
+import { Plus, FileText, Copy, Trash2, Edit, Upload, Image, FileIcon, X, Eye, Calendar, Clock, AlertCircle, Link as LinkIcon, Check, ImagePlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -133,6 +133,14 @@ export default function LandingPages() {
 
   const deleteMutation = trpc.landingPages.delete.useMutation({
     onSuccess: () => { toast.success("Landing page deleted"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const duplicateMutation = trpc.landingPages.duplicate.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Landing page duplicated! New slug: /lp/${data.slug}`);
+      refetch();
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -835,8 +843,14 @@ export default function LandingPages() {
                         </div>
                       )}
 
-                      {/* Tags row */}
-                      <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+                      {/* Tags row + Lead Count */}
+                      <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
+                        {(page as any).leadCount !== undefined && (
+                          <span className="flex items-center gap-1 font-medium text-brand-green">
+                            <Users className="h-3 w-3" />
+                            {(page as any).leadCount} lead{(page as any).leadCount !== 1 ? "s" : ""}
+                          </span>
+                        )}
                         {page.sourceTag && <span>Source: {page.sourceTag}</span>}
                         {page.campaignTag && <span>Campaign: {page.campaignTag}</span>}
                         {Array.isArray(page.enabledFields) && <span>{(page.enabledFields as string[]).length} fields</span>}
@@ -846,10 +860,18 @@ export default function LandingPages() {
                     {/* Action buttons */}
                     <div className="flex gap-1 flex-shrink-0">
                       <a href={`/lp/${page.slug}`} target="_blank" rel="noopener noreferrer">
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Preview"><Eye className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="Preview landing page"><Eye className="h-4 w-4" /></Button>
                       </a>
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openEdit(page)} title="Edit">
                         <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost" size="sm" className="h-8 w-8 p-0 text-muted-foreground"
+                        title="Duplicate landing page"
+                        disabled={duplicateMutation.isPending}
+                        onClick={() => duplicateMutation.mutate({ id: page.id })}
+                      >
+                        <Copy className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive" onClick={() => deleteMutation.mutate({ id: page.id })} title="Delete">
                         <Trash2 className="h-4 w-4" />

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import {
-  createLandingPage, getLandingPages, getLandingPageBySlug,
+  createLandingPage, getLandingPages, getLandingPagesWithLeadCount, getLandingPageBySlug,
   getLandingPageById, updateLandingPage, deleteLandingPage,
   getWebinarSessions,
 } from "../db";
@@ -9,7 +9,7 @@ import { storagePut } from "../storage";
 import { nanoid } from "nanoid";
 
 export const landingPagesRouter = router({
-  list: protectedProcedure.query(() => getLandingPages()),
+  list: protectedProcedure.query(() => getLandingPagesWithLeadCount()),
 
   getBySlug: publicProcedure
     .input(z.object({ slug: z.string() }))
@@ -99,6 +99,36 @@ export const landingPagesRouter = router({
     .mutation(async ({ input }) => {
       await deleteLandingPage(input.id);
       return { success: true };
+    }),
+
+  duplicate: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const page = await getLandingPageById(input.id);
+      if (!page) throw new Error("Landing page not found");
+      // Generate a unique slug by appending a short ID
+      const newSlug = `${page.slug}-copy-${nanoid(4)}`;
+      const id = await createLandingPage({
+        title: `${page.title} (Copy)`,
+        slug: newSlug,
+        headline: page.headline ?? undefined,
+        subheadline: page.subheadline ?? undefined,
+        bodyText: page.bodyText ?? undefined,
+        ctaText: page.ctaText ?? undefined,
+        campaignTag: page.campaignTag ?? undefined,
+        sourceTag: page.sourceTag ?? undefined,
+        webinarId: page.webinarId ?? undefined,
+        isActive: false, // start as draft
+        accentColor: page.accentColor ?? undefined,
+        enabledFields: page.enabledFields ?? ["firstName", "lastName", "email", "phone"],
+        optInLabel: page.optInLabel ?? undefined,
+        showOptIn: page.showOptIn ?? false,
+        confirmationEmailSubject: page.confirmationEmailSubject ?? undefined,
+        confirmationEmailBody: page.confirmationEmailBody ?? undefined,
+        artworkUrl: page.artworkUrl ?? undefined,
+        createdBy: ctx.user.id,
+      });
+      return { id, slug: newSlug };
     }),
 
   // Upload artwork image for a landing page

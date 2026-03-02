@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, sql, like, or, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, lte, sql, like, or, inArray, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser, users,
@@ -214,6 +214,13 @@ export async function deleteWebinarSessions(webinarId: number) {
   await db.delete(webinarSessions).where(eq(webinarSessions.webinarId, webinarId));
 }
 
+export async function deleteWebinar(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(webinarSessions).where(eq(webinarSessions.webinarId, id));
+  await db.delete(webinars).where(eq(webinars.id, id));
+}
+
 export async function getWebinarSessionById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
@@ -233,6 +240,19 @@ export async function getLandingPages() {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(landingPages).orderBy(desc(landingPages.createdAt));
+}
+
+export async function getLandingPagesWithLeadCount() {
+  const db = await getDb();
+  if (!db) return [];
+  const pages = await db.select().from(landingPages).orderBy(desc(landingPages.createdAt));
+  const counts = await db
+    .select({ landingPageId: leads.landingPageId, count: sql<number>`count(*)` })
+    .from(leads)
+    .where(isNotNull(leads.landingPageId))
+    .groupBy(leads.landingPageId);
+  const countMap = new Map(counts.map(c => [c.landingPageId, Number(c.count)]));
+  return pages.map(p => ({ ...p, leadCount: countMap.get(p.id) ?? 0 }));
 }
 
 export async function getLandingPageBySlug(slug: string) {

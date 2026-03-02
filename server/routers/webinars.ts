@@ -6,10 +6,27 @@ import {
   createEmailReminder, getRemindersByLead,
   createWebinarSession, getWebinarSessions, deleteWebinarSessions, getWebinarSessionById,
   createLandingPage, getLandingPageBySlug, updateLandingPage,
+  deleteWebinar,
 } from "../db";
 
 export const webinarsRouter = router({
-  list: protectedProcedure.query(() => getWebinars()),
+  list: protectedProcedure
+    .input(z.object({ search: z.string().optional(), status: z.string().optional() }).optional())
+    .query(async ({ input }) => {
+      const all = await getWebinars();
+      let result = all;
+      if (input?.search) {
+        const q = input.search.toLowerCase();
+        result = result.filter(w =>
+          w.title.toLowerCase().includes(q) ||
+          (w.description ?? "").toLowerCase().includes(q)
+        );
+      }
+      if (input?.status && input.status !== "all") {
+        result = result.filter(w => w.status === input.status);
+      }
+      return result;
+    }),
 
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
@@ -272,4 +289,11 @@ export const webinarsRouter = router({
   getReminders: protectedProcedure
     .input(z.object({ leadId: z.number() }))
     .query(({ input }) => getRemindersByLead(input.leadId)),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await deleteWebinar(input.id);
+      return { success: true };
+    }),
 });

@@ -179,3 +179,14 @@
 
 ## Railway Deployment Guide (User Request)
 - [x] Add RAILWAY_DEPLOYMENT_GUIDE.md with step-by-step deployment instructions
+
+## UI Polish & Feature Additions (Continued)
+- [x] Webinars page: search bar, status filter dropdown, delete with confirmation dialog
+- [x] Landing pages: lead count badge on each card
+- [x] Landing pages: duplicate button on each card
+- [x] Dashboard: improved KPI cards with trend indicators
+- [x] Dashboard: upcoming webinars section with countdown badges
+- [x] Dashboard: quick action buttons (Add Lead, Schedule Webinar)
+- [x] Dashboard: clickable recent leads rows linking to lead profile
+- [x] Dashboard: improved pipeline bar chart with per-bar color coding
+- [x] Dashboard: improved source pie chart with inline legend

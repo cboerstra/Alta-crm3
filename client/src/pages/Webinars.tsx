@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,10 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
-import { Plus, Video, Calendar, Clock, ExternalLink, Trash2, FileText, Link2 } from "lucide-react";
+import { Plus, Video, Calendar, Clock, ExternalLink, Trash2, FileText, Search, Filter, Users } from "lucide-react";
 import { toast } from "sonner";
 
 const statusColors: Record<string, string> = {
@@ -32,6 +34,9 @@ type SessionDraft = {
 export default function Webinars() {
   const [, setLocation] = useLocation();
   const [showCreate, setShowCreate] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [deleteId, setDeleteId] = useState<number | null>(null);
   const [form, setForm] = useState({
     title: "", description: "", scheduledAt: "", durationMinutes: 60,
     zoomJoinUrl: "", zoomWebinarId: "", replayUrl: "",
@@ -44,9 +49,7 @@ export default function Webinars() {
   const createMutation = trpc.webinars.create.useMutation({
     onSuccess: (data) => {
       toast.success("Webinar created successfully!");
-      if (data.landingPageId) {
-        toast.success("Landing page auto-created and linked", { duration: 4000 });
-      }
+      if (data.landingPageId) toast.success("Landing page auto-created and linked", { duration: 4000 });
       setShowCreate(false);
       resetForm();
       refetch();
@@ -54,23 +57,22 @@ export default function Webinars() {
     onError: (e) => toast.error(e.message),
   });
 
+  const deleteMutation = trpc.webinars.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Webinar deleted");
+      setDeleteId(null);
+      refetch();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   function resetForm() {
-    setForm({
-      title: "", description: "", scheduledAt: "", durationMinutes: 60,
-      zoomJoinUrl: "", zoomWebinarId: "", replayUrl: "",
-      createLandingPage: true, landingPageSlug: "",
-    });
+    setForm({ title: "", description: "", scheduledAt: "", durationMinutes: 60, zoomJoinUrl: "", zoomWebinarId: "", replayUrl: "", createLandingPage: true, landingPageSlug: "" });
     setAdditionalSessions([]);
   }
 
   function addSession() {
-    setAdditionalSessions(prev => [...prev, {
-      id: crypto.randomUUID(),
-      date: "",
-      durationMinutes: 60,
-      label: "",
-      zoomJoinUrl: "",
-    }]);
+    setAdditionalSessions(prev => [...prev, { id: crypto.randomUUID(), date: "", durationMinutes: 60, label: "", zoomJoinUrl: "" }]);
   }
 
   function updateSession(id: string, field: keyof SessionDraft, value: string | number) {
@@ -82,6 +84,8 @@ export default function Webinars() {
   }
 
   const handleCreate = () => {
+    if (!form.title) return toast.error("Webinar title is required");
+    if (!form.scheduledAt) return toast.error("Date & time is required");
     createMutation.mutate({
       title: form.title,
       description: form.description || undefined,
@@ -92,26 +96,42 @@ export default function Webinars() {
       replayUrl: form.replayUrl || undefined,
       createLandingPage: form.createLandingPage,
       landingPageSlug: form.landingPageSlug || undefined,
-      additionalSessions: additionalSessions
-        .filter(s => s.date)
-        .map(s => ({
-          sessionDate: new Date(s.date).getTime(),
-          durationMinutes: s.durationMinutes,
-          label: s.label || undefined,
-          zoomJoinUrl: s.zoomJoinUrl || undefined,
-        })),
+      additionalSessions: additionalSessions.filter(s => s.date).map(s => ({
+        sessionDate: new Date(s.date).getTime(),
+        durationMinutes: s.durationMinutes,
+        label: s.label || undefined,
+        zoomJoinUrl: s.zoomJoinUrl || undefined,
+      })),
     });
   };
 
-  // Auto-generate slug from title
   const autoSlug = form.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+  // Client-side filtering
+  const filtered = useMemo(() => {
+    if (!webinars) return [];
+    let result = webinars;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(w => w.title.toLowerCase().includes(q) || (w.description ?? "").toLowerCase().includes(q));
+    }
+    if (statusFilter !== "all") {
+      result = result.filter(w => w.status === statusFilter);
+    }
+    return result;
+  }, [webinars, search, statusFilter]);
+
+  const webinarToDelete = webinars?.find(w => w.id === deleteId);
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ fontFamily: "Raleway, sans-serif" }}>Webinars</h1>
-          <p className="text-muted-foreground text-sm mt-1">Create and manage webinar events with landing pages</p>
+          <p className="text-muted-foreground text-sm mt-1">
+            {webinars?.length ?? 0} webinar{(webinars?.length ?? 0) !== 1 ? "s" : ""} total
+          </p>
         </div>
         <Dialog open={showCreate} onOpenChange={(v) => { if (!v) resetForm(); setShowCreate(v); }}>
           <DialogTrigger asChild>
@@ -124,11 +144,10 @@ export default function Webinars() {
               <DialogTitle style={{ fontFamily: "Raleway, sans-serif" }}>Schedule New Webinar</DialogTitle>
             </DialogHeader>
             <div className="space-y-5 py-2">
-              {/* Basic Info */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Event Details</h3>
                 <div>
-                  <Label>Webinar Title *</Label>
+                  <Label>Webinar Title <span className="text-red-500">*</span></Label>
                   <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="First-Time Homebuyer Webinar" />
                 </div>
                 <div>
@@ -136,15 +155,12 @@ export default function Webinars() {
                   <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="What attendees will learn..." rows={3} />
                 </div>
               </div>
-
               <Separator />
-
-              {/* Primary Session */}
               <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Primary Session</h3>
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Primary Session <span className="text-red-500">*</span></h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label>Date & Time *</Label>
+                    <Label>Date & Time <span className="text-red-500">*</span></Label>
                     <Input type="datetime-local" value={form.scheduledAt} onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })} />
                   </div>
                   <div>
@@ -153,8 +169,6 @@ export default function Webinars() {
                   </div>
                 </div>
               </div>
-
-              {/* Additional Sessions */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Additional Sessions</h3>
@@ -166,12 +180,7 @@ export default function Webinars() {
                 {additionalSessions.map((session) => (
                   <div key={session.id} className="p-3 rounded-lg border bg-card space-y-2">
                     <div className="flex items-center justify-between">
-                      <Input
-                        placeholder="Session label (e.g., Evening Session)"
-                        value={session.label}
-                        onChange={(e) => updateSession(session.id, "label", e.target.value)}
-                        className="text-sm h-8"
-                      />
+                      <Input placeholder="Session label (e.g., Evening Session)" value={session.label} onChange={(e) => updateSession(session.id, "label", e.target.value)} className="text-sm h-8" />
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive ml-2" onClick={() => removeSession(session.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
@@ -184,10 +193,7 @@ export default function Webinars() {
                   </div>
                 ))}
               </div>
-
               <Separator />
-
-              {/* Zoom Integration */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Zoom Integration</h3>
                 <div>
@@ -203,10 +209,7 @@ export default function Webinars() {
                   <Input value={form.replayUrl} onChange={(e) => setForm({ ...form, replayUrl: e.target.value })} placeholder="https://..." />
                 </div>
               </div>
-
               <Separator />
-
-              {/* Auto Landing Page */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Landing Page</h3>
                 <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
@@ -228,7 +231,6 @@ export default function Webinars() {
                   </div>
                 )}
               </div>
-
               <Button
                 className="w-full bg-brand-green hover:bg-brand-green-dark text-white h-11"
                 disabled={!form.title || !form.scheduledAt || createMutation.isPending}
@@ -241,10 +243,45 @@ export default function Webinars() {
         </Dialog>
       </div>
 
+      {/* Search & Filter Bar */}
+      <div className="flex gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search webinars..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-40 gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="scheduled">Scheduled</SelectItem>
+            <SelectItem value="live">Live</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Webinar List */}
       {isLoading ? (
         <div className="grid gap-4">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="border-0 shadow-sm"><CardContent className="p-6"><div className="animate-pulse space-y-3"><div className="h-5 w-48 bg-muted rounded" /><div className="h-3 w-32 bg-muted rounded" /></div></CardContent></Card>
+            <Card key={i} className="border-0 shadow-sm">
+              <CardContent className="p-6">
+                <div className="animate-pulse space-y-3">
+                  <div className="h-5 w-48 bg-muted rounded" />
+                  <div className="h-3 w-32 bg-muted rounded" />
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       ) : !webinars?.length ? (
@@ -255,34 +292,53 @@ export default function Webinars() {
             <p className="text-xs text-muted-foreground mt-1">Schedule your first webinar to get started</p>
           </CardContent>
         </Card>
+      ) : filtered.length === 0 ? (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-12 text-center">
+            <Search className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground">No webinars match your search</p>
+            <Button variant="ghost" size="sm" className="mt-2" onClick={() => { setSearch(""); setStatusFilter("all"); }}>Clear filters</Button>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid gap-4">
-          {webinars.map((webinar) => (
+        <div className="grid gap-3">
+          {filtered.map((webinar) => (
             <Card
               key={webinar.id}
-              className="border-0 shadow-sm hover:shadow-md transition-all cursor-pointer"
+              className="border-0 shadow-sm hover:shadow-md transition-all cursor-pointer group"
               onClick={() => setLocation(`/webinars/${webinar.id}`)}
             >
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-base font-semibold" style={{ fontFamily: "Raleway, sans-serif" }}>{webinar.title}</h3>
-                      <Badge className={`text-xs ${statusColors[webinar.status] || ""}`}>{webinar.status}</Badge>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <h3 className="text-base font-semibold truncate" style={{ fontFamily: "Raleway, sans-serif" }}>{webinar.title}</h3>
+                      <Badge className={`text-xs shrink-0 ${statusColors[webinar.status] || ""}`}>{webinar.status}</Badge>
                       {webinar.landingPageId && (
-                        <Badge variant="outline" className="text-[10px] gap-1">
+                        <Badge variant="outline" className="text-[10px] gap-1 shrink-0">
                           <FileText className="h-2.5 w-2.5" /> Landing Page
                         </Badge>
                       )}
                     </div>
-                    {webinar.description && <p className="text-sm text-muted-foreground line-clamp-2">{webinar.description}</p>}
-                    <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {new Date(webinar.scheduledAt).toLocaleDateString()}</span>
-                      <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {new Date(webinar.scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                      <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {webinar.durationMinutes} min</span>
+                    {webinar.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-1 mb-2">{webinar.description}</p>
+                    )}
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3.5 w-3.5 text-brand-green" />
+                        {new Date(webinar.scheduledAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3.5 w-3.5 text-brand-green" />
+                        {new Date(webinar.scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3.5 w-3.5 text-brand-green" />
+                        {webinar.durationMinutes} min
+                      </span>
                     </div>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 ml-3 shrink-0">
                     {webinar.zoomJoinUrl && (
                       <a href={webinar.zoomJoinUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
                         <Button variant="outline" size="sm" className="gap-1 text-xs">
@@ -290,13 +346,48 @@ export default function Webinars() {
                         </Button>
                       </a>
                     )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => { e.stopPropagation(); setDeleteId(webinar.id); }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
               </CardContent>
             </Card>
           ))}
+          {filtered.length > 0 && (
+            <p className="text-xs text-muted-foreground text-center pt-1">
+              Showing {filtered.length} of {webinars.length} webinar{webinars.length !== 1 ? "s" : ""}
+            </p>
+          )}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Webinar?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>"{webinarToDelete?.title}"</strong> and all its sessions. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteId && deleteMutation.mutate({ id: deleteId })}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete Webinar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
