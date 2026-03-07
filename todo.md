@@ -228,3 +228,11 @@
 - [x] Mask Auth Token after saving (show only last 4 chars)
 - [x] Disconnect Twilio button
 - [x] All 82 tests passing
+
+## Twilio Error Fixes (User Report)
+- [x] Error 1: "Invalid 'To' Phone Number" — auto-strip spaces/dashes/parens from phone, validate E.164 before sending, show clear format hint; trial account warning added
+- [x] Error 2: "Invalid Twilio credentials" — 401 now shows specific message: check SID starts with 'AC', copy token exactly; other HTTP errors surface Twilio's own message
+- [x] Strip spaces/dashes/parens from phone numbers automatically before sending to Twilio
+- [x] Account SID field shows inline red error if value doesn't start with 'AC'
+- [x] Setup form now shows step-by-step guide to find credentials in Twilio Console
+- [x] All 82 tests passing

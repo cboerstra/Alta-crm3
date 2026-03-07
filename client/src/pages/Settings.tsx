@@ -485,7 +485,7 @@ export default function SettingsPage() {
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
-                      <p className="text-xs text-muted-foreground">Enter a phone number in E.164 format (e.g. +15550001234)</p>
+                      <p className="text-xs text-muted-foreground">Enter the number to receive the test SMS. Format: <span className="font-mono">+15550001234</span> (include country code). <strong>Trial accounts</strong> can only text verified numbers.</p>
                     </div>
                   )}
 
@@ -505,11 +505,14 @@ export default function SettingsPage() {
               ) : (
                 <>
                   {/* Setup form */}
-                  <div className="p-3 rounded-lg bg-muted/30 border border-border/30 text-sm text-muted-foreground">
-                    You'll need a <strong>Twilio account</strong> to enable SMS. Get your credentials at{" "}
-                    <a href="https://console.twilio.com" target="_blank" rel="noopener noreferrer" className="text-brand-green underline">
-                      console.twilio.com
-                    </a>.
+                        <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800 space-y-1.5">
+                    <p className="font-medium">Where to find your Twilio credentials:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-xs">
+                      <li>Log in at <a href="https://console.twilio.com" target="_blank" rel="noopener noreferrer" className="underline font-medium">console.twilio.com</a></li>
+                      <li>Your <strong>Account SID</strong> and <strong>Auth Token</strong> are on the Console home page</li>
+                      <li>Your <strong>From Phone</strong> is under Phone Numbers → Manage → Active Numbers</li>
+                    </ol>
+                    <p className="text-xs text-blue-700 pt-1">⚠️ <strong>Trial accounts</strong> can only send SMS to verified numbers. Verify numbers at Console → Phone Numbers → Verified Caller IDs.</p>
                   </div>
 
                   <div className="space-y-4">
@@ -519,9 +522,14 @@ export default function SettingsPage() {
                         value={twilioForm.accountSid}
                         onChange={(e) => setTwilioForm({ ...twilioForm, accountSid: e.target.value })}
                         placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                        className="font-mono text-sm"
+                        className={`font-mono text-sm ${twilioForm.accountSid && !twilioForm.accountSid.trim().startsWith("AC") ? "border-red-400 focus-visible:ring-red-400" : ""}`}
                       />
-                      <p className="text-xs text-muted-foreground mt-1">Found on your Twilio Console dashboard.</p>
+                      {twilioForm.accountSid && !twilioForm.accountSid.trim().startsWith("AC") && (
+                        <p className="text-xs text-red-500 mt-1">Account SID must start with "AC"</p>
+                      )}
+                      {(!twilioForm.accountSid || twilioForm.accountSid.trim().startsWith("AC")) && (
+                        <p className="text-xs text-muted-foreground mt-1">Starts with "AC" — found on your Twilio Console home page.</p>
+                      )}
                     </div>
 
                     <div>
@@ -553,7 +561,7 @@ export default function SettingsPage() {
                         placeholder="+15550001234"
                         className="font-mono text-sm"
                       />
-                      <p className="text-xs text-muted-foreground mt-1">Must be a Twilio-verified number in E.164 format.</p>
+                      <p className="text-xs text-muted-foreground mt-1">Your Twilio phone number in E.164 format (e.g. <span className="font-mono">+15550001234</span>). Include the country code.</p>
                     </div>
 
                     <Button

@@ -75,31 +75,51 @@ export const integrationsRouter = router({
       fromPhone: z.string().min(1, "From phone number is required"),
     }))
     .mutation(async ({ input, ctx }) => {
+      // Normalize the Account SID (trim whitespace)
+      const accountSid = input.accountSid.trim();
+      const authToken = input.authToken.trim();
       // Validate credentials by calling Twilio's accounts endpoint
-      const credentials = Buffer.from(`${input.accountSid}:${input.authToken}`).toString("base64");
-      const res = await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${input.accountSid}.json`,
-        { headers: { Authorization: `Basic ${credentials}` } }
-      );
-      if (!res.ok) {
+      const credentials = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
+      let res: Response;
+      try {
+        res = await fetch(
+          `https://api.twilio.com/2010-04-01/Accounts/${accountSid}.json`,
+          { headers: { Authorization: `Basic ${credentials}` } }
+        );
+      } catch (fetchErr) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Could not reach Twilio. Please check your internet connection and try again.",
+        });
+      }
+      if (res.status === 401) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Invalid Twilio credentials. Please check your Account SID and Auth Token.",
+          message: "Twilio rejected these credentials (401 Unauthorized). Double-check that your Account SID starts with 'AC' and that the Auth Token is copied exactly from the Twilio Console dashboard — no extra spaces.",
+        });
+      }
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({})) as { message?: string; code?: number };
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: errBody.message
+            ? `Twilio error: ${errBody.message}`
+            : `Twilio returned an unexpected error (HTTP ${res.status}). Please verify your Account SID and Auth Token.`,
         });
       }
       const account = (await res.json()) as { friendly_name?: string; status?: string };
       if (account.status && account.status !== "active") {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `Twilio account is not active (status: ${account.status}).`,
+          message: `Twilio account is not active (status: ${account.status}). Please activate your Twilio account at console.twilio.com.`,
         });
       }
       await upsertIntegration({
         userId: ctx.user.id,
         provider: "twilio",
-        accessToken: input.authToken,          // stored as accessToken
-        accountId: input.accountSid,           // stored as accountId
-        accountEmail: input.fromPhone,         // stored as accountEmail (repurposed)
+        accessToken: authToken,          // stored as accessToken
+        accountId: accountSid,           // stored as accountId
+        accountEmail: input.fromPhone.trim(),  // stored as accountEmail (repurposed)
         metadata: { enabled: true, friendlyName: account.friendly_name ?? "" },
       });
       return { success: true };
@@ -112,10 +132,22 @@ export const integrationsRouter = router({
       if (!twilio?.accessToken || !twilio.accountId || !twilio.accountEmail) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Twilio is not configured." });
       }
+      // Normalize the destination phone: strip spaces, dashes, parentheses, then ensure E.164
+      let toPhone = input.toPhone.trim().replace(/[\s\-().]/g, "");
+      if (!toPhone.startsWith("+")) {
+        toPhone = `+1${toPhone}`; // default to US country code
+      }
+      // Basic E.164 sanity check: + followed by 7-15 digits
+      if (!/^\+[1-9]\d{6,14}$/.test(toPhone)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `"${input.toPhone}" doesn't look like a valid phone number. Use E.164 format, e.g. +15550001234 (include country code).`,
+        });
+      }
       const credentials = Buffer.from(`${twilio.accountId}:${twilio.accessToken}`).toString("base64");
       const body = new URLSearchParams({
         From: twilio.accountEmail,
-        To: input.toPhone,
+        To: toPhone,
         Body: "✅ Clarke & Associates CRM — Twilio SMS connection verified successfully!",
       });
       const res = await fetch(
@@ -123,8 +155,18 @@ export const integrationsRouter = router({
         { method: "POST", headers: { Authorization: `Basic ${credentials}`, "Content-Type": "application/x-www-form-urlencoded" }, body }
       );
       if (!res.ok) {
-        const err = (await res.json()) as { message?: string };
-        throw new TRPCError({ code: "BAD_REQUEST", message: err.message ?? "Failed to send test SMS." });
+        const err = (await res.json()) as { message?: string; code?: number };
+        // Twilio error code 21211 = invalid To number
+        if (err.code === 21211 || (err.message && err.message.toLowerCase().includes("invalid 'to'"))) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `The destination number "${toPhone}" was rejected by Twilio. Make sure it is a real, reachable phone number in E.164 format (e.g. +15550001234). Trial Twilio accounts can only send to verified numbers — verify the number at console.twilio.com/phone-numbers/verified.`,
+          });
+        }
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: err.message ?? "Failed to send test SMS. Check your Twilio account for details.",
+        });
       }
       return { success: true };
     }),
