@@ -190,3 +190,15 @@
 - [x] Dashboard: clickable recent leads rows linking to lead profile
 - [x] Dashboard: improved pipeline bar chart with per-bar color coding
 - [x] Dashboard: improved source pie chart with inline legend
+
+## Admin: Add Employee Logins & Delete Leads (User Request)
+- [x] Admin can create employee logins from User Management page (Add Employee dialog)
+- [x] Employee invite stores name, email, role in the system
+- [x] Invite link generated and displayed to admin (7-day expiry)
+- [x] Delete individual leads from the Leads list with confirmation dialog
+- [ ] Bulk delete selected leads from Leads list
+
+## Testing Update
+- [x] Invite system tests (5 tests: admin can list/create invites, user cannot, admin-level invite, unauthenticated blocked)
+- [x] Lead deletion tests (2 tests: authenticated can delete, unauthenticated blocked)
+- [x] Total: 78 tests passing

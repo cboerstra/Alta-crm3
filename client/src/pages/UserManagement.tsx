@@ -2,6 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -26,6 +27,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -36,31 +45,49 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import {
   Users,
   Shield,
   ShieldCheck,
   Search,
   MoreHorizontal,
-  ArrowUpDown,
   UserCog,
   Clock,
   Mail,
+  UserPlus,
+  Copy,
+  Check,
+  Trash2,
+  Link,
+  AlertCircle,
+  CalendarDays,
 } from "lucide-react";
 
 export default function UserManagement() {
   const { user: currentUser } = useAuth();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | "admin" | "user">("all");
-  const [confirmDialog, setConfirmDialog] = useState<{
-    open: boolean;
-    userId: number;
-    userName: string;
-    newRole: "admin" | "user";
+
+  // Invite dialog state
+  const [inviteDialog, setInviteDialog] = useState(false);
+  const [inviteForm, setInviteForm] = useState({ name: "", email: "", role: "user" as "admin" | "user" });
+  const [inviteResult, setInviteResult] = useState<{ token: string; expiresAt: Date } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Confirm dialogs
+  const [confirmRole, setConfirmRole] = useState<{
+    open: boolean; userId: number; userName: string; newRole: "admin" | "user";
   }>({ open: false, userId: 0, userName: "", newRole: "user" });
+  const [confirmDelete, setConfirmDelete] = useState<{
+    open: boolean; userId: number; userName: string;
+  }>({ open: false, userId: 0, userName: "" });
+  const [confirmRevokeInvite, setConfirmRevokeInvite] = useState<{
+    open: boolean; inviteId: number; inviteEmail: string;
+  }>({ open: false, inviteId: 0, inviteEmail: "" });
 
   const utils = trpc.useUtils();
 
@@ -68,8 +95,8 @@ export default function UserManagement() {
     search: search || undefined,
     role: roleFilter,
   });
-
   const { data: stats } = trpc.userManagement.stats.useQuery();
+  const { data: invites, isLoading: invitesLoading } = trpc.userManagement.listInvites.useQuery();
 
   const updateRole = trpc.userManagement.updateRole.useMutation({
     onSuccess: () => {
@@ -77,44 +104,92 @@ export default function UserManagement() {
       utils.userManagement.stats.invalidate();
       toast.success("User role updated successfully");
     },
-    onError: (err) => {
-      toast.error(err.message || "Failed to update role");
-    },
+    onError: (err) => toast.error(err.message || "Failed to update role"),
   });
 
-  const handleRoleChange = (userId: number, userName: string, newRole: "admin" | "user") => {
-    setConfirmDialog({ open: true, userId, userName, newRole });
+  const deleteUser = trpc.userManagement.deleteUser.useMutation({
+    onSuccess: () => {
+      utils.userManagement.list.invalidate();
+      utils.userManagement.stats.invalidate();
+      toast.success("User removed from the system");
+    },
+    onError: (err) => toast.error(err.message || "Failed to remove user"),
+  });
+
+  const createInvite = trpc.userManagement.createInvite.useMutation({
+    onSuccess: (data) => {
+      setInviteResult(data);
+      utils.userManagement.listInvites.invalidate();
+    },
+    onError: (err) => toast.error(err.message || "Failed to create invite"),
+  });
+
+  const revokeInvite = trpc.userManagement.deleteInvite.useMutation({
+    onSuccess: () => {
+      utils.userManagement.listInvites.invalidate();
+      toast.success("Invite revoked");
+    },
+    onError: (err) => toast.error(err.message || "Failed to revoke invite"),
+  });
+
+  const handleCreateInvite = () => {
+    if (!inviteForm.name.trim()) { toast.error("Name is required"); return; }
+    if (!inviteForm.email.trim()) { toast.error("Email is required"); return; }
+    createInvite.mutate(inviteForm);
   };
 
-  const confirmRoleChange = () => {
-    updateRole.mutate({
-      userId: confirmDialog.userId,
-      role: confirmDialog.newRole,
+  const handleCopyInviteLink = (token: string) => {
+    const link = `${window.location.origin}/?invite=${token}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast.success("Invite link copied to clipboard");
     });
-    setConfirmDialog({ open: false, userId: 0, userName: "", newRole: "user" });
+  };
+
+  const handleCloseInviteDialog = () => {
+    setInviteDialog(false);
+    setInviteResult(null);
+    setInviteForm({ name: "", email: "", role: "user" });
+    setCopied(false);
   };
 
   const formatDate = (date: Date | string | null) => {
     if (!date) return "Never";
     return new Date(date).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
+      month: "short", day: "numeric", year: "numeric",
     });
   };
+
+  const formatDateTime = (date: Date | string | null) => {
+    if (!date) return "Never";
+    return new Date(date).toLocaleDateString("en-US", {
+      month: "short", day: "numeric", year: "numeric",
+      hour: "numeric", minute: "2-digit",
+    });
+  };
+
+  const isExpired = (date: Date | string) => new Date(date) < new Date();
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground" style={{ fontFamily: "Raleway, sans-serif" }}>
-          User Management
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Manage team access and assign roles to CRM users
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground" style={{ fontFamily: "Raleway, sans-serif" }}>
+            User Management
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Manage team access, assign roles, and invite new employees
+          </p>
+        </div>
+        <Button
+          onClick={() => setInviteDialog(true)}
+          className="bg-brand-green hover:bg-brand-green-dark text-white gap-2"
+        >
+          <UserPlus className="h-4 w-4" />
+          Add Employee
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -154,223 +229,560 @@ export default function UserManagement() {
         </Card>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <UserCog className="h-5 w-5 text-brand-green" />
-              Team Members
-            </CardTitle>
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div className="relative flex-1 sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name or email..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9 h-9"
-                />
+      {/* Tabs: Active Users & Pending Invites */}
+      <Tabs defaultValue="users">
+        <TabsList className="mb-4">
+          <TabsTrigger value="users" className="gap-2">
+            <Users className="h-4 w-4" />
+            Active Users
+            {usersList && <Badge variant="secondary" className="ml-1 text-xs">{usersList.length}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="invites" className="gap-2">
+            <Link className="h-4 w-4" />
+            Pending Invites
+            {invites && invites.filter(i => !i.acceptedAt && !isExpired(i.expiresAt)).length > 0 && (
+              <Badge className="ml-1 text-xs bg-brand-gold/20 text-brand-gold-dark border-brand-gold/30">
+                {invites.filter(i => !i.acceptedAt && !isExpired(i.expiresAt)).length}
+              </Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Active Users Tab */}
+        <TabsContent value="users">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <UserCog className="h-5 w-5 text-brand-green" />
+                  Team Members
+                </CardTitle>
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by name or email..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="pl-9 h-9"
+                    />
+                  </div>
+                  <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as any)}>
+                    <SelectTrigger className="w-32 h-9">
+                      <SelectValue placeholder="Filter role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Roles</SelectItem>
+                      <SelectItem value="admin">Admins</SelectItem>
+                      <SelectItem value="user">Users</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <Select value={roleFilter} onValueChange={(v) => setRoleFilter(v as any)}>
-                <SelectTrigger className="w-32 h-9">
-                  <SelectValue placeholder="Filter role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="admin">Admins</SelectItem>
-                  <SelectItem value="user">Users</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-green" />
-            </div>
-          ) : !usersList?.length ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <Users className="h-12 w-12 mb-3 opacity-30" />
-              <p className="text-sm">No users found</p>
+            </CardHeader>
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-green" />
+                </div>
+              ) : !usersList?.length ? (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <Users className="h-12 w-12 mb-3 opacity-30" />
+                  <p className="text-sm">No users found</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="pl-6">User</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Last Sign In</TableHead>
+                        <TableHead>Joined</TableHead>
+                        <TableHead className="text-right pr-6">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {usersList.map((u) => {
+                        const isCurrentUser = u.id === currentUser?.id;
+                        const initials = (u.name || "?").charAt(0).toUpperCase();
+                        return (
+                          <TableRow key={u.id} className="group">
+                            <TableCell className="pl-6">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-9 w-9 border border-brand-green/20">
+                                  <AvatarFallback className="text-xs font-semibold bg-brand-green/10 text-brand-green">
+                                    {initials}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <p className="font-medium text-sm text-foreground">
+                                    {u.name || "Unnamed User"}
+                                    {isCurrentUser && (
+                                      <span className="ml-2 text-xs text-muted-foreground">(you)</span>
+                                    )}
+                                  </p>
+                                  {u.loginMethod && (
+                                    <p className="text-xs text-muted-foreground capitalize">{u.loginMethod}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                <Mail className="h-3.5 w-3.5" />
+                                {u.email || "—"}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {u.role === "admin" ? (
+                                <Badge className="bg-brand-gold/15 text-brand-gold-dark border-brand-gold/30 hover:bg-brand-gold/20">
+                                  <ShieldCheck className="h-3 w-3 mr-1" />
+                                  Admin
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-muted-foreground">
+                                  <Shield className="h-3 w-3 mr-1" />
+                                  User
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                <Clock className="h-3.5 w-3.5" />
+                                {formatDateTime(u.lastSignedIn)}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm text-muted-foreground">{formatDate(u.createdAt)}</span>
+                            </TableCell>
+                            <TableCell className="text-right pr-6">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-48">
+                                  {u.role === "user" ? (
+                                    <DropdownMenuItem
+                                      onClick={() => setConfirmRole({ open: true, userId: u.id, userName: u.name || "this user", newRole: "admin" })}
+                                      className="gap-2"
+                                    >
+                                      <ShieldCheck className="h-4 w-4 text-brand-gold" />
+                                      Promote to Admin
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem
+                                      onClick={() => !isCurrentUser && setConfirmRole({ open: true, userId: u.id, userName: u.name || "this user", newRole: "user" })}
+                                      disabled={isCurrentUser}
+                                      className="gap-2"
+                                    >
+                                      <Shield className="h-4 w-4 text-blue-500" />
+                                      Demote to User
+                                    </DropdownMenuItem>
+                                  )}
+                                  {!isCurrentUser && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        onClick={() => setConfirmDelete({ open: true, userId: u.id, userName: u.name || "this user" })}
+                                        className="gap-2 text-destructive focus:text-destructive"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                        Remove User
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Role Permissions Legend */}
+          <Card className="mt-4 bg-muted/30 border-dashed">
+            <CardContent className="p-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Role Permissions</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <ShieldCheck className="h-4 w-4 text-brand-gold" />
+                    <span className="font-semibold text-foreground">Admin</span>
+                  </div>
+                  <ul className="text-muted-foreground space-y-1 text-xs ml-6">
+                    <li>• Full CRM access (leads, webinars, deals)</li>
+                    <li>• Manage users and assign roles</li>
+                    <li>• Configure integrations and settings</li>
+                    <li>• Access revenue and analytics dashboards</li>
+                    <li>• Manage media library and landing pages</li>
+                  </ul>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Shield className="h-4 w-4 text-blue-500" />
+                    <span className="font-semibold text-foreground">User</span>
+                  </div>
+                  <ul className="text-muted-foreground space-y-1 text-xs ml-6">
+                    <li>• View and manage leads and pipeline</li>
+                    <li>• Create and manage webinars</li>
+                    <li>• Access scheduling and deals</li>
+                    <li>• View analytics dashboard</li>
+                    <li>• No access to settings or user management</li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Pending Invites Tab */}
+        <TabsContent value="invites">
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Link className="h-5 w-5 text-brand-green" />
+                  Pending Invites
+                </CardTitle>
+                <Button
+                  size="sm"
+                  onClick={() => setInviteDialog(true)}
+                  className="bg-brand-green hover:bg-brand-green-dark text-white gap-2"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  New Invite
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {invitesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-green" />
+                </div>
+              ) : !invites?.length ? (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <Link className="h-12 w-12 mb-3 opacity-30" />
+                  <p className="text-sm font-medium">No pending invites</p>
+                  <p className="text-xs mt-1">Click "Add Employee" to invite team members</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="pl-6">Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Expires</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead className="text-right pr-6">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {invites.map((inv) => {
+                        const expired = isExpired(inv.expiresAt);
+                        const accepted = !!inv.acceptedAt;
+                        return (
+                          <TableRow key={inv.id} className="group">
+                            <TableCell className="pl-6 font-medium text-sm">{inv.name || "—"}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                <Mail className="h-3.5 w-3.5" />
+                                {inv.email}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {inv.role === "admin" ? (
+                                <Badge className="bg-brand-gold/15 text-brand-gold-dark border-brand-gold/30">
+                                  <ShieldCheck className="h-3 w-3 mr-1" />Admin
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="text-muted-foreground">
+                                  <Shield className="h-3 w-3 mr-1" />User
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {accepted ? (
+                                <Badge className="bg-green-100 text-green-700 border-green-200">
+                                  <Check className="h-3 w-3 mr-1" />Accepted
+                                </Badge>
+                              ) : expired ? (
+                                <Badge variant="destructive" className="bg-red-100 text-red-700 border-red-200">
+                                  <AlertCircle className="h-3 w-3 mr-1" />Expired
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+                                  <Clock className="h-3 w-3 mr-1" />Pending
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                <CalendarDays className="h-3.5 w-3.5" />
+                                {formatDate(inv.expiresAt)}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm text-muted-foreground">{formatDate(inv.createdAt)}</span>
+                            </TableCell>
+                            <TableCell className="text-right pr-6">
+                              <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {!accepted && !expired && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 gap-1.5 text-xs"
+                                    onClick={() => handleCopyInviteLink(inv.token)}
+                                  >
+                                    <Copy className="h-3.5 w-3.5" />
+                                    Copy Link
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                  onClick={() => setConfirmRevokeInvite({ open: true, inviteId: inv.id, inviteEmail: inv.email })}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Add Employee / Create Invite Dialog */}
+      <Dialog open={inviteDialog} onOpenChange={(open) => { if (!open) handleCloseInviteDialog(); else setInviteDialog(true); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-brand-green" />
+              Add Employee
+            </DialogTitle>
+            <DialogDescription>
+              {inviteResult
+                ? "Invite created successfully. Share this link with the employee."
+                : "Create an invite link for a new team member. The link expires in 7 days."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {inviteResult ? (
+            // Show the invite link after creation
+            <div className="space-y-4">
+              <div className="rounded-lg bg-green-50 border border-green-200 p-4">
+                <div className="flex items-center gap-2 text-green-700 mb-2">
+                  <Check className="h-4 w-4" />
+                  <span className="text-sm font-semibold">Invite Created!</span>
+                </div>
+                <p className="text-xs text-green-600">
+                  Share this link with the employee. They'll be automatically added to the CRM when they sign in.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Invite Link</Label>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 rounded-md border bg-muted/50 px-3 py-2 text-xs font-mono text-muted-foreground truncate">
+                    {`${window.location.origin}/?invite=${inviteResult.token}`}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 gap-1.5"
+                    onClick={() => handleCopyInviteLink(inviteResult.token)}
+                  >
+                    {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                    {copied ? "Copied!" : "Copy"}
+                  </Button>
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <CalendarDays className="h-3.5 w-3.5" />
+                Expires: {new Date(inviteResult.expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+              </div>
+              <DialogFooter>
+                <Button onClick={handleCloseInviteDialog} className="w-full bg-brand-green hover:bg-brand-green-dark text-white">
+                  Done
+                </Button>
+              </DialogFooter>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="pl-6">User</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>
-                      <div className="flex items-center gap-1">
-                        Role
-                        <ArrowUpDown className="h-3 w-3" />
+            // Show the invite form
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="invite-name">
+                  Full Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="invite-name"
+                  placeholder="e.g. Jane Smith"
+                  value={inviteForm.name}
+                  onChange={(e) => setInviteForm(f => ({ ...f, name: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invite-email">
+                  Email Address <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="invite-email"
+                  type="email"
+                  placeholder="e.g. jane@clarkeassociates.com"
+                  value={inviteForm.email}
+                  onChange={(e) => setInviteForm(f => ({ ...f, email: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invite-role">Access Level</Label>
+                <Select value={inviteForm.role} onValueChange={(v) => setInviteForm(f => ({ ...f, role: v as "admin" | "user" }))}>
+                  <SelectTrigger id="invite-role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-blue-500" />
+                        <div>
+                          <p className="font-medium">User</p>
+                          <p className="text-xs text-muted-foreground">Can manage leads, webinars, and deals</p>
+                        </div>
                       </div>
-                    </TableHead>
-                    <TableHead>Last Sign In</TableHead>
-                    <TableHead>Joined</TableHead>
-                    <TableHead className="text-right pr-6">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {usersList.map((u) => {
-                    const isCurrentUser = u.id === currentUser?.id;
-                    const initials = (u.name || "?").charAt(0).toUpperCase();
-                    return (
-                      <TableRow key={u.id} className="group">
-                        <TableCell className="pl-6">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-9 w-9 border border-brand-green/20">
-                              <AvatarFallback className="text-xs font-semibold bg-brand-green/10 text-brand-green">
-                                {initials}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-medium text-sm text-foreground">
-                                {u.name || "Unnamed User"}
-                                {isCurrentUser && (
-                                  <span className="ml-2 text-xs text-muted-foreground">(you)</span>
-                                )}
-                              </p>
-                              {u.loginMethod && (
-                                <p className="text-xs text-muted-foreground capitalize">{u.loginMethod}</p>
-                              )}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                            <Mail className="h-3.5 w-3.5" />
-                            {u.email || "—"}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {u.role === "admin" ? (
-                            <Badge className="bg-brand-gold/15 text-brand-gold-dark border-brand-gold/30 hover:bg-brand-gold/20">
-                              <ShieldCheck className="h-3 w-3 mr-1" />
-                              Admin
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="text-muted-foreground">
-                              <Shield className="h-3 w-3 mr-1" />
-                              User
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                            <Clock className="h-3.5 w-3.5" />
-                            {formatDate(u.lastSignedIn)}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">
-                            {formatDate(u.createdAt)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right pr-6">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                              {u.role === "user" ? (
-                                <DropdownMenuItem
-                                  onClick={() => handleRoleChange(u.id, u.name || "this user", "admin")}
-                                  className="cursor-pointer"
-                                >
-                                  <ShieldCheck className="mr-2 h-4 w-4 text-brand-gold" />
-                                  Promote to Admin
-                                </DropdownMenuItem>
-                              ) : (
-                                <DropdownMenuItem
-                                  onClick={() => handleRoleChange(u.id, u.name || "this user", "user")}
-                                  disabled={isCurrentUser}
-                                  className="cursor-pointer"
-                                >
-                                  <Shield className="mr-2 h-4 w-4" />
-                                  Demote to User
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                                ID: {u.id} · {u.openId?.slice(0, 12)}...
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                    </SelectItem>
+                    <SelectItem value="admin">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="h-4 w-4 text-brand-gold" />
+                        <div>
+                          <p className="font-medium">Admin</p>
+                          <p className="text-xs text-muted-foreground">Full access including settings and user management</p>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700">
+                <p className="font-semibold mb-1">How it works:</p>
+                <ol className="space-y-1 list-decimal list-inside">
+                  <li>You'll receive an invite link after clicking "Create Invite"</li>
+                  <li>Share the link with the employee via email or message</li>
+                  <li>When they click the link and sign in, they're automatically added with the assigned role</li>
+                </ol>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={handleCloseInviteDialog}>Cancel</Button>
+                <Button
+                  onClick={handleCreateInvite}
+                  disabled={createInvite.isPending}
+                  className="bg-brand-green hover:bg-brand-green-dark text-white gap-2"
+                >
+                  {createInvite.isPending ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                  ) : (
+                    <UserPlus className="h-4 w-4" />
+                  )}
+                  Create Invite
+                </Button>
+              </DialogFooter>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </DialogContent>
+      </Dialog>
 
-      {/* Role Legend */}
-      <Card className="bg-muted/30">
-        <CardContent className="p-4">
-          <h3 className="text-sm font-semibold text-foreground mb-3">Role Permissions</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="flex items-start gap-3">
-              <div className="h-8 w-8 rounded-lg bg-brand-gold/10 flex items-center justify-center shrink-0 mt-0.5">
-                <ShieldCheck className="h-4 w-4 text-brand-gold" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">Admin</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Full access to all CRM features including user management, settings, integrations, and all data.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 mt-0.5">
-                <Shield className="h-4 w-4 text-blue-500" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">User</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Access to leads, pipeline, webinars, deals, scheduling, and revenue. Cannot manage users or settings.
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Confirmation Dialog */}
-      <AlertDialog open={confirmDialog.open} onOpenChange={(open) => !open && setConfirmDialog({ ...confirmDialog, open: false })}>
+      {/* Confirm Role Change */}
+      <AlertDialog open={confirmRole.open} onOpenChange={(open) => !open && setConfirmRole(p => ({ ...p, open: false }))}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {confirmDialog.newRole === "admin" ? "Promote to Admin?" : "Demote to User?"}
-            </AlertDialogTitle>
+            <AlertDialogTitle>Change User Role</AlertDialogTitle>
             <AlertDialogDescription>
-              {confirmDialog.newRole === "admin"
-                ? `This will give ${confirmDialog.userName} full admin access including user management, settings, and integrations.`
-                : `This will remove admin privileges from ${confirmDialog.userName}. They will no longer be able to manage users or access settings.`}
+              Are you sure you want to {confirmRole.newRole === "admin" ? "promote" : "demote"}{" "}
+              <strong>{confirmRole.userName}</strong> to{" "}
+              <strong>{confirmRole.newRole === "admin" ? "Admin" : "User"}</strong>?
+              {confirmRole.newRole === "admin" && " They will gain access to Settings and User Management."}
+              {confirmRole.newRole === "user" && " They will lose access to Settings and User Management."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmRoleChange}
-              className={
-                confirmDialog.newRole === "admin"
-                  ? "bg-brand-green hover:bg-brand-green-dark"
-                  : "bg-destructive hover:bg-destructive/90"
-              }
+              onClick={() => {
+                updateRole.mutate({ userId: confirmRole.userId, role: confirmRole.newRole });
+                setConfirmRole(p => ({ ...p, open: false }));
+              }}
+              className="bg-brand-green hover:bg-brand-green-dark text-white"
             >
-              {confirmDialog.newRole === "admin" ? "Promote" : "Demote"}
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm Delete User */}
+      <AlertDialog open={confirmDelete.open} onOpenChange={(open) => !open && setConfirmDelete(p => ({ ...p, open: false }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Remove User
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove <strong>{confirmDelete.userName}</strong> from the CRM?
+              They will lose all access immediately. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                deleteUser.mutate({ userId: confirmDelete.userId });
+                setConfirmDelete(p => ({ ...p, open: false }));
+              }}
+              className="bg-destructive hover:bg-destructive/90 text-white"
+            >
+              Remove User
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm Revoke Invite */}
+      <AlertDialog open={confirmRevokeInvite.open} onOpenChange={(open) => !open && setConfirmRevokeInvite(p => ({ ...p, open: false }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke Invite</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to revoke the invite for <strong>{confirmRevokeInvite.inviteEmail}</strong>?
+              The invite link will no longer work.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                revokeInvite.mutate({ inviteId: confirmRevokeInvite.inviteId });
+                setConfirmRevokeInvite(p => ({ ...p, open: false }));
+              }}
+              className="bg-destructive hover:bg-destructive/90 text-white"
+            >
+              Revoke Invite
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

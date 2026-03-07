@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { adminProcedure, router } from "../_core/trpc";
-import { getDb } from "../db";
-import { users } from "../../drizzle/schema";
+import { getDb, createInvite, listInvites, deleteInvite } from "../db";
+import { users, pendingInvites } from "../../drizzle/schema";
 import { eq, desc, sql, like, or } from "drizzle-orm";
+import { nanoid } from "nanoid";
 
 export const userManagementRouter = router({
   // List all users with search/filter
@@ -107,5 +108,50 @@ export const userManagementRouter = router({
         .where(eq(users.id, input.userId))
         .limit(1);
       return user ?? null;
+    }),
+
+  // Remove a user from the system
+  deleteUser: adminProcedure
+    .input(z.object({ userId: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      if (input.userId === ctx.user.id) throw new Error("You cannot delete your own account.");
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+      await db.delete(users).where(eq(users.id, input.userId));
+      return { success: true };
+    }),
+
+  // Create an invite for a new employee
+  createInvite: adminProcedure
+    .input(z.object({
+      email: z.string().email(),
+      name: z.string().min(1),
+      role: z.enum(["admin", "user"]).default("user"),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const token = nanoid(32);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      await createInvite({
+        email: input.email,
+        name: input.name,
+        role: input.role,
+        token,
+        invitedBy: ctx.user.id,
+        expiresAt,
+      });
+      return { token, expiresAt };
+    }),
+
+  // List all pending invites
+  listInvites: adminProcedure.query(async () => {
+    return listInvites();
+  }),
+
+  // Delete/revoke an invite
+  deleteInvite: adminProcedure
+    .input(z.object({ inviteId: z.number() }))
+    .mutation(async ({ input }) => {
+      await deleteInvite(input.inviteId);
+      return { success: true };
     }),
 });

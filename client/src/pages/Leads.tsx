@@ -5,9 +5,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { useLocation } from "wouter";
-import { Plus, Search, Users, Filter, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { Plus, Search, Users, Filter, ChevronLeft, ChevronRight, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 const STAGES = [
@@ -39,7 +49,16 @@ export default function Leads() {
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "", source: "", campaign: "" });
 
+  // Delete confirmation state
+  const [confirmDelete, setConfirmDelete] = useState<{
+    open: boolean;
+    leadId: number;
+    leadName: string;
+  }>({ open: false, leadId: 0, leadName: "" });
+
   const stableSearch = useMemo(() => search, [search]);
+  const utils = trpc.useUtils();
+
   const { data, isLoading, refetch } = trpc.leads.list.useQuery({
     search: stableSearch || undefined,
     stage: stage !== "all" ? stage : undefined,
@@ -55,6 +74,14 @@ export default function Leads() {
       refetch();
     },
     onError: (e) => toast.error(e.message),
+  });
+
+  const deleteMutation = trpc.leads.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Lead deleted successfully");
+      refetch();
+    },
+    onError: (e) => toast.error(e.message || "Failed to delete lead"),
   });
 
   const scoreMutation = trpc.leads.scoreWithLLM.useMutation({
@@ -171,7 +198,7 @@ export default function Leads() {
                   {data.items.map((lead) => (
                     <tr
                       key={lead.id}
-                      className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer"
+                      className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer group"
                       onClick={() => setLocation(`/leads/${lead.id}`)}
                     >
                       <td className="p-3">
@@ -205,9 +232,31 @@ export default function Leads() {
                         )}
                       </td>
                       <td className="p-3">
-                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); setLocation(`/leads/${lead.id}`); }}>
-                          View
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={(e) => { e.stopPropagation(); setLocation(`/leads/${lead.id}`); }}
+                          >
+                            View
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmDelete({
+                                open: true,
+                                leadId: lead.id,
+                                leadName: `${lead.firstName} ${lead.lastName}`,
+                              });
+                            }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -234,6 +283,38 @@ export default function Leads() {
           </div>
         </div>
       )}
+
+      {/* Delete Lead Confirmation */}
+      <AlertDialog
+        open={confirmDelete.open}
+        onOpenChange={(open) => !open && setConfirmDelete(p => ({ ...p, open: false }))}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Delete Lead
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete{" "}
+              <strong>{confirmDelete.leadName}</strong>? This will remove all their data,
+              including notes, activity history, and deal associations. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90 text-white"
+              onClick={() => {
+                deleteMutation.mutate({ id: confirmDelete.leadId });
+                setConfirmDelete(p => ({ ...p, open: false }));
+              }}
+            >
+              Delete Lead
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

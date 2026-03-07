@@ -28,12 +28,41 @@ export function registerOAuthRoutes(app: Express) {
         return;
       }
 
+      // Check if there's an invite token in the state (encoded as base64 JSON)
+      let inviteRole: "admin" | "user" | undefined;
+      let inviteToken: string | undefined;
+      try {
+        const decoded = atob(state);
+        // State may be a JSON object with redirectUri and inviteToken
+        if (decoded.startsWith("{")) {
+          const parsed = JSON.parse(decoded) as { redirectUri?: string; inviteToken?: string };
+          inviteToken = parsed.inviteToken;
+        }
+      } catch {
+        // State is plain redirectUri, no invite token
+      }
+
+      // If there's an invite token, validate it and get the role
+      if (inviteToken && userInfo.email) {
+        const invite = await db.getInviteByToken(inviteToken);
+        if (
+          invite &&
+          !invite.acceptedAt &&
+          new Date(invite.expiresAt) > new Date() &&
+          invite.email.toLowerCase() === userInfo.email.toLowerCase()
+        ) {
+          inviteRole = invite.role as "admin" | "user";
+          await db.acceptInvite(inviteToken);
+        }
+      }
+
       await db.upsertUser({
         openId: userInfo.openId,
         name: userInfo.name || null,
         email: userInfo.email ?? null,
         loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
         lastSignedIn: new Date(),
+        ...(inviteRole ? { role: inviteRole } : {}),
       });
 
       const sessionToken = await sdk.createSessionToken(userInfo.openId, {

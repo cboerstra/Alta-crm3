@@ -13,6 +13,7 @@ import {
   bookings, InsertBooking,
   integrations,
   webinarSessions, InsertWebinarSession,
+  pendingInvites, InsertPendingInvite,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -516,4 +517,66 @@ export async function getDashboardMetrics() {
     leadsBySource: leadsBySource.map((r) => ({ source: r.source ?? "Direct", count: Number(r.count) })),
     recentLeads,
   };
+}
+
+// ─── Lead Delete ──────────────────────────────────────────────────────────────
+export async function deleteLead(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  // Delete related records first to avoid FK constraint issues
+  await db.delete(activityLog).where(eq(activityLog.leadId, id));
+  await db.delete(smsMessages).where(eq(smsMessages.leadId, id));
+  await db.delete(emailReminders).where(eq(emailReminders.leadId, id));
+  await db.delete(leads).where(eq(leads.id, id));
+}
+
+export async function deleteLeads(ids: number[]): Promise<void> {
+  if (ids.length === 0) return;
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(activityLog).where(inArray(activityLog.leadId, ids));
+  await db.delete(smsMessages).where(inArray(smsMessages.leadId, ids));
+  await db.delete(emailReminders).where(inArray(emailReminders.leadId, ids));
+  await db.delete(leads).where(inArray(leads.id, ids));
+}
+
+// ─── Pending Invites ──────────────────────────────────────────────────────────
+export async function createInvite(data: InsertPendingInvite): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [result] = await db.insert(pendingInvites).values(data).$returningId();
+  return result!.id;
+}
+
+export async function getInviteByToken(token: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const [invite] = await db
+    .select()
+    .from(pendingInvites)
+    .where(eq(pendingInvites.token, token))
+    .limit(1);
+  return invite ?? null;
+}
+
+export async function acceptInvite(token: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(pendingInvites)
+    .set({ acceptedAt: new Date() })
+    .where(eq(pendingInvites.token, token));
+}
+
+export async function listInvites(invitedBy?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const query = db.select().from(pendingInvites).orderBy(desc(pendingInvites.createdAt));
+  return query;
+}
+
+export async function deleteInvite(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(pendingInvites).where(eq(pendingInvites.id, id));
 }

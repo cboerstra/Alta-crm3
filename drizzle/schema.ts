@@ -310,6 +310,21 @@ export const mediaLibrary = mysqlTable("media_library", {
 export type MediaItem = typeof mediaLibrary.$inferSelect;
 export type InsertMediaItem = typeof mediaLibrary.$inferInsert;
 
+// ─── Pending Invites ─────────────────────────────────────────────────────────
+export const pendingInvites = mysqlTable("pending_invites", {
+  id: int("id").autoincrement().primaryKey(),
+  email: varchar("email", { length: 320 }).notNull(),
+  name: text("name"),
+  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  invitedBy: int("invitedBy").notNull(),
+  acceptedAt: timestamp("acceptedAt"),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PendingInvite = typeof pendingInvites.$inferSelect;
+export type InsertPendingInvite = typeof pendingInvites.$inferInsert;
+
 // ─── Landing Page Media (many-to-many: foreground logos/images per landing page) ─
 export const landingPageMedia = mysqlTable("landing_page_media", {
   id: int("id").autoincrement().primaryKey(),

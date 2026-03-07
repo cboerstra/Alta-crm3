@@ -217,3 +217,75 @@ describe("Role-Based Access Control", () => {
     });
   });
 });
+
+describe("Invite System - Admin Only", () => {
+  it("admin can list invites", async () => {
+    const ctx = createAdminContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.userManagement.listInvites();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("regular user cannot list invites", async () => {
+    const ctx = createUserContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.userManagement.listInvites()).rejects.toThrow();
+  });
+
+  it("admin can create an invite", async () => {
+    const ctx = createAdminContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.userManagement.createInvite({
+      email: "newemployee@test.com",
+      name: "New Employee",
+      role: "user",
+    });
+    expect(result).toBeDefined();
+    expect(result.token).toBeDefined();
+    expect(result.expiresAt).toBeDefined();
+    expect(typeof result.token).toBe("string");
+    expect(result.token.length).toBeGreaterThan(10);
+  });
+
+  it("admin can create an admin-level invite", async () => {
+    const ctx = createAdminContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.userManagement.createInvite({
+      email: "newadmin@test.com",
+      name: "New Admin",
+      role: "admin",
+    });
+    expect(result.token).toBeDefined();
+  });
+
+  it("regular user cannot create an invite", async () => {
+    const ctx = createUserContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.userManagement.createInvite({ email: "x@x.com", name: "X", role: "user" })
+    ).rejects.toThrow();
+  });
+});
+
+describe("Lead Deletion", () => {
+  it("authenticated user can delete a lead", async () => {
+    const ctx = createAdminContext();
+    const caller = appRouter.createCaller(ctx);
+    // Create a lead first
+    const created = await caller.leads.create({
+      firstName: "Delete",
+      lastName: "Me",
+      email: "deleteme@test.com",
+    });
+    expect(typeof created.id).toBe("number");
+    // Now delete it
+    const result = await caller.leads.delete({ id: created.id });
+    expect(result).toEqual({ success: true });
+  });
+
+  it("unauthenticated user cannot delete a lead", async () => {
+    const ctx = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.leads.delete({ id: 9999 })).rejects.toThrow();
+  });
+});

@@ -4,7 +4,7 @@ import {
   createLead, getLeads, getLeadById, updateLead, updateLeadStage,
   logActivity, getActivityByLeadId, updateLeadScore,
   getLandingPageBySlug, getWebinarById, getWebinarSessionById,
-  createEmailReminder,
+  createEmailReminder, deleteLead, deleteLeads,
 } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { notifyOwner } from "../_core/notification";
@@ -161,6 +161,20 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
         content: parsed.reason,
       });
       return { score, reason: parsed.reason };
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      await deleteLead(input.id);
+      return { success: true };
+    }),
+
+  bulkDelete: protectedProcedure
+    .input(z.object({ ids: z.array(z.number()).min(1) }))
+    .mutation(async ({ input }) => {
+      await deleteLeads(input.ids);
+      return { success: true, count: input.ids.length };
     }),
 
   // Public endpoint for landing page form submissions
