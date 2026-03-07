@@ -221,6 +221,14 @@ export async function deleteWebinar(id: number) {
   await db.delete(webinarSessions).where(eq(webinarSessions.webinarId, id));
   await db.delete(webinars).where(eq(webinars.id, id));
 }
+export async function deleteWebinars(ids: number[]) {
+  const db = await getDb();
+  if (!db) return;
+  for (const id of ids) {
+    await db.delete(webinarSessions).where(eq(webinarSessions.webinarId, id));
+  }
+  await db.delete(webinars).where(inArray(webinars.id, ids));
+}
 
 export async function getWebinarSessionById(id: number) {
   const db = await getDb();

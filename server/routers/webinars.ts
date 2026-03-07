@@ -6,7 +6,7 @@ import {
   createEmailReminder, getRemindersByLead,
   createWebinarSession, getWebinarSessions, deleteWebinarSessions, getWebinarSessionById,
   createLandingPage, getLandingPageBySlug, updateLandingPage,
-  deleteWebinar,
+  deleteWebinar, deleteWebinars,
 } from "../db";
 
 export const webinarsRouter = router({
@@ -295,5 +295,12 @@ export const webinarsRouter = router({
     .mutation(async ({ input }) => {
       await deleteWebinar(input.id);
       return { success: true };
+    }),
+
+  bulkDelete: protectedProcedure
+    .input(z.object({ ids: z.array(z.number()).min(1) }))
+    .mutation(async ({ input }) => {
+      await deleteWebinars(input.ids);
+      return { success: true, count: input.ids.length };
     }),
 });

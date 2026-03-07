@@ -209,3 +209,11 @@
 - [x] Show bulk-action toolbar when any leads are selected (count + Delete Selected button)
 - [x] Confirm bulk delete with count in AlertDialog
 - [x] Keep individual per-row delete button (hover trash icon)
+
+## Bulk Webinar Deletion (User Request)
+- [x] Add checkboxes to each webinar card on the Webinars page
+- [x] Add "select all" checkbox above the list
+- [x] Show bulk-action toolbar when any webinars are selected (count + Delete Selected button)
+- [x] Confirm bulk delete with count in AlertDialog
+- [x] Keep individual per-card delete button (hover trash icon)
+- [x] Add bulkDelete backend procedure to webinars router

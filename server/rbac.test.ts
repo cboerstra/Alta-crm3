@@ -309,3 +309,24 @@ describe("Bulk Lead Deletion", () => {
     await expect(caller.leads.bulkDelete({ ids: [1, 2] })).rejects.toThrow();
   });
 });
+
+describe("Bulk Webinar Deletion", () => {
+  it("authenticated user can bulk delete multiple webinars", async () => {
+    const ctx = createAdminContext();
+    const caller = appRouter.createCaller(ctx);
+    // Create two webinars
+    const now = Date.now();
+    const a = await caller.webinars.create({ title: "Bulk Webinar A", scheduledAt: now + 86400000, durationMinutes: 60 });
+    const b = await caller.webinars.create({ title: "Bulk Webinar B", scheduledAt: now + 172800000, durationMinutes: 60 });
+    // Bulk delete both
+    const result = await caller.webinars.bulkDelete({ ids: [a.id, b.id] });
+    expect(result.success).toBe(true);
+    expect(result.count).toBe(2);
+  });
+
+  it("unauthenticated user cannot bulk delete webinars", async () => {
+    const ctx = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.webinars.bulkDelete({ ids: [1, 2] })).rejects.toThrow();
+  });
+});

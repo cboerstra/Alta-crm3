@@ -7,12 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
-import { Plus, Video, Calendar, Clock, ExternalLink, Trash2, FileText, Search, Filter, Users } from "lucide-react";
+import { Plus, Video, Calendar, Clock, ExternalLink, Trash2, FileText, Search, Filter, Users, X } from "lucide-react";
 import { toast } from "sonner";
 
 const statusColors: Record<string, string> = {
@@ -44,6 +45,10 @@ export default function Webinars() {
   });
   const [additionalSessions, setAdditionalSessions] = useState<SessionDraft[]>([]);
 
+  // Selection state
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+
   const { data: webinars, isLoading, refetch } = trpc.webinars.list.useQuery();
 
   const createMutation = trpc.webinars.create.useMutation({
@@ -64,6 +69,15 @@ export default function Webinars() {
       refetch();
     },
     onError: (e) => toast.error(e.message),
+  });
+
+  const bulkDeleteMutation = trpc.webinars.bulkDelete.useMutation({
+    onSuccess: (data) => {
+      toast.success(`${data.count} webinar${data.count === 1 ? "" : "s"} deleted`);
+      setSelected(new Set());
+      refetch();
+    },
+    onError: (e) => toast.error(e.message || "Failed to delete webinars"),
   });
 
   function resetForm() {
@@ -122,6 +136,30 @@ export default function Webinars() {
   }, [webinars, search, statusFilter]);
 
   const webinarToDelete = webinars?.find(w => w.id === deleteId);
+
+  // Selection helpers
+  const filteredIds = filtered.map(w => w.id);
+  const allSelected = filteredIds.length > 0 && filteredIds.every(id => selected.has(id));
+  const someSelected = filteredIds.some(id => selected.has(id));
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      const next = new Set(selected);
+      filteredIds.forEach(id => next.delete(id));
+      setSelected(next);
+    } else {
+      const next = new Set(selected);
+      filteredIds.forEach(id => next.add(id));
+      setSelected(next);
+    }
+  };
+
+  const toggleSelect = (id: number) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+  };
 
   return (
     <div className="space-y-6">
@@ -222,7 +260,7 @@ export default function Webinars() {
                 {form.createLandingPage && (
                   <div>
                     <Label>Custom URL Slug (optional)</Label>
-                    <div className="text-xs text-muted-foreground mb-1">/lp/<span className="font-medium">{form.landingPageSlug || autoSlug || "your-slug"}</span></div>
+                    <div className="text-xs text-muted-foreground mb-1">/lp/<span className="font-mono">{form.landingPageSlug || autoSlug || "auto-generated"}</span></div>
                     <Input
                       value={form.landingPageSlug}
                       onChange={(e) => setForm({ ...form, landingPageSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })}
@@ -250,11 +288,11 @@ export default function Webinars() {
           <Input
             placeholder="Search webinars..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setSelected(new Set()); }}
             className="pl-9"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setSelected(new Set()); }}>
           <SelectTrigger className="w-40 gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
             <SelectValue placeholder="All statuses" />
@@ -269,6 +307,36 @@ export default function Webinars() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Bulk Action Toolbar */}
+      {selected.size > 0 && (
+        <div className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-2.5">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-foreground">
+              {selected.size} webinar{selected.size === 1 ? "" : "s"} selected
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs text-muted-foreground gap-1"
+              onClick={() => setSelected(new Set())}
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear selection
+            </Button>
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="gap-2"
+            onClick={() => setConfirmBulkDelete(true)}
+            disabled={bulkDeleteMutation.isPending}
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete {selected.size} Webinar{selected.size === 1 ? "" : "s"}
+          </Button>
+        </div>
+      )}
 
       {/* Webinar List */}
       {isLoading ? (
@@ -302,63 +370,97 @@ export default function Webinars() {
         </Card>
       ) : (
         <div className="grid gap-3">
-          {filtered.map((webinar) => (
-            <Card
-              key={webinar.id}
-              className="border-0 shadow-sm hover:shadow-md transition-all cursor-pointer group"
-              onClick={() => setLocation(`/webinars/${webinar.id}`)}
-            >
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <h3 className="text-base font-semibold truncate" style={{ fontFamily: "Raleway, sans-serif" }}>{webinar.title}</h3>
-                      <Badge className={`text-xs shrink-0 ${statusColors[webinar.status] || ""}`}>{webinar.status}</Badge>
-                      {webinar.landingPageId && (
-                        <Badge variant="outline" className="text-[10px] gap-1 shrink-0">
-                          <FileText className="h-2.5 w-2.5" /> Landing Page
-                        </Badge>
-                      )}
+          {/* Select-all row */}
+          {filtered.length > 1 && (
+            <div className="flex items-center gap-3 px-1 pb-1">
+              <Checkbox
+                checked={allSelected}
+                data-state={someSelected && !allSelected ? "indeterminate" : undefined}
+                onCheckedChange={toggleSelectAll}
+                aria-label="Select all visible webinars"
+                className="border-muted-foreground/40"
+              />
+              <span className="text-xs text-muted-foreground">
+                {allSelected ? "Deselect all" : `Select all ${filtered.length} webinars`}
+              </span>
+            </div>
+          )}
+
+          {filtered.map((webinar) => {
+            const isSelected = selected.has(webinar.id);
+            return (
+              <Card
+                key={webinar.id}
+                className={`border-0 shadow-sm hover:shadow-md transition-all cursor-pointer group ${isSelected ? "ring-1 ring-destructive/40 bg-destructive/5" : ""}`}
+                onClick={() => setLocation(`/webinars/${webinar.id}`)}
+              >
+                <CardContent className="p-5">
+                  <div className="flex items-start gap-3">
+                    {/* Checkbox */}
+                    <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleSelect(webinar.id)}
+                        aria-label={`Select ${webinar.title}`}
+                        className="border-muted-foreground/40"
+                      />
                     </div>
-                    {webinar.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-1 mb-2">{webinar.description}</p>
-                    )}
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3.5 w-3.5 text-brand-green" />
-                        {new Date(webinar.scheduledAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5 text-brand-green" />
-                        {new Date(webinar.scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3.5 w-3.5 text-brand-green" />
-                        {webinar.durationMinutes} min
-                      </span>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <h3 className="text-base font-semibold truncate" style={{ fontFamily: "Raleway, sans-serif" }}>{webinar.title}</h3>
+                            <Badge className={`text-xs shrink-0 ${statusColors[webinar.status] || ""}`}>{webinar.status}</Badge>
+                            {webinar.landingPageId && (
+                              <Badge variant="outline" className="text-[10px] gap-1 shrink-0">
+                                <FileText className="h-2.5 w-2.5" /> Landing Page
+                              </Badge>
+                            )}
+                          </div>
+                          {webinar.description && (
+                            <p className="text-sm text-muted-foreground line-clamp-1 mb-2">{webinar.description}</p>
+                          )}
+                          <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3.5 w-3.5 text-brand-green" />
+                              {new Date(webinar.scheduledAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3.5 w-3.5 text-brand-green" />
+                              {new Date(webinar.scheduledAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3.5 w-3.5 text-brand-green" />
+                              {webinar.durationMinutes} min
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex gap-1 ml-3 shrink-0">
+                          {webinar.zoomJoinUrl && (
+                            <a href={webinar.zoomJoinUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                              <Button variant="outline" size="sm" className="gap-1 text-xs">
+                                <ExternalLink className="h-3 w-3" /> Zoom
+                              </Button>
+                            </a>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => { e.stopPropagation(); setDeleteId(webinar.id); }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex gap-1 ml-3 shrink-0">
-                    {webinar.zoomJoinUrl && (
-                      <a href={webinar.zoomJoinUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="outline" size="sm" className="gap-1 text-xs">
-                          <ExternalLink className="h-3 w-3" /> Zoom
-                        </Button>
-                      </a>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => { e.stopPropagation(); setDeleteId(webinar.id); }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
+
           {filtered.length > 0 && (
             <p className="text-xs text-muted-foreground text-center pt-1">
               Showing {filtered.length} of {webinars.length} webinar{webinars.length !== 1 ? "s" : ""}
@@ -367,11 +469,14 @@ export default function Webinars() {
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
+      {/* Single Delete Confirmation */}
       <AlertDialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Webinar?</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Delete Webinar?
+            </AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete <strong>"{webinarToDelete?.title}"</strong> and all its sessions. This action cannot be undone.
             </AlertDialogDescription>
@@ -384,6 +489,33 @@ export default function Webinars() {
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete Webinar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={confirmBulkDelete} onOpenChange={setConfirmBulkDelete}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Delete {selected.size} Webinar{selected.size === 1 ? "" : "s"}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to permanently delete <strong>{selected.size} webinar{selected.size === 1 ? "" : "s"}</strong> and all their sessions. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                bulkDeleteMutation.mutate({ ids: Array.from(selected) });
+                setConfirmBulkDelete(false);
+              }}
+            >
+              Delete {selected.size} Webinar{selected.size === 1 ? "" : "s"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
