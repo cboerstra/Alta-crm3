@@ -202,3 +202,10 @@
 - [x] Invite system tests (5 tests: admin can list/create invites, user cannot, admin-level invite, unauthenticated blocked)
 - [x] Lead deletion tests (2 tests: authenticated can delete, unauthenticated blocked)
 - [x] Total: 78 tests passing
+
+## Bulk Lead Deletion (User Request)
+- [x] Add checkboxes to each lead row in the Leads list
+- [x] Add "select all" checkbox in the table header
+- [x] Show bulk-action toolbar when any leads are selected (count + Delete Selected button)
+- [x] Confirm bulk delete with count in AlertDialog
+- [x] Keep individual per-row delete button (hover trash icon)

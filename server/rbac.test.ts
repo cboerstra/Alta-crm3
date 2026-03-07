@@ -289,3 +289,23 @@ describe("Lead Deletion", () => {
     await expect(caller.leads.delete({ id: 9999 })).rejects.toThrow();
   });
 });
+
+describe("Bulk Lead Deletion", () => {
+  it("authenticated user can bulk delete multiple leads", async () => {
+    const ctx = createAdminContext();
+    const caller = appRouter.createCaller(ctx);
+    // Create two leads
+    const a = await caller.leads.create({ firstName: "Bulk", lastName: "One", email: "bulk1@test.com" });
+    const b = await caller.leads.create({ firstName: "Bulk", lastName: "Two", email: "bulk2@test.com" });
+    // Bulk delete both
+    const result = await caller.leads.bulkDelete({ ids: [a.id, b.id] });
+    expect(result.success).toBe(true);
+    expect(result.count).toBe(2);
+  });
+
+  it("unauthenticated user cannot bulk delete leads", async () => {
+    const ctx = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.leads.bulkDelete({ ids: [1, 2] })).rejects.toThrow();
+  });
+});
