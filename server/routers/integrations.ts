@@ -2,13 +2,15 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { adminProcedure, router } from "../_core/trpc";
 import { getIntegration, upsertIntegration } from "../db";
+import { verifyGmailCredentials, sendEmail } from "../email";
 
 export const integrationsRouter = router({
   getStatus: adminProcedure.query(async ({ ctx }) => {
-    const [zoom, google, twilio] = await Promise.all([
+    const [zoom, google, twilio, gmail] = await Promise.all([
       getIntegration(ctx.user.id, "zoom"),
       getIntegration(ctx.user.id, "google_calendar"),
       getIntegration(ctx.user.id, "twilio"),
+      getIntegration(ctx.user.id, "gmail"),
     ]);
     return {
       zoom: zoom
@@ -22,12 +24,104 @@ export const integrationsRouter = router({
             connected: true,
             accountSid: twilio.accountId ?? "",
             fromPhone: twilio.accountEmail ?? "",
-            // Never expose the raw auth token — return a masked hint only
             authTokenHint: twilio.accessToken ? `****${twilio.accessToken.slice(-4)}` : "",
             enabled: (twilio.metadata as { enabled?: boolean } | null)?.enabled !== false,
           }
         : { connected: false },
+      gmail: gmail
+        ? {
+            connected: true,
+            gmailAddress: gmail.accountEmail ?? "",
+            appPasswordHint: gmail.accessToken ? `****${gmail.accessToken.slice(-4)}` : "",
+            enabled: (gmail.metadata as { enabled?: boolean } | null)?.enabled !== false,
+          }
+        : { connected: false },
     };
+  }),
+
+  // ─── Gmail SMTP ───────────────────────────────────────────────────────────────
+
+  connectGmail: adminProcedure
+    .input(z.object({
+      gmailAddress: z.string().email("Must be a valid Gmail address"),
+      appPassword: z.string().min(1, "App Password is required"),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const addr = input.gmailAddress.trim().toLowerCase();
+      const pass = input.appPassword.trim().replace(/\s/g, ""); // strip spaces from 16-char password
+      // Verify credentials by connecting to Gmail SMTP
+      try {
+        await verifyGmailCredentials(addr, pass);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("Invalid login") || msg.includes("Username and Password") || msg.includes("535")) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Gmail rejected these credentials. Make sure you are using an App Password (not your regular Gmail password). Generate one at myaccount.google.com → Security → 2-Step Verification → App Passwords.",
+          });
+        }
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Could not connect to Gmail: ${msg}`,
+        });
+      }
+      await upsertIntegration({
+        userId: ctx.user.id,
+        provider: "gmail",
+        accessToken: pass,
+        accountEmail: addr,
+        metadata: { enabled: true },
+      });
+      return { success: true };
+    }),
+
+  testGmail: adminProcedure
+    .input(z.object({ toEmail: z.string().email("Must be a valid email address") }))
+    .mutation(async ({ input, ctx }) => {
+      const gmail = await getIntegration(ctx.user.id, "gmail");
+      if (!gmail?.accessToken || !gmail.accountEmail) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Gmail is not configured." });
+      }
+      try {
+        await sendEmail(gmail.accountEmail, gmail.accessToken, {
+          from: `Clarke & Associates CRM <${gmail.accountEmail}>`,
+          to: input.toEmail,
+          subject: "✅ Clarke & Associates CRM — Gmail connection verified",
+          html: `<p>Your Gmail integration is working correctly.</p><p>Emails from the CRM will be sent from <strong>${gmail.accountEmail}</strong>.</p>`,
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Failed to send test email: ${msg}` });
+      }
+      return { success: true };
+    }),
+
+  toggleGmail: adminProcedure
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(async ({ input, ctx }) => {
+      const gmail = await getIntegration(ctx.user.id, "gmail");
+      if (!gmail) throw new TRPCError({ code: "NOT_FOUND", message: "Gmail is not configured." });
+      await upsertIntegration({
+        userId: ctx.user.id,
+        provider: "gmail",
+        accessToken: gmail.accessToken ?? undefined,
+        accountEmail: gmail.accountEmail ?? undefined,
+        metadata: { ...(gmail.metadata as object ?? {}), enabled: input.enabled },
+      });
+      return { success: true };
+    }),
+
+  disconnectGmail: adminProcedure.mutation(async ({ ctx }) => {
+    const { getDb } = await import("../db");
+    const { integrations } = await import("../../drizzle/schema");
+    const { and, eq } = await import("drizzle-orm");
+    const db = await getDb();
+    if (db) {
+      await db.delete(integrations).where(
+        and(eq(integrations.userId, ctx.user.id), eq(integrations.provider, "gmail"))
+      );
+    }
+    return { success: true };
   }),
 
   connectZoom: adminProcedure

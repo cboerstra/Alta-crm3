@@ -456,7 +456,7 @@ export async function getUserBySchedulingSlug(slug: string) {
 }
 
 // ─── Integrations ─────────────────────────────────────────────────────────────
-export async function getIntegration(userId: number, provider: "zoom" | "google_calendar" | "twilio") {
+export async function getIntegration(userId: number, provider: "zoom" | "google_calendar" | "twilio" | "gmail") {
   const db = await getDb();
   if (!db) return undefined;
   const r = await db.select().from(integrations)
@@ -466,7 +466,7 @@ export async function getIntegration(userId: number, provider: "zoom" | "google_
 
 export async function upsertIntegration(data: {
   userId: number;
-  provider: "zoom" | "google_calendar" | "twilio";
+  provider: "zoom" | "google_calendar" | "twilio" | "gmail";
   accessToken?: string;
   refreshToken?: string;
   tokenExpiresAt?: Date;
@@ -484,7 +484,7 @@ export async function upsertIntegration(data: {
   }
 }
 
-export async function deleteIntegration(userId: number, provider: "zoom" | "google_calendar" | "twilio") {
+export async function deleteIntegration(userId: number, provider: "zoom" | "google_calendar" | "twilio" | "gmail") {
   const db = await getDb();
   if (!db) return;
   await db.delete(integrations).where(and(eq(integrations.userId, userId), eq(integrations.provider, provider)));

@@ -236,3 +236,17 @@
 - [x] Account SID field shows inline red error if value doesn't start with 'AC'
 - [x] Setup form now shows step-by-step guide to find credentials in Twilio Console
 - [x] All 82 tests passing
+
+## Gmail Email Integration (User Request)
+- [x] Extend integrations provider enum to include "gmail" and push schema migration
+- [x] Install nodemailer for SMTP sending
+- [x] Backend: connectGmail — validates App Password via SMTP verify() before saving
+- [x] Backend: testGmail — sends a live test email to admin-specified address
+- [x] Backend: toggleGmail — pause/resume without disconnecting
+- [x] Backend: disconnectGmail — removes credentials
+- [x] Backend: getStatus returns Gmail connection status (address, password hint, enabled)
+- [x] Backend: sendEmail helper using nodemailer + Gmail SMTP (server/email.ts)
+- [x] emailService.ts updated: uses real Gmail SMTP when connected, falls back to owner notification log
+- [x] Email reminder scheduler wired into server startup (every 60s, joins leads table for recipient email)
+- [x] Frontend: Email tab in Settings with step-by-step App Password guide, setup form, connected state, test email panel, enable/disable toggle, disconnect button
+- [x] All 82 tests passing

@@ -43,6 +43,13 @@
       "when": 1772860251221,
       "tag": "0005_slow_roughhouse",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1772863887831,
+      "tag": "0006_high_jean_grey",
+      "breakpoints": true
     }
   ]
 }

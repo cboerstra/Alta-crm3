@@ -10,36 +10,56 @@
  */
 
 import { getDb } from "./db";
-import { emailReminders } from "../drizzle/schema";
-import { eq, and, lte, isNull } from "drizzle-orm";
+import { emailReminders, leads, integrations } from "../drizzle/schema";
+import { eq, and, lte } from "drizzle-orm";
 import { notifyOwner } from "./_core/notification";
+import { sendEmail as sendGmailEmail } from "./email";
 
 export type EmailPayload = {
   to: string;
   subject: string;
   body: string;
   attachmentUrl?: string;
-  attachmentName?: string;
 };
 
 /**
- * Send an email. In production, replace this with your email provider's API.
- * Currently logs the email and notifies the owner.
+ * Retrieve the active Gmail integration for any admin user.
+ * Returns credentials or null if not configured/enabled.
+ */
+async function getGmailCredentials(): Promise<{ gmailAddress: string; appPassword: string } | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(integrations).where(eq(integrations.provider, "gmail")).limit(1);
+  const row = rows[0];
+  if (!row?.accessToken || !row.accountEmail) return null;
+  const enabled = (row.metadata as { enabled?: boolean } | null)?.enabled !== false;
+  if (!enabled) return null;
+  return { gmailAddress: row.accountEmail, appPassword: row.accessToken };
+}
+
+/**
+ * Send an email via Gmail SMTP if configured, otherwise log and notify owner.
  */
 export async function sendEmail(payload: EmailPayload): Promise<boolean> {
   try {
-    // Log the email for development/debugging
-    console.log(`[Email] Sending to ${payload.to}: ${payload.subject}`);
-    if (payload.attachmentUrl) {
-      console.log(`[Email] Attachment: ${payload.attachmentUrl}`);
+    const creds = await getGmailCredentials();
+    if (creds) {
+      await sendGmailEmail(creds.gmailAddress, creds.appPassword, {
+        from: `Clarke & Associates CRM <${creds.gmailAddress}>`,
+        to: payload.to,
+        subject: payload.subject,
+        html: payload.body.includes("<") ? payload.body : `<p>${payload.body.replace(/\n/g, "<br>")}</p>`,
+        attachmentUrl: payload.attachmentUrl,
+      });
+      console.log(`[Email] Sent via Gmail to ${payload.to}: ${payload.subject}`);
+    } else {
+      // No Gmail configured — log and notify owner so nothing is silently lost
+      console.log(`[Email] Gmail not configured. Would send to ${payload.to}: ${payload.subject}`);
+      await notifyOwner({
+        title: `Email Queued (Gmail not connected): ${payload.subject}`,
+        content: `To: ${payload.to}\n\n${payload.body.substring(0, 500)}${payload.attachmentUrl ? `\n\nAttachment: ${payload.attachmentUrl}` : ""}`,
+      }).catch(() => {});
     }
-
-    // Notify the owner about the email being sent (for monitoring)
-    await notifyOwner({
-      title: `Email Sent: ${payload.subject}`,
-      content: `To: ${payload.to}\n\n${payload.body.substring(0, 500)}${payload.attachmentUrl ? `\n\nAttachment: ${payload.attachmentUrl}` : ""}`,
-    }).catch(() => {});
-
     return true;
   } catch (error) {
     console.error("[Email] Failed to send:", error);
@@ -57,23 +77,30 @@ export async function processPendingReminders(): Promise<number> {
 
   try {
     const now = new Date();
-    const pending = await db.select()
+    // Join with leads to get the recipient email address
+    const pending = await db
+      .select({
+        id: emailReminders.id,
+        subject: emailReminders.subject,
+        body: emailReminders.body,
+        attachmentUrl: emailReminders.attachmentUrl,
+        leadEmail: leads.email,
+      })
       .from(emailReminders)
-      .where(
-        and(
-          eq(emailReminders.status, "pending"),
-          lte(emailReminders.scheduledAt, now)
-        )
-      )
+      .innerJoin(leads, eq(emailReminders.leadId, leads.id))
+      .where(and(eq(emailReminders.status, "pending"), lte(emailReminders.scheduledAt, now)))
       .limit(50);
 
     let sent = 0;
     for (const reminder of pending) {
+      if (!reminder.leadEmail) {
+        await db.update(emailReminders).set({ status: "failed" }).where(eq(emailReminders.id, reminder.id));
+        continue;
+      }
       const success = await sendEmail({
-        to: "lead@example.com", // In production, join with leads table to get email
-        subject: reminder.subject ?? "Notification",
+        to: reminder.leadEmail,
+        subject: reminder.subject ?? "Notification from Clarke & Associates",
         body: reminder.body ?? "",
-        attachmentName: reminder.attachmentUrl ? "attachment.pdf" : undefined,
         attachmentUrl: reminder.attachmentUrl ?? undefined,
       });
 

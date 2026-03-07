@@ -7,6 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { processPendingReminders } from "../emailService";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -60,6 +61,16 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+
+  // Email reminder scheduler: process pending reminders every 60 seconds
+  setInterval(async () => {
+    try {
+      const sent = await processPendingReminders();
+      if (sent > 0) console.log(`[Email Scheduler] Sent ${sent} reminder(s)`);
+    } catch (err) {
+      console.error("[Email Scheduler] Error:", err);
+    }
+  }, 60_000);
 }
 
 startServer().catch(console.error);

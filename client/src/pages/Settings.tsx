@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   Settings, Video, Calendar, CheckCircle, AlertCircle,
   Upload, Image, Trash2, Edit, ImageIcon, FileImage,
-  LayoutGrid, Tag, Loader2, X, MessageSquare, Phone, Eye, EyeOff, Send,
+  LayoutGrid, Tag, Loader2, X, MessageSquare, Phone, Eye, EyeOff, Send, Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,6 +38,12 @@ export default function SettingsPage() {
   const [showAuthToken, setShowAuthToken] = useState(false);
   const [testPhone, setTestPhone] = useState("");
   const [showTestSms, setShowTestSms] = useState(false);
+
+  // Gmail state
+  const [gmailForm, setGmailForm] = useState({ gmailAddress: "", appPassword: "" });
+  const [showAppPassword, setShowAppPassword] = useState(false);
+  const [testEmail, setTestEmail] = useState("");
+  const [showTestEmail, setShowTestEmail] = useState(false);
 
   // Media upload state
   const [uploading, setUploading] = useState(false);
@@ -91,6 +97,38 @@ export default function SettingsPage() {
 
   const disconnectTwilio = trpc.integrations.disconnectTwilio.useMutation({
     onSuccess: () => { toast.success("Twilio disconnected"); refetchStatus(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  // ─── Gmail mutations ────────────────────────────────────────────────────────
+  const connectGmail = trpc.integrations.connectGmail.useMutation({
+    onSuccess: () => {
+      toast.success("Gmail connected successfully! Emails will now be sent via Gmail.");
+      refetchStatus();
+      setGmailForm({ gmailAddress: "", appPassword: "" });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const testGmailMutation = trpc.integrations.testGmail.useMutation({
+    onSuccess: () => {
+      toast.success("Test email sent! Check your inbox.");
+      setShowTestEmail(false);
+      setTestEmail("");
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const toggleGmail = trpc.integrations.toggleGmail.useMutation({
+    onSuccess: (_: any, vars: { enabled: boolean }) => {
+      toast.success(vars.enabled ? "Email sending enabled" : "Email sending paused");
+      refetchStatus();
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const disconnectGmail = trpc.integrations.disconnectGmail.useMutation({
+    onSuccess: () => { toast.success("Gmail disconnected"); refetchStatus(); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -171,6 +209,10 @@ export default function SettingsPage() {
   };
 
   const twilioConnected = status?.twilio?.connected;
+  const gmailConnected = status?.gmail?.connected;
+  const gmailDetails = gmailConnected && "gmailAddress" in status!.gmail! ? status!.gmail as {
+    connected: true; gmailAddress: string; appPasswordHint: string; enabled: boolean;
+  } : null;
   const twilioDetails = twilioConnected && "accountSid" in status!.twilio! ? status!.twilio as {
     connected: true; accountSid: string; fromPhone: string; authTokenHint: string; enabled: boolean;
   } : null;
@@ -190,6 +232,12 @@ export default function SettingsPage() {
           <TabsTrigger value="sms" className="gap-1 relative">
             <MessageSquare className="h-3.5 w-3.5" /> SMS
             {twilioConnected && (
+              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-green-500" />
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="email" className="gap-1 relative">
+            <Mail className="h-3.5 w-3.5" /> Email
+            {gmailConnected && (
               <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-green-500" />
             )}
           </TabsTrigger>
@@ -573,6 +621,174 @@ export default function SettingsPage() {
                         <><Loader2 className="h-4 w-4 animate-spin" /> Verifying credentials...</>
                       ) : (
                         <><MessageSquare className="h-4 w-4" /> Connect Twilio</>
+                      )}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ─── Email / Gmail Tab ─── */}
+        <TabsContent value="email">
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2" style={{ fontFamily: "Raleway, sans-serif" }}>
+                    <Mail className="h-4 w-4 text-brand-green" />
+                    Gmail Integration
+                    {gmailConnected && <span className="h-2 w-2 rounded-full bg-green-500 inline-block" />}
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Send confirmation emails and webinar reminders directly from your Gmail account.
+                  </p>
+                </div>
+                {gmailDetails && (
+                  <Badge className={gmailDetails.enabled ? "bg-green-100 text-green-700 border-green-200" : "bg-amber-100 text-amber-700 border-amber-200"}>
+                    {gmailDetails.enabled ? "Active" : "Paused"}
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {gmailDetails ? (
+                <>
+                  {/* Connected state */}
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 border border-green-200">
+                    <CheckCircle className="h-5 w-5 text-green-600 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-green-800">Connected</p>
+                      <p className="text-xs text-green-700 truncate">{gmailDetails.gmailAddress}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="p-3 rounded-lg bg-muted/30 border border-border/30">
+                      <p className="text-xs text-muted-foreground mb-1">Gmail Address</p>
+                      <p className="font-mono text-xs truncate">{gmailDetails.gmailAddress}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/30 border border-border/30">
+                      <p className="text-xs text-muted-foreground mb-1">App Password</p>
+                      <p className="font-mono text-xs">{gmailDetails.appPasswordHint}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 rounded-lg border border-border/40">
+                    <div>
+                      <p className="text-sm font-medium">Email Sending</p>
+                      <p className="text-xs text-muted-foreground">Pause without disconnecting</p>
+                    </div>
+                    <Switch
+                      checked={gmailDetails.enabled}
+                      onCheckedChange={(enabled) => toggleGmail.mutate({ enabled })}
+                      disabled={toggleGmail.isPending}
+                    />
+                  </div>
+
+                  {/* Test email panel */}
+                  {!showTestEmail ? (
+                    <Button variant="outline" className="w-full gap-2" onClick={() => setShowTestEmail(true)}>
+                      <Send className="h-4 w-4" /> Send Test Email
+                    </Button>
+                  ) : (
+                    <div className="space-y-2 p-3 rounded-lg border border-border/40">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium">Send Test Email</p>
+                        <Button variant="ghost" size="icon" onClick={() => { setShowTestEmail(false); setTestEmail(""); }}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Enter the address to receive the test email.</p>
+                      <div className="flex gap-2">
+                        <Input
+                          value={testEmail}
+                          onChange={(e) => setTestEmail(e.target.value)}
+                          placeholder="you@example.com"
+                          type="email"
+                          className="flex-1"
+                        />
+                        <Button
+                          className="bg-brand-green hover:bg-brand-green-dark text-white gap-1"
+                          onClick={() => testGmailMutation.mutate({ toEmail: testEmail })}
+                          disabled={!testEmail || testGmailMutation.isPending}
+                        >
+                          {testGmailMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                          Send
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                    onClick={() => disconnectGmail.mutate()}
+                    disabled={disconnectGmail.isPending}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    {disconnectGmail.isPending ? "Disconnecting..." : "Disconnect Gmail"}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  {/* Setup form */}
+                  <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800 space-y-1.5">
+                    <p className="font-medium">How to set up Gmail sending:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-xs">
+                      <li>Enable <strong>2-Step Verification</strong> on your Google account at <a href="https://myaccount.google.com/security" target="_blank" rel="noopener noreferrer" className="underline font-medium">myaccount.google.com/security</a></li>
+                      <li>Go to <strong>Security → 2-Step Verification → App Passwords</strong></li>
+                      <li>Create a new App Password (select "Mail" and "Other")</li>
+                      <li>Copy the 16-character password and paste it below</li>
+                    </ol>
+                    <p className="text-xs text-blue-700 pt-1">⚠️ Use a <strong>Gmail App Password</strong>, not your regular Google password. Regular passwords will be rejected.</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Gmail Address <span className="text-red-500">*</span></Label>
+                      <Input
+                        value={gmailForm.gmailAddress}
+                        onChange={(e) => setGmailForm({ ...gmailForm, gmailAddress: e.target.value })}
+                        placeholder="team@altamortgagegroup.com"
+                        type="email"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">The Gmail address emails will be sent from.</p>
+                    </div>
+
+                    <div>
+                      <Label>App Password <span className="text-red-500">*</span></Label>
+                      <div className="relative">
+                        <Input
+                          value={gmailForm.appPassword}
+                          onChange={(e) => setGmailForm({ ...gmailForm, appPassword: e.target.value })}
+                          placeholder="xxxx xxxx xxxx xxxx"
+                          type={showAppPassword ? "text" : "password"}
+                          className="font-mono pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAppPassword(!showAppPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showAppPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">16-character App Password from Google. Spaces are stripped automatically.</p>
+                    </div>
+
+                    <Button
+                      className="w-full bg-brand-green hover:bg-brand-green-dark text-white h-11 gap-2"
+                      onClick={() => connectGmail.mutate(gmailForm)}
+                      disabled={!gmailForm.gmailAddress || !gmailForm.appPassword || connectGmail.isPending}
+                    >
+                      {connectGmail.isPending ? (
+                        <><Loader2 className="h-4 w-4 animate-spin" /> Verifying credentials...</>
+                      ) : (
+                        <><Mail className="h-4 w-4" /> Connect Gmail</>
                       )}
                     </Button>
                   </div>
