@@ -250,3 +250,17 @@
 - [x] Email reminder scheduler wired into server startup (every 60s, joins leads table for recipient email)
 - [x] Frontend: Email tab in Settings with step-by-step App Password guide, setup form, connected state, test email panel, enable/disable toggle, disconnect button
 - [x] All 82 tests passing
+
+## Link Deals to Leads (User Request)
+- [x] leadId FK already existed as NOT NULL on deals table (no migration needed)
+- [x] Update getDeals and getDealById to INNER JOIN leads table, returning leadFirstName/leadLastName/leadEmail
+- [x] deals.create enforces leadId required (z.number().min(1))
+- [x] deals.list now accepts optional leadId filter
+- [x] deals.update allows changing the associated lead
+- [x] New deals.searchLeads procedure for live lead search in the picker
+- [x] Deals UI: searchable lead picker (type to search, dropdown results, clear/change)
+- [x] Deals UI: show lead avatar, full name, and email on each deal row
+- [x] Deals UI: clicking lead row navigates to lead profile page
+- [x] Deals UI: stage filter pills added
+- [x] Deals UI: colored stage badges replace plain text
+- [x] All 82 tests passing

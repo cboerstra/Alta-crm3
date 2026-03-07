@@ -364,21 +364,66 @@ export async function createDeal(data: InsertDeal) {
   return (r as any).insertId as number;
 }
 
-export async function getDeals(filters?: { assignedTo?: number; stage?: string }) {
+export async function getDeals(filters?: { assignedTo?: number; stage?: string; leadId?: number }) {
   const db = await getDb();
   if (!db) return [];
   const conditions = [];
   if (filters?.assignedTo) conditions.push(eq(deals.assignedTo, filters.assignedTo));
   if (filters?.stage) conditions.push(eq(deals.stage, filters.stage as any));
+  if (filters?.leadId) conditions.push(eq(deals.leadId, filters.leadId));
   const where = conditions.length > 0 ? and(...conditions) : undefined;
-  return db.select().from(deals).where(where).orderBy(desc(deals.createdAt));
+  const rows = await db
+    .select({
+      id: deals.id,
+      leadId: deals.leadId,
+      assignedTo: deals.assignedTo,
+      title: deals.title,
+      value: deals.value,
+      stage: deals.stage,
+      propertyAddress: deals.propertyAddress,
+      expectedCloseDate: deals.expectedCloseDate,
+      actualCloseDate: deals.actualCloseDate,
+      notes: deals.notes,
+      createdAt: deals.createdAt,
+      updatedAt: deals.updatedAt,
+      leadFirstName: leads.firstName,
+      leadLastName: leads.lastName,
+      leadEmail: leads.email,
+      leadPhone: leads.phone,
+    })
+    .from(deals)
+    .innerJoin(leads, eq(deals.leadId, leads.id))
+    .where(where)
+    .orderBy(desc(deals.createdAt));
+  return rows;
 }
-
 export async function getDealById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const r = await db.select().from(deals).where(eq(deals.id, id)).limit(1);
-  return r[0];
+  const rows = await db
+    .select({
+      id: deals.id,
+      leadId: deals.leadId,
+      assignedTo: deals.assignedTo,
+      title: deals.title,
+      value: deals.value,
+      stage: deals.stage,
+      propertyAddress: deals.propertyAddress,
+      expectedCloseDate: deals.expectedCloseDate,
+      actualCloseDate: deals.actualCloseDate,
+      notes: deals.notes,
+      createdAt: deals.createdAt,
+      updatedAt: deals.updatedAt,
+      leadFirstName: leads.firstName,
+      leadLastName: leads.lastName,
+      leadEmail: leads.email,
+      leadPhone: leads.phone,
+    })
+    .from(deals)
+    .innerJoin(leads, eq(deals.leadId, leads.id))
+    .where(eq(deals.id, id))
+    .limit(1);
+  return rows[0];
 }
 
 export async function updateDeal(id: number, data: Partial<InsertDeal>) {
