@@ -33,7 +33,7 @@ export type InsertUser = typeof users.$inferInsert;
 export const integrations = mysqlTable("integrations", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
-  provider: mysqlEnum("provider", ["zoom", "google_calendar"]).notNull(),
+  provider: mysqlEnum("provider", ["zoom", "google_calendar", "twilio"]).notNull(),
   accessToken: text("accessToken"),
   refreshToken: text("refreshToken"),
   tokenExpiresAt: timestamp("tokenExpiresAt"),

@@ -1,0 +1,1 @@
+ALTER TABLE `integrations` MODIFY COLUMN `provider` enum('zoom','google_calendar','twilio') NOT NULL;

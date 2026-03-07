@@ -217,3 +217,14 @@
 - [x] Confirm bulk delete with count in AlertDialog
 - [x] Keep individual per-card delete button (hover trash icon)
 - [x] Add bulkDelete backend procedure to webinars router
+
+## SMS Integration Settings (User Request)
+- [x] SMS settings panel in the Settings page (admin-only)
+- [x] Fields: Twilio Account SID, Auth Token, From phone number
+- [x] Save/update credentials securely in the database (validated against Twilio API on save)
+- [x] Test connection button (sends a live test SMS to admin-specified number)
+- [x] Enable/disable SMS toggle (without disconnecting)
+- [x] Show current connection status (connected / not configured) with green dot on tab
+- [x] Mask Auth Token after saving (show only last 4 chars)
+- [x] Disconnect Twilio button
+- [x] All 82 tests passing
