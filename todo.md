@@ -302,3 +302,8 @@
 - [x] Runs SELECT 1 test query at startup so connection failures are logged immediately
 - [x] Clear error message when DATABASE_URL env var is missing (tells user exactly where to add it)
 - [x] All 82 tests passing, production build clean (126.6kb)
+
+## Fix "Zero-length key is not supported" on Hostinger /setup (User Report)
+- [x] Add clear error when JWT_SECRET is missing/empty in signSession
+- [x] Generate a fallback secret at startup with a warning log if JWT_SECRET is not set
+- [x] Add startup validation that logs all missing required env vars

@@ -1,0 +1,19 @@
+{
+  "query": "SELECT id, openId, name, email, role, loginMethod, createdAt FROM users LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dDnpezfLjGa5dS.c6434c886c49 --database 29hRXSpda4mmakt4QeiCJh --execute SELECT id, openId, name, email, role, loginMethod, createdAt FROM users LIMIT 10;",
+  "rows": [
+    {
+      "id": "1",
+      "openId": "LgnaLvVF8sDjxrsdjZCTmB",
+      "name": "Scott Boerstra",
+      "email": "sboerstra@gmail.com",
+      "role": "admin",
+      "loginMethod": "google",
+      "createdAt": "2026-02-25 20:56:46"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\topenId\tname\temail\trole\tloginMethod\tcreatedAt\n1\tLgnaLvVF8sDjxrsdjZCTmB\tScott Boerstra\tsboerstra@gmail.com\tadmin\tgoogle\t2026-02-25 20:56:46\n",
+  "stderr": "",
+  "execution_time_ms": 278
+}

@@ -29,6 +29,27 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // ── Startup environment validation ──────────────────────────────────────────
+  const missingEnvVars: string[] = [];
+  if (!process.env.JWT_SECRET) missingEnvVars.push("JWT_SECRET");
+  if (!process.env.DATABASE_URL) missingEnvVars.push("DATABASE_URL");
+  if (missingEnvVars.length > 0) {
+    console.error(
+      `[Startup] CRITICAL: Missing required environment variables: ${missingEnvVars.join(", ")}. ` +
+      `Set these in Hostinger → Node.js → Environment Variables and restart the app.`
+    );
+    // Generate a temporary JWT_SECRET so the server can still start and show
+    // a meaningful error to the user instead of crashing with "zero-length key".
+    if (!process.env.JWT_SECRET) {
+      const crypto = await import("crypto");
+      process.env.JWT_SECRET = crypto.randomBytes(32).toString("hex");
+      console.warn(
+        "[Startup] JWT_SECRET is not set — generated a temporary random secret. " +
+        "Sessions will be invalidated on every restart until you set JWT_SECRET permanently."
+      );
+    }
+  }
+
   const app = express();
   const server = createServer(app);
   // Configure body parser with larger size limit for file uploads
