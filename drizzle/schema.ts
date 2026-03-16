@@ -21,6 +21,7 @@ export const users = mysqlTable("users", {
   schedulingSlug: varchar("schedulingSlug", { length: 64 }),
   avatarUrl: text("avatarUrl"),
   phone: varchar("phone", { length: 32 }),
+  passwordHash: text("passwordHash"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),

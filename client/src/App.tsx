@@ -19,6 +19,8 @@ import SettingsPage from "./pages/Settings";
 import UserManagement from "./pages/UserManagement";
 import PublicLandingPage from "./pages/PublicLandingPage";
 import PublicBooking from "./pages/PublicBooking";
+import Login from "./pages/Login";
+import Setup from "./pages/Setup";
 import { useAuth } from "./_core/hooks/useAuth";
 import { ShieldAlert } from "lucide-react";
 
@@ -82,6 +84,9 @@ function CRMRoutes() {
 function Router() {
   return (
     <Switch>
+      {/* Auth routes */}
+      <Route path="/login" component={Login} />
+      <Route path="/setup" component={Setup} />
       {/* Public routes */}
       <Route path="/lp/:slug" component={PublicLandingPage} />
       <Route path="/schedule/:slug" component={PublicBooking} />

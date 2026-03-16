@@ -45,6 +45,18 @@ import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { Button } from "./ui/button";
 
+// Detect whether Manus OAuth is configured
+const isManus = (() => {
+  try {
+    const url = import.meta.env.VITE_OAUTH_PORTAL_URL;
+    const appId = import.meta.env.VITE_APP_ID;
+    return !!(url && appId && url !== "" && appId !== "");
+  } catch {
+    return false;
+  }
+})();
+
+
 type MenuItem = {
   icon: any;
   label: string;
@@ -113,7 +125,11 @@ export default function DashboardLayout({
           </div>
           <Button
             onClick={() => {
-              window.location.href = getLoginUrl();
+              if (isManus) {
+                window.location.href = getLoginUrl();
+              } else {
+                window.location.href = "/login";
+              }
             }}
             size="lg"
             className="w-full bg-brand-green hover:bg-brand-green-dark text-white shadow-lg hover:shadow-xl transition-all text-base font-semibold"

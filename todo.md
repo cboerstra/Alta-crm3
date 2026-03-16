@@ -272,3 +272,20 @@
 - [x] postinstall: find + chmod +x all esbuild binaries in node_modules
 - [x] Added engines field: node >=22.0.0
 - [x] Build produces both dist/index.js and dist/server.js for any entry file config
+
+## TypeError: Invalid URL on Hostinger Production (User Report)
+- [x] Root cause: VITE_OAUTH_PORTAL_URL is undefined on Hostinger, making new URL("undefined/app-auth") crash
+- [x] Fixed: DashboardLayout now detects missing OAuth env vars and redirects to /login instead of calling getLoginUrl()
+- [x] Fixed: /login page guards getLoginUrl() with isManus check before rendering the Manus button
+
+## Custom Email/Password Auth for Hostinger (User Request)
+- [x] Add passwordHash column to users table, push migration (0007_high_agent_brand.sql)
+- [x] Install bcrypt 6.0.0 for password hashing (added to onlyBuiltDependencies)
+- [x] Backend: auth.login procedure (email + password → JWT session cookie)
+- [x] Backend: auth.register procedure (first-time admin setup only, blocked if users exist)
+- [x] Backend: auth.setPassword procedure (admin can set/reset any user's password)
+- [x] Backend: getUserByEmail and updateUserPassword db helpers
+- [x] Frontend: /login page with email/password form + optional Manus OAuth button
+- [x] Frontend: /setup page for first-time admin account creation
+- [x] DashboardLayout: auto-detects Manus vs standalone, redirects to /login when no OAuth configured
+- [x] All 82 tests passing, production build clean
