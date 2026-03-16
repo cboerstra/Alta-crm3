@@ -57,34 +57,38 @@ export const appRouter = router({
         password: z.string().min(8, "Password must be at least 8 characters"),
       }))
       .mutation(async ({ input, ctx }) => {
-        const allUsers = await db.getAllUsers();
-        if (allUsers.length > 0) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Registration is closed. Contact your admin to create an account." });
+        try {
+          const allUsers = await db.getAllUsers();
+          if (allUsers.length > 0) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Registration is closed. Contact your admin to create an account." });
+          }
+          const existing = await db.getUserByEmail(input.email);
+          if (existing) {
+            throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists" });
+          }
+          const passwordHash = await bcrypt.hash(input.password, 12);
+          const openId = `local_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+          // Use direct insert instead of upsertUser so DB errors are not silently swallowed
+          const user = await db.createUserWithPassword({
+            openId,
+            name: input.name,
+            email: input.email,
+            passwordHash,
+            role: "admin",
+          });
+          const sessionToken = await sdk.signSession(
+            { openId, appId: ENV.appId || "standalone", name: input.name },
+            { expiresInMs: ONE_YEAR_MS }
+          );
+          const cookieOptions = getSessionCookieOptions(ctx.req);
+          ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+          return { success: true, userId: user.id };
+        } catch (err) {
+          if (err instanceof TRPCError) throw err;
+          // Surface the real DB error message to help diagnose Hostinger issues
+          const msg = err instanceof Error ? err.message : String(err);
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Failed to create account: ${msg}` });
         }
-        const existing = await db.getUserByEmail(input.email);
-        if (existing) {
-          throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists" });
-        }
-        const passwordHash = await bcrypt.hash(input.password, 12);
-        const openId = `local_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-        await db.upsertUser({
-          openId,
-          name: input.name,
-          email: input.email,
-          loginMethod: "email",
-          role: "admin",
-          lastSignedIn: new Date(),
-        });
-        const user = await db.getUserByEmail(input.email);
-        if (!user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create user" });
-        await db.updateUserPassword(user.id, passwordHash);
-        const sessionToken = await sdk.signSession(
-          { openId, appId: ENV.appId || "standalone", name: input.name },
-          { expiresInMs: ONE_YEAR_MS }
-        );
-        const cookieOptions = getSessionCookieOptions(ctx.req);
-        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-        return { success: true };
       }),
     // ── Set/change password for existing user (admin or self) ─────────────
     setPassword: publicProcedure

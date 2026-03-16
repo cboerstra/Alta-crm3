@@ -289,3 +289,9 @@
 - [x] Frontend: /setup page for first-time admin account creation
 - [x] DashboardLayout: auto-detects Manus vs standalone, redirects to /login when no OAuth configured
 - [x] All 82 tests passing, production build clean
+
+## Fix Setup Page "Failed to create user" Error (User Report)
+- [x] Fix register procedure to use direct INSERT via new createUserWithPassword() helper
+- [x] Real DB errors now surface in the UI (e.g. "Database connection unavailable — check DATABASE_URL")
+- [x] getUserByEmail now throws on DB unavailability instead of silently returning undefined
+- [x] All 82 tests passing

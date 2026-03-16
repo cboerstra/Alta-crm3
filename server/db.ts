@@ -61,8 +61,31 @@ export async function getUserByOpenId(openId: string) {
 }
 export async function getUserByEmail(email: string) {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) throw new Error("Database connection unavailable");
   const r = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  return r[0];
+}
+
+export async function createUserWithPassword(data: {
+  openId: string;
+  name: string;
+  email: string;
+  passwordHash: string;
+  role: "admin" | "user";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection unavailable — check DATABASE_URL");
+  await db.insert(users).values({
+    openId: data.openId,
+    name: data.name,
+    email: data.email,
+    passwordHash: data.passwordHash,
+    loginMethod: "email",
+    role: data.role,
+    lastSignedIn: new Date(),
+  });
+  const r = await db.select().from(users).where(eq(users.email, data.email)).limit(1);
+  if (!r[0]) throw new Error("User insert succeeded but row not found — check DB permissions");
   return r[0];
 }
 export async function updateUserPassword(userId: number, passwordHash: string) {
