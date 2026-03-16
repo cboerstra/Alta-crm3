@@ -307,3 +307,9 @@
 - [x] Add clear error when JWT_SECRET is missing/empty in signSession
 - [x] Generate a fallback secret at startup with a warning log if JWT_SECRET is not set
 - [x] Add startup validation that logs all missing required env vars
+
+## Landing Page Slug Auto-Generation (User Request)
+- [x] Auto-generate slug from title as admin types (e.g. "Spring Webinar 2026" → "spring-webinar-2026")
+- [x] Show full public URL preview in the form (e.g. https://altamortgagecrm.net/lp/spring-webinar-2026)
+- [x] Allow admin to manually edit the slug before saving
+- [x] Slug field locked/readonly after page is created (edit via separate edit flow)
