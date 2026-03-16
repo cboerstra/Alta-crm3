@@ -21,7 +21,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { getLoginUrl } from "@/const";
+import { getLoginUrl, isManus } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
 import {
   LayoutDashboard,
@@ -44,17 +44,6 @@ import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from "./DashboardLayoutSkeleton";
 import { Button } from "./ui/button";
-
-// Detect whether Manus OAuth is configured
-const isManus = (() => {
-  try {
-    const url = import.meta.env.VITE_OAUTH_PORTAL_URL;
-    const appId = import.meta.env.VITE_APP_ID;
-    return !!(url && appId && url !== "" && appId !== "");
-  } catch {
-    return false;
-  }
-})();
 
 
 type MenuItem = {
@@ -125,7 +114,7 @@ export default function DashboardLayout({
           </div>
           <Button
             onClick={() => {
-              if (isManus) {
+              if (isManus()) {
                 window.location.href = getLoginUrl();
               } else {
                 window.location.href = "/login";

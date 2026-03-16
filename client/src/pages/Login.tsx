@@ -7,18 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff, Lock, Mail, Building2 } from "lucide-react";
-import { getLoginUrl } from "@/const";
-
-// Detect whether Manus OAuth is configured
-const isManus = (() => {
-  try {
-    const url = import.meta.env.VITE_OAUTH_PORTAL_URL;
-    const appId = import.meta.env.VITE_APP_ID;
-    return !!(url && appId && url !== "" && appId !== "");
-  } catch {
-    return false;
-  }
-})();
+import { getLoginUrl, isManus } from "@/const";
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -122,7 +111,7 @@ export default function Login() {
             </form>
 
             {/* Manus OAuth option if configured */}
-            {isManus && (
+            {isManus() && (
               <>
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">

@@ -9,6 +9,8 @@ type UseAuthOptions = {
 };
 
 export function useAuth(options?: UseAuthOptions) {
+  // getLoginUrl() is called lazily here — it now safely returns "/login" when
+  // Manus OAuth env vars are absent, preventing TypeError: Invalid URL on Hostinger.
   const { redirectOnUnauthenticated = false, redirectPath = getLoginUrl() } =
     options ?? {};
   const utils = trpc.useUtils();

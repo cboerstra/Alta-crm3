@@ -18,6 +18,7 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
+  // getLoginUrl() now safely returns "/login" when Manus OAuth is not configured
   window.location.href = getLoginUrl();
 };
 
