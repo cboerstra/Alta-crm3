@@ -264,3 +264,11 @@
 - [x] Deals UI: stage filter pills added
 - [x] Deals UI: colored stage badges replace plain text
 - [x] All 82 tests passing
+
+## Node 20/Hostinger Compatibility (User Request)
+- [x] Check for Node 22-only features in server code (import.meta.dirname in vite.ts — requires Node 22+)
+- [x] Recommend Hostinger use Node 22 or 24 (both supported)
+- [x] Add postinstall script to fix esbuild binary permissions (EACCES error on Hostinger)
+- [x] postinstall: find + chmod +x all esbuild binaries in node_modules
+- [x] Added engines field: node >=22.0.0
+- [x] Build produces both dist/index.js and dist/server.js for any entry file config

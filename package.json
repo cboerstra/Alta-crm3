@@ -10,7 +10,8 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate"
+    "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "postinstall": "find node_modules -name esbuild -type f -path \"*/bin/*\" -exec chmod +x {} + 2>/dev/null; chmod +x node_modules/.bin/esbuild 2>/dev/null; exit 0"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
@@ -126,5 +127,8 @@
       "sharp",
       "better-sqlite3"
     ]
+  },
+  "engines": {
+    "node": ">=22.0.0"
   }
 }
