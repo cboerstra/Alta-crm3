@@ -295,3 +295,10 @@
 - [x] Real DB errors now surface in the UI (e.g. "Database connection unavailable — check DATABASE_URL")
 - [x] getUserByEmail now throws on DB unavailability instead of silently returning undefined
 - [x] All 82 tests passing
+
+## Fix "Database connection unavailable" on Hostinger (User Report)
+- [x] Rewrote getDb() to use explicit mysql2.createPool() instead of drizzle(url-string)
+- [x] Auto-adds ssl:{rejectUnauthorized:false} for remote MySQL hosts unless URL already has ssl= params
+- [x] Runs SELECT 1 test query at startup so connection failures are logged immediately
+- [x] Clear error message when DATABASE_URL env var is missing (tells user exactly where to add it)
+- [x] All 82 tests passing, production build clean (126.6kb)

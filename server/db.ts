@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, lte, sql, like, or, inArray, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import mysql2 from "mysql2/promise";
 import {
   InsertUser, users,
   leads, InsertLead, Lead,
@@ -18,17 +19,55 @@ import {
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _dbInitError: string | null = null;
 
+/**
+ * Returns the Drizzle database instance.
+ * Uses an explicit mysql2 connection pool so SSL options can be injected
+ * for remote hosts (e.g. Hostinger) that require encrypted connections.
+ * Throws with a descriptive message when DATABASE_URL is missing or the
+ * connection cannot be established.
+ */
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
-    try {
-      _db = drizzle(process.env.DATABASE_URL);
-    } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
-      _db = null;
-    }
+  if (_db) return _db;
+  if (_dbInitError) throw new Error(_dbInitError);
+
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    const msg = "DATABASE_URL environment variable is not set. " +
+      "Add it in Hostinger → Node.js → Environment Variables as: " +
+      "mysql://USER:PASS@HOST:3306/DBNAME";
+    _dbInitError = msg;
+    throw new Error(msg);
   }
-  return _db;
+
+  try {
+    // Parse the URL to decide whether to add SSL.
+    // Hostinger remote MySQL (and most cloud MySQL) requires SSL.
+    // If the URL already contains ssl= params, respect them.
+    // Otherwise add ssl: { rejectUnauthorized: false } as a safe default
+    // that works with self-signed certs common on shared hosting.
+    const hasExplicitSsl = url.includes("ssl=") || url.includes("sslmode=");
+    const pool = mysql2.createPool(
+      hasExplicitSsl
+        ? { uri: url }
+        : { uri: url, ssl: { rejectUnauthorized: false } }
+    );
+
+    // Test the connection immediately so we get a clear error at startup
+    // rather than a cryptic failure on the first user action.
+    await pool.query("SELECT 1");
+    console.log("[Database] Connected successfully");
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _db = drizzle(pool as any);
+    return _db;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    _dbInitError = `Database connection failed: ${msg}. Check DATABASE_URL and ensure the MySQL server is reachable.`;
+    console.error("[Database]", _dbInitError);
+    throw new Error(_dbInitError);
+  }
 }
 
 // ─── Users ────────────────────────────────────────────────────────────────────
