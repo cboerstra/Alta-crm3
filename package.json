@@ -121,7 +121,10 @@
       "esbuild": "0.27.4"
     },
     "onlyBuiltDependencies": [
-      "esbuild"
+      "esbuild",
+      "@tailwindcss/oxide",
+      "sharp",
+      "better-sqlite3"
     ]
   }
 }
