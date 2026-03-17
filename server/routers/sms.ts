@@ -25,6 +25,23 @@ export const smsRouter = router({
       if (!lead.smsConsent) throw new TRPCError({ code: "BAD_REQUEST", message: "Lead has not consented to SMS" });
       if (!lead.phone) throw new TRPCError({ code: "BAD_REQUEST", message: "Lead has no phone number" });
 
+      // Resolve placeholder variables in the message body
+      let resolvedBody = input.body;
+      if (resolvedBody.includes("{{webinar_link}}") || resolvedBody.includes("{{webinar_title}}") || resolvedBody.includes("{{session_date}}")) {
+        const webinarInfo = await getNextWebinarForLead(input.leadId);
+        resolvedBody = resolvedBody
+          .replace(/\{\{webinar_link\}\}/g, webinarInfo?.joinUrl ?? "[webinar link unavailable]")
+          .replace(/\{\{webinar_title\}\}/g, webinarInfo?.webinarTitle ?? "Upcoming Webinar")
+          .replace(/\{\{session_date\}\}/g, webinarInfo?.sessionDate
+            ? new Date(webinarInfo.sessionDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+            : "[date TBD]"
+          );
+      }
+      resolvedBody = resolvedBody
+        .replace(/\{\{first_name\}\}/g, lead.firstName ?? "")
+        .replace(/\{\{last_name\}\}/g, lead.lastName ?? "")
+        .replace(/\{\{full_name\}\}/g, [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "there");
+
       // Send via Telnyx
       const telnyx = await getIntegration(ctx.user.id, "twilio"); // stored as "twilio" provider key
       if (!telnyx?.accessToken || !telnyx.accountEmail) {
@@ -41,7 +58,7 @@ export const smsRouter = router({
       const res = await fetch("https://api.telnyx.com/v2/messages", {
         method: "POST",
         headers: { Authorization: `Bearer ${telnyx.accessToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: telnyx.accountEmail, to: toPhone, text: input.body }),
+        body: JSON.stringify({ from: telnyx.accountEmail, to: toPhone, text: resolvedBody }),
       });
 
       let externalId: string | undefined;
@@ -57,7 +74,7 @@ export const smsRouter = router({
       await createSmsMessage({
         leadId: input.leadId,
         direction: "outbound",
-        body: input.body,
+        body: resolvedBody,
         status: "sent",
         sentBy: ctx.user.id,
       });
@@ -66,7 +83,7 @@ export const smsRouter = router({
         userId: ctx.user.id,
         type: "sms_sent",
         title: "SMS sent",
-        content: input.body,
+        content: resolvedBody,
       });
       return { success: true, externalId };
     }),

@@ -355,3 +355,9 @@
 - [x] When toggled on, append the join URL to the message body preview
 - [x] Show which webinar/session the link is for so the user knows what's being included
 - [x] All 82 tests passing
+
+## {{webinar_link}} Placeholder in SMS Templates (User Request)
+- [x] Add server-side placeholder resolution: replace {{webinar_link}} with lead's Zoom join URL before sending
+- [x] Support {{first_name}}, {{last_name}}, {{full_name}}, {{webinar_title}}, {{session_date}} as additional variables
+- [x] Show available placeholder variables in the SMS Templates editor UI (click to copy)
+- [x] All 82 tests passing, TypeScript 0 errors

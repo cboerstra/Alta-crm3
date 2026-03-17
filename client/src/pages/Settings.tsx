@@ -844,20 +844,37 @@ export default function SettingsPage() {
                 <div>
                   <CardTitle className="text-base" style={{ fontFamily: "Raleway, sans-serif" }}>SMS Templates</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Manage automated SMS messages sent at each lead stage. Use <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">{'{{firstName}}'}</span>, <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">{'{{webinarTitle}}'}</span>, and other variables to personalise messages.
+                    Manage automated SMS messages sent at each lead stage. Use <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">{'{{webinar_link}}'}</span>, <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">{'{{first_name}}'}</span>, and other variables — they resolve automatically when sent.
                   </p>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {/* Variable reference */}
-              <div className="p-3 rounded-lg bg-muted/30 border border-border/30 text-xs text-muted-foreground">
-                <p className="font-semibold text-foreground mb-1">Available variables</p>
+              <div className="p-3 rounded-lg bg-muted/30 border border-border/30 text-xs">
+                <p className="font-semibold text-foreground mb-1">Available variables <span className="font-normal text-muted-foreground">(click to copy)</span></p>
                 <div className="flex flex-wrap gap-1.5">
-                  {['{{firstName}}','{{lastName}}','{{webinarTitle}}','{{sessionDate}}','{{sessionTime}}','{{joinUrl}}','{{replayUrl}}','{{schedulingUrl}}','{{consultationDate}}','{{reviewUrl}}'].map(v => (
-                    <span key={v} className="font-mono bg-background border border-border/50 px-1.5 py-0.5 rounded">{v}</span>
+                  {[
+                    { tag: '{{first_name}}', desc: 'Lead\'s first name' },
+                    { tag: '{{last_name}}', desc: 'Lead\'s last name' },
+                    { tag: '{{full_name}}', desc: 'Full name' },
+                    { tag: '{{webinar_link}}', desc: 'Zoom join URL' },
+                    { tag: '{{webinar_title}}', desc: 'Webinar title' },
+                    { tag: '{{session_date}}', desc: 'Session date' },
+                  ].map(({ tag, desc }) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      title={desc}
+                      className="font-mono bg-background border border-border/50 px-1.5 py-0.5 rounded hover:border-brand-green hover:text-brand-green transition-colors cursor-pointer"
+                      onClick={() => {
+                        navigator.clipboard.writeText(tag);
+                        toast.success(`Copied ${tag}`);
+                      }}
+                    >{tag}</button>
                   ))}
                 </div>
+                <p className="text-muted-foreground mt-1.5">Example: <span className="font-mono">Hi {'{{first_name}}'}, join us: {'{{webinar_link}}'}</span></p>
               </div>
 
               {templatesLoading ? (
