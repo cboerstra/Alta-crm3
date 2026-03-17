@@ -323,9 +323,14 @@
 - [x] Provide ALTER TABLE fix for leads table missing columns
 
 ## Replace Twilio with Telnyx SMS Integration (User Request)
-- [ ] Research Telnyx API (send SMS, inbound webhook format)
-- [ ] Update integrations router: replace Twilio connect/send/test with Telnyx
-- [ ] Add Telnyx inbound webhook HTTP endpoint (not tRPC — must be unauthenticated)
-- [ ] Add Telnyx status callback webhook endpoint
-- [ ] Update Settings UI to show Telnyx fields instead of Twilio
-- [ ] Update sms.send procedure to call Telnyx API
+- [x] Research Telnyx API (send SMS, inbound webhook format)
+- [x] Update integrations router: replace Twilio connect/send/test with Telnyx
+- [x] Add Telnyx inbound webhook HTTP endpoint (not tRPC — must be unauthenticated)
+- [x] Add Telnyx status callback webhook endpoint
+- [x] Update Settings UI to show Telnyx fields instead of Twilio
+- [x] Update sms.send procedure to call Telnyx API
+- [x] All 82 tests passing, production build clean (130.3kb)
+
+## Telnyx From-Phone Number (User Request)
+- [x] Pre-fill from phone with +18017840672 in the Telnyx connect form
+- [x] Add editable "From Phone" field in SMS settings when already connected (update without full reconnect)

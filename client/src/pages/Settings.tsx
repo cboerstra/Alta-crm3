@@ -34,7 +34,9 @@ export default function SettingsPage() {
 
   const [zoomForm, setZoomForm] = useState({ accessToken: "", accountId: "", accountEmail: "" });
   const [gcalForm, setGcalForm] = useState({ accessToken: "", accountEmail: "" });
-  const [telnyxForm, setTelnyxForm] = useState({ apiKey: "", fromPhone: "" });
+  const [telnyxForm, setTelnyxForm] = useState({ apiKey: "", fromPhone: "+18017840672" });
+  const [editFromPhone, setEditFromPhone] = useState("");
+  const [showEditFromPhone, setShowEditFromPhone] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [testPhone, setTestPhone] = useState("");
   const [showTestSms, setShowTestSms] = useState(false);
@@ -96,6 +98,16 @@ export default function SettingsPage() {
 
   const disconnectTelnyx = trpc.integrations.disconnectTelnyx.useMutation({
     onSuccess: () => { toast.success("Telnyx disconnected"); refetchStatus(); },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const updateFromPhone = trpc.integrations.connectTelnyx.useMutation({
+    onSuccess: () => {
+      toast.success("From phone number updated!");
+      refetchStatus();
+      setShowEditFromPhone(false);
+      setEditFromPhone("");
+    },
     onError: (e: any) => toast.error(e.message),
   });// ─── Gmail mutations ────────────────────────────────────────────────────────
   const connectGmail = trpc.integrations.connectGmail.useMutation({
@@ -471,7 +483,39 @@ export default function SettingsPage() {
                       <CheckCircle className="h-4 w-4" /> Telnyx is connected
                     </p>
                     <div className="text-xs text-green-700 space-y-1">
-                      <p className="flex items-center gap-1.5"><Phone className="h-3 w-3" /> From: <span className="font-mono">{telnyxDetails.fromPhone}</span></p>
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-3 w-3" />
+                        <span>From:</span>
+                        <span className="font-mono">{telnyxDetails.fromPhone}</span>
+                        <button
+                          type="button"
+                          className="text-green-600 hover:text-green-800 underline text-xs ml-1"
+                          onClick={() => { setEditFromPhone(telnyxDetails.fromPhone); setShowEditFromPhone(true); }}
+                        >Edit</button>
+                      </div>
+                      {showEditFromPhone && (
+                        <div className="flex gap-2 mt-1">
+                          <input
+                            className="font-mono text-xs border border-green-300 rounded px-2 py-1 flex-1 bg-white text-green-900"
+                            value={editFromPhone}
+                            onChange={(e) => setEditFromPhone(e.target.value)}
+                            placeholder="+18017840672"
+                          />
+                          <button
+                            type="button"
+                            className="text-xs bg-green-700 text-white rounded px-2 py-1 hover:bg-green-800 disabled:opacity-50"
+                            disabled={!editFromPhone || updateFromPhone.isPending}
+                            onClick={() => updateFromPhone.mutate({ apiKey: telnyxDetails.apiKeyHint, fromPhone: editFromPhone })}
+                          >
+                            {updateFromPhone.isPending ? "Saving..." : "Save"}
+                          </button>
+                          <button
+                            type="button"
+                            className="text-xs text-green-700 hover:text-green-900 px-1"
+                            onClick={() => { setShowEditFromPhone(false); setEditFromPhone(""); }}
+                          >Cancel</button>
+                        </div>
+                      )}
                       <p>API Key: <span className="font-mono">{telnyxDetails.apiKeyHint}</span></p>
                     </div>
                   </div>
@@ -601,10 +645,10 @@ export default function SettingsPage() {
                       <Input
                         value={telnyxForm.fromPhone}
                         onChange={(e) => setTelnyxForm({ ...telnyxForm, fromPhone: e.target.value })}
-                        placeholder="+15550001234"
+                        placeholder="+18017840672"
                         className="font-mono text-sm"
                       />
-                      <p className="text-xs text-muted-foreground mt-1">Your Telnyx phone number in E.164 format (e.g. <span className="font-mono">+15550001234</span>). Include the country code.</p>
+                      <p className="text-xs text-muted-foreground mt-1">Your Telnyx phone number in E.164 format (e.g. <span className="font-mono">+18017840672</span>). Include the country code.</p>
                     </div>
 
                     <Button
