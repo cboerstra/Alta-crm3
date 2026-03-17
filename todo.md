@@ -361,3 +361,7 @@
 - [x] Support {{first_name}}, {{last_name}}, {{full_name}}, {{webinar_title}}, {{session_date}} as additional variables
 - [x] Show available placeholder variables in the SMS Templates editor UI (click to copy)
 - [x] All 82 tests passing, TypeScript 0 errors
+
+## Default Registered SMS Template with Webinar Link (User Request)
+- [x] Update default "Registered" template body to include {{webinar_link}}
+- [x] Reset existing "registered" template rows in the DB to pick up the new default

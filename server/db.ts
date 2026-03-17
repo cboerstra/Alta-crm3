@@ -720,45 +720,95 @@ export async function deleteInvite(id: number): Promise<void> {
 const DEFAULT_SMS_TEMPLATES: Omit<InsertSmsTemplate, "createdBy">[] = [
   {
     trigger: "new_lead",
-    body: "Hi {{firstName}}, thanks for your interest in Alta Mortgage! We'll be in touch shortly. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, thanks for your interest in Clarke & Associates! We'll be in touch shortly. Reply STOP to opt out.",
     isActive: true,
   },
   {
     trigger: "registered",
-    body: "Hi {{firstName}}, you're registered for {{webinarTitle}} on {{sessionDate}}! Join link: {{joinUrl}}. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, you're registered for {{webinar_title}} on {{session_date}}! Join here: {{webinar_link}} — Reply STOP to opt out.",
     isActive: true,
   },
   {
     trigger: "reminder_24h",
-    body: "Hi {{firstName}}, reminder: {{webinarTitle}} is tomorrow at {{sessionTime}}. Join: {{joinUrl}}. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, reminder: {{webinar_title}} is tomorrow. Join here: {{webinar_link}} — Reply STOP to opt out.",
     isActive: true,
   },
   {
     trigger: "reminder_1h",
-    body: "Hi {{firstName}}, {{webinarTitle}} starts in 1 hour! Join now: {{joinUrl}}. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, {{webinar_title}} starts in 1 hour! Join now: {{webinar_link}} — Reply STOP to opt out.",
     isActive: true,
   },
   {
     trigger: "attended",
-    body: "Hi {{firstName}}, thanks for attending {{webinarTitle}}! Ready to take the next step? Book a free consultation: {{schedulingUrl}}. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, thanks for attending {{webinar_title}}! Ready to take the next step? Book a free consultation and we'll be in touch. Reply STOP to opt out.",
     isActive: false,
   },
   {
     trigger: "no_show",
-    body: "Hi {{firstName}}, we missed you at {{webinarTitle}}! Watch the replay: {{replayUrl}}. Questions? Reply here. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, we missed you at {{webinar_title}}! Reply here if you have questions or would like to register for the next session. Reply STOP to opt out.",
     isActive: false,
   },
   {
     trigger: "consultation_booked",
-    body: "Hi {{firstName}}, your consultation with Clarke & Associates is confirmed for {{consultationDate}}. We look forward to speaking with you! Reply STOP to opt out.",
+    body: "Hi {{first_name}}, your consultation with Clarke & Associates is confirmed. We look forward to speaking with you! Reply STOP to opt out.",
     isActive: true,
   },
   {
     trigger: "deal_closed",
-    body: "Hi {{firstName}}, congratulations on your new home! It was a pleasure working with you. Please leave us a review: {{reviewUrl}}. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, congratulations! It was a pleasure working with you at Clarke & Associates. Reply STOP to opt out.",
     isActive: false,
   },
 ];
+
+/**
+ * Replace legacy camelCase placeholder names with the canonical snake_case names
+ * that the SMS send procedure resolves. Safe to run on every startup — it only
+ * touches rows that still contain the old names.
+ */
+export async function migrateDefaultSmsTemplates(): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  // Map of old placeholder → new canonical placeholder
+  const RENAMES: [RegExp, string][] = [
+    [/\{\{firstName\}\}/g, "{{first_name}}"],
+    [/\{\{lastName\}\}/g, "{{last_name}}"],
+    [/\{\{fullName\}\}/g, "{{full_name}}"],
+    [/\{\{webinarTitle\}\}/g, "{{webinar_title}}"],
+    [/\{\{sessionDate\}\}/g, "{{session_date}}"],
+    [/\{\{sessionTime\}\}/g, "{{session_date}}"],
+    [/\{\{joinUrl\}\}/g, "{{webinar_link}}"],
+    [/\{\{replayUrl\}\}/g, "{{webinar_link}}"],
+    [/\{\{schedulingUrl\}\}/g, "{{webinar_link}}"],
+    [/\{\{consultationDate\}\}/g, "{{session_date}}"],
+    [/\{\{reviewUrl\}\}/g, "{{webinar_link}}"],
+  ];
+
+  const rows = await db.select().from(smsTemplates);
+  for (const row of rows) {
+    let updated = row.body;
+    for (const [pattern, replacement] of RENAMES) {
+      updated = updated.replace(pattern, replacement);
+    }
+    if (updated !== row.body) {
+      await db
+        .update(smsTemplates)
+        .set({ body: updated, updatedAt: new Date() })
+        .where(eq(smsTemplates.trigger, row.trigger));
+    }
+  }
+
+  // Also ensure the registered template always contains {{webinar_link}}
+  const registered = rows.find((r) => r.trigger === "registered");
+  if (registered && !registered.body.includes("{{webinar_link}}")) {
+    const def = DEFAULT_SMS_TEMPLATES.find((t) => t.trigger === "registered");
+    if (def) {
+      await db
+        .update(smsTemplates)
+        .set({ body: def.body, updatedAt: new Date() })
+        .where(eq(smsTemplates.trigger, "registered"));
+    }
+  }
+}
 
 export async function getSmsTemplates(): Promise<SmsTemplate[]> {
   const db = await getDb();
