@@ -562,36 +562,19 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  {/* Test SMS */}
-                  {!showTestSms ? (
-                    <Button variant="outline" className="gap-2" onClick={() => setShowTestSms(true)}>
-                      <Send className="h-4 w-4" /> Send Test SMS
-                    </Button>
-                  ) : (
-                    <div className="space-y-3 p-4 rounded-lg border bg-muted/20">
-                      <p className="text-sm font-medium">Send a test SMS to verify the connection</p>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="+15550001234"
-                          value={testPhone}
-                          onChange={(e) => setTestPhone(e.target.value)}
-                          className="flex-1 font-mono"
-                        />
-                        <Button
-                          className="bg-brand-green hover:bg-brand-green-dark text-white gap-1"
-                          disabled={!testPhone || testTelnyx.isPending}
-                          onClick={() => testTelnyx.mutate({ toPhone: testPhone })}
-                        >
-                          {testTelnyx.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                          Send
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => { setShowTestSms(false); setTestPhone(""); }}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Enter the number to receive the test SMS. Format: <span className="font-mono">+15550001234</span> (include country code).</p>
-                    </div>
-                  )}
+                  {/* Test SMS — sends to the configured from number */}
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    disabled={testTelnyx.isPending}
+                    onClick={() => testTelnyx.mutate({})}
+                  >
+                    {testTelnyx.isPending ? (
+                      <><Loader2 className="h-4 w-4 animate-spin" /> Sending...</>
+                    ) : (
+                      <><Send className="h-4 w-4" /> Test SMS → {telnyxDetails.fromPhone}</>
+                    )}
+                  </Button>
 
                   <Separator />
 

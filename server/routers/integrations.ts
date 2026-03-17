@@ -205,18 +205,20 @@ export const integrationsRouter = router({
     }),
 
   testTelnyx: adminProcedure
-    .input(z.object({ toPhone: z.string().min(1) }))
+    .input(z.object({ toPhone: z.string().optional() }))
     .mutation(async ({ input, ctx }) => {
       const telnyx = await getIntegration(ctx.user.id, "twilio");
       if (!telnyx?.accessToken || !telnyx.accountEmail) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Telnyx is not configured." });
       }
-      let toPhone = input.toPhone.trim().replace(/[\s\-().]/g, "");
+      // Default to the configured from number if no toPhone provided
+      const rawPhone = (input.toPhone ?? telnyx.accountEmail).trim();
+      let toPhone = rawPhone.replace(/[\s\-().]/g, "");
       if (!toPhone.startsWith("+")) toPhone = `+1${toPhone}`;
       if (!/^\+[1-9]\d{6,14}$/.test(toPhone)) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: `"${input.toPhone}" doesn't look like a valid phone number. Use E.164 format, e.g. +15550001234.`,
+          message: `"${rawPhone}" doesn't look like a valid phone number. Use E.164 format, e.g. +15550001234.`,
         });
       }
       const res = await fetch("https://api.telnyx.com/v2/messages", {
@@ -233,7 +235,7 @@ export const integrationsRouter = router({
         const detail = err.errors?.[0]?.detail ?? "Failed to send test SMS. Check your Telnyx account for details.";
         throw new TRPCError({ code: "BAD_REQUEST", message: detail });
       }
-      return { success: true };
+      return { success: true, sentTo: toPhone };
     }),
 
   toggleTelnyx: adminProcedure

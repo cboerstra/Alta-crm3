@@ -334,3 +334,8 @@
 ## Telnyx From-Phone Number (User Request)
 - [x] Pre-fill from phone with +18017840672 in the Telnyx connect form
 - [x] Add editable "From Phone" field in SMS settings when already connected (update without full reconnect)
+
+## Test SMS to From Number (User Request)
+- [x] Update testTelnyx procedure to accept optional toPhone — default to the configured from number if omitted
+- [x] Replace the existing "enter a phone number" test panel with a single "Test SMS" button that sends to the from number
+- [x] Show the destination number in the button label so it's clear where the message is going
