@@ -317,3 +317,15 @@
 ## Fix enabledFields JSON Parsing Error on Landing Page Update (User Report)
 - [x] Parse enabledFields from string to array when reading from MySQL (MySQL returns JSON columns as strings)
 - [x] Apply same fix to any other JSON columns returned from landing_pages
+
+## Fix Missing Columns in Hostinger leads Table (User Report)
+- [x] Generate definitive up-to-date schema SQL with all columns from current Drizzle schema (v4)
+- [x] Provide ALTER TABLE fix for leads table missing columns
+
+## Replace Twilio with Telnyx SMS Integration (User Request)
+- [ ] Research Telnyx API (send SMS, inbound webhook format)
+- [ ] Update integrations router: replace Twilio connect/send/test with Telnyx
+- [ ] Add Telnyx inbound webhook HTTP endpoint (not tRPC — must be unauthenticated)
+- [ ] Add Telnyx status callback webhook endpoint
+- [ ] Update Settings UI to show Telnyx fields instead of Twilio
+- [ ] Update sms.send procedure to call Telnyx API

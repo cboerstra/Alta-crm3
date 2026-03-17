@@ -34,8 +34,8 @@ export default function SettingsPage() {
 
   const [zoomForm, setZoomForm] = useState({ accessToken: "", accountId: "", accountEmail: "" });
   const [gcalForm, setGcalForm] = useState({ accessToken: "", accountEmail: "" });
-  const [twilioForm, setTwilioForm] = useState({ accountSid: "", authToken: "", fromPhone: "" });
-  const [showAuthToken, setShowAuthToken] = useState(false);
+  const [telnyxForm, setTelnyxForm] = useState({ apiKey: "", fromPhone: "" });
+  const [showApiKey, setShowApiKey] = useState(false);
   const [testPhone, setTestPhone] = useState("");
   const [showTestSms, setShowTestSms] = useState(false);
 
@@ -67,18 +67,17 @@ export default function SettingsPage() {
     onSuccess: () => { toast.success("Disconnected"); refetchStatus(); },
     onError: (e: any) => toast.error(e.message),
   });
-
-  // ─── Twilio mutations ───────────────────────────────────────────────────────
-  const connectTwilio = trpc.integrations.connectTwilio.useMutation({
+  // ─── Telnyx mutations ────────────────────────────────────────────────────────────
+  const connectTelnyx = trpc.integrations.connectTelnyx.useMutation({
     onSuccess: () => {
-      toast.success("Twilio connected successfully!");
+      toast.success("Telnyx connected successfully!");
       refetchStatus();
-      setTwilioForm({ accountSid: "", authToken: "", fromPhone: "" });
+      setTelnyxForm({ apiKey: "", fromPhone: "" });
     },
     onError: (e: any) => toast.error(e.message),
   });
 
-  const testTwilio = trpc.integrations.testTwilio.useMutation({
+  const testTelnyx = trpc.integrations.testTelnyx.useMutation({
     onSuccess: () => {
       toast.success("Test SMS sent! Check your phone.");
       setShowTestSms(false);
@@ -87,7 +86,7 @@ export default function SettingsPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const toggleTwilio = trpc.integrations.toggleTwilio.useMutation({
+  const toggleTelnyx = trpc.integrations.toggleTelnyx.useMutation({
     onSuccess: (_: any, vars: { enabled: boolean }) => {
       toast.success(vars.enabled ? "SMS sending enabled" : "SMS sending disabled");
       refetchStatus();
@@ -95,12 +94,10 @@ export default function SettingsPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const disconnectTwilio = trpc.integrations.disconnectTwilio.useMutation({
-    onSuccess: () => { toast.success("Twilio disconnected"); refetchStatus(); },
+  const disconnectTelnyx = trpc.integrations.disconnectTelnyx.useMutation({
+    onSuccess: () => { toast.success("Telnyx disconnected"); refetchStatus(); },
     onError: (e: any) => toast.error(e.message),
-  });
-
-  // ─── Gmail mutations ────────────────────────────────────────────────────────
+  });// ─── Gmail mutations ────────────────────────────────────────────────────────
   const connectGmail = trpc.integrations.connectGmail.useMutation({
     onSuccess: () => {
       toast.success("Gmail connected successfully! Emails will now be sent via Gmail.");
@@ -208,13 +205,13 @@ export default function SettingsPage() {
     }
   };
 
-  const twilioConnected = status?.twilio?.connected;
+  const telnyxConnected = status?.telnyx?.connected;
   const gmailConnected = status?.gmail?.connected;
   const gmailDetails = gmailConnected && "gmailAddress" in status!.gmail! ? status!.gmail as {
     connected: true; gmailAddress: string; appPasswordHint: string; enabled: boolean;
   } : null;
-  const twilioDetails = twilioConnected && "accountSid" in status!.twilio! ? status!.twilio as {
-    connected: true; accountSid: string; fromPhone: string; authTokenHint: string; enabled: boolean;
+  const telnyxDetails = telnyxConnected && "apiKeyHint" in status!.telnyx! ? status!.telnyx as {
+    connected: true; apiKeyHint: string; fromPhone: string; enabled: boolean;
   } : null;
 
   return (
@@ -231,7 +228,7 @@ export default function SettingsPage() {
           <TabsTrigger value="google" className="gap-1"><Calendar className="h-3.5 w-3.5" /> Google Calendar</TabsTrigger>
           <TabsTrigger value="sms" className="gap-1 relative">
             <MessageSquare className="h-3.5 w-3.5" /> SMS
-            {twilioConnected && (
+            {telnyxConnected && (
               <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-green-500" />
             )}
           </TabsTrigger>
@@ -452,13 +449,13 @@ export default function SettingsPage() {
                 <div>
                   <CardTitle className="text-base flex items-center gap-2" style={{ fontFamily: "Raleway, sans-serif" }}>
                     <MessageSquare className="h-5 w-5 text-brand-green" />
-                    SMS Integration (Twilio)
+                    SMS Integration (Telnyx)
                   </CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Send automated reminders and two-way SMS to leads via Twilio.
+                    Send automated reminders and two-way SMS to leads via Telnyx.
                   </p>
                 </div>
-                {twilioConnected ? (
+                {telnyxConnected ? (
                   <Badge className="bg-green-100 text-green-700 gap-1"><CheckCircle className="h-3 w-3" /> Connected</Badge>
                 ) : (
                   <Badge variant="secondary" className="gap-1"><AlertCircle className="h-3 w-3" /> Not Connected</Badge>
@@ -466,17 +463,16 @@ export default function SettingsPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
-              {twilioConnected && twilioDetails ? (
+              {telnyxConnected && telnyxDetails ? (
                 <>
                   {/* Connected state */}
                   <div className="p-4 rounded-lg bg-green-50 border border-green-200 space-y-2">
                     <p className="text-sm font-semibold text-green-800 flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4" /> Twilio is connected
+                      <CheckCircle className="h-4 w-4" /> Telnyx is connected
                     </p>
                     <div className="text-xs text-green-700 space-y-1">
-                      <p className="flex items-center gap-1.5"><Phone className="h-3 w-3" /> From: <span className="font-mono">{twilioDetails.fromPhone}</span></p>
-                      <p>Account SID: <span className="font-mono">{twilioDetails.accountSid}</span></p>
-                      <p>Auth Token: <span className="font-mono">{twilioDetails.authTokenHint}</span></p>
+                      <p className="flex items-center gap-1.5"><Phone className="h-3 w-3" /> From: <span className="font-mono">{telnyxDetails.fromPhone}</span></p>
+                      <p>API Key: <span className="font-mono">{telnyxDetails.apiKeyHint}</span></p>
                     </div>
                   </div>
 
@@ -487,9 +483,9 @@ export default function SettingsPage() {
                       <p className="text-xs text-muted-foreground">When disabled, no SMS messages will be sent to leads.</p>
                     </div>
                     <Switch
-                      checked={twilioDetails.enabled}
-                      onCheckedChange={(v) => toggleTwilio.mutate({ enabled: v })}
-                      disabled={toggleTwilio.isPending}
+                      checked={telnyxDetails.enabled}
+                      onCheckedChange={(v) => toggleTelnyx.mutate({ enabled: v })}
+                      disabled={toggleTelnyx.isPending}
                     />
                   </div>
 
@@ -504,6 +500,22 @@ export default function SettingsPage() {
                       <li className="flex items-center gap-2"><CheckCircle className="h-3 w-3 text-brand-green shrink-0" /> No-show follow-up with replay link</li>
                     </ul>
                     <p className="text-xs text-muted-foreground pt-1">Only sent to leads who have granted SMS consent on their profile.</p>
+                  </div>
+
+                  {/* Webhook URLs */}
+                  <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 space-y-2">
+                    <p className="text-xs font-semibold text-blue-800 uppercase tracking-wider">Telnyx Webhook URLs</p>
+                    <p className="text-xs text-blue-700">Set these in your Telnyx Messaging Profile:</p>
+                    <div className="space-y-1.5">
+                      <div>
+                        <p className="text-xs text-blue-600 font-medium">Primary (Inbound SMS):</p>
+                        <p className="font-mono text-xs bg-white border border-blue-200 rounded px-2 py-1 break-all select-all">{window.location.origin}/api/sms/webhook</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-blue-600 font-medium">Secondary (Status Callbacks):</p>
+                        <p className="font-mono text-xs bg-white border border-blue-200 rounded px-2 py-1 break-all select-all">{window.location.origin}/api/sms/status</p>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Test SMS */}
@@ -523,17 +535,17 @@ export default function SettingsPage() {
                         />
                         <Button
                           className="bg-brand-green hover:bg-brand-green-dark text-white gap-1"
-                          disabled={!testPhone || testTwilio.isPending}
-                          onClick={() => testTwilio.mutate({ toPhone: testPhone })}
+                          disabled={!testPhone || testTelnyx.isPending}
+                          onClick={() => testTelnyx.mutate({ toPhone: testPhone })}
                         >
-                          {testTwilio.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                          {testTelnyx.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                           Send
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => { setShowTestSms(false); setTestPhone(""); }}>
                           <X className="h-4 w-4" />
                         </Button>
                       </div>
-                      <p className="text-xs text-muted-foreground">Enter the number to receive the test SMS. Format: <span className="font-mono">+15550001234</span> (include country code). <strong>Trial accounts</strong> can only text verified numbers.</p>
+                      <p className="text-xs text-muted-foreground">Enter the number to receive the test SMS. Format: <span className="font-mono">+15550001234</span> (include country code).</p>
                     </div>
                   )}
 
@@ -543,84 +555,67 @@ export default function SettingsPage() {
                   <Button
                     variant="outline"
                     className="text-destructive border-destructive/30 hover:bg-destructive/5 gap-2"
-                    onClick={() => disconnectTwilio.mutate()}
-                    disabled={disconnectTwilio.isPending}
+                    onClick={() => disconnectTelnyx.mutate()}
+                    disabled={disconnectTelnyx.isPending}
                   >
                     <Trash2 className="h-4 w-4" />
-                    {disconnectTwilio.isPending ? "Disconnecting..." : "Disconnect Twilio"}
+                    {disconnectTelnyx.isPending ? "Disconnecting..." : "Disconnect Telnyx"}
                   </Button>
                 </>
               ) : (
                 <>
                   {/* Setup form */}
-                        <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800 space-y-1.5">
-                    <p className="font-medium">Where to find your Twilio credentials:</p>
+                  <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800 space-y-1.5">
+                    <p className="font-medium">Where to find your Telnyx credentials:</p>
                     <ol className="list-decimal list-inside space-y-1 text-xs">
-                      <li>Log in at <a href="https://console.twilio.com" target="_blank" rel="noopener noreferrer" className="underline font-medium">console.twilio.com</a></li>
-                      <li>Your <strong>Account SID</strong> and <strong>Auth Token</strong> are on the Console home page</li>
-                      <li>Your <strong>From Phone</strong> is under Phone Numbers → Manage → Active Numbers</li>
+                      <li>Log in at <a href="https://portal.telnyx.com" target="_blank" rel="noopener noreferrer" className="underline font-medium">portal.telnyx.com</a></li>
+                      <li>Go to <strong>Auth</strong> → <strong>API Keys</strong> and create or copy your API key (starts with <span className="font-mono">KEY</span>)</li>
+                      <li>Your <strong>From Phone</strong> is under <strong>Numbers</strong> → your purchased number in E.164 format</li>
                     </ol>
-                    <p className="text-xs text-blue-700 pt-1">⚠️ <strong>Trial accounts</strong> can only send SMS to verified numbers. Verify numbers at Console → Phone Numbers → Verified Caller IDs.</p>
                   </div>
 
                   <div className="space-y-4">
                     <div>
-                      <Label>Account SID <span className="text-red-500">*</span></Label>
-                      <Input
-                        value={twilioForm.accountSid}
-                        onChange={(e) => setTwilioForm({ ...twilioForm, accountSid: e.target.value })}
-                        placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                        className={`font-mono text-sm ${twilioForm.accountSid && !twilioForm.accountSid.trim().startsWith("AC") ? "border-red-400 focus-visible:ring-red-400" : ""}`}
-                      />
-                      {twilioForm.accountSid && !twilioForm.accountSid.trim().startsWith("AC") && (
-                        <p className="text-xs text-red-500 mt-1">Account SID must start with "AC"</p>
-                      )}
-                      {(!twilioForm.accountSid || twilioForm.accountSid.trim().startsWith("AC")) && (
-                        <p className="text-xs text-muted-foreground mt-1">Starts with "AC" — found on your Twilio Console home page.</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <Label>Auth Token <span className="text-red-500">*</span></Label>
+                      <Label>API Key <span className="text-red-500">*</span></Label>
                       <div className="relative">
                         <Input
-                          type={showAuthToken ? "text" : "password"}
-                          value={twilioForm.authToken}
-                          onChange={(e) => setTwilioForm({ ...twilioForm, authToken: e.target.value })}
-                          placeholder="Your Twilio Auth Token"
+                          type={showApiKey ? "text" : "password"}
+                          value={telnyxForm.apiKey}
+                          onChange={(e) => setTelnyxForm({ ...telnyxForm, apiKey: e.target.value })}
+                          placeholder="KEY..."
                           className="font-mono text-sm pr-10"
                         />
                         <button
                           type="button"
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                          onClick={() => setShowAuthToken(!showAuthToken)}
+                          onClick={() => setShowApiKey(!showApiKey)}
                         >
-                          {showAuthToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">Stored securely. Only the last 4 characters will be shown after saving.</p>
+                      <p className="text-xs text-muted-foreground mt-1">Stored securely. Starts with "KEY" — found in Telnyx portal under Auth → API Keys.</p>
                     </div>
 
                     <div>
                       <Label>From Phone Number <span className="text-red-500">*</span></Label>
                       <Input
-                        value={twilioForm.fromPhone}
-                        onChange={(e) => setTwilioForm({ ...twilioForm, fromPhone: e.target.value })}
+                        value={telnyxForm.fromPhone}
+                        onChange={(e) => setTelnyxForm({ ...telnyxForm, fromPhone: e.target.value })}
                         placeholder="+15550001234"
                         className="font-mono text-sm"
                       />
-                      <p className="text-xs text-muted-foreground mt-1">Your Twilio phone number in E.164 format (e.g. <span className="font-mono">+15550001234</span>). Include the country code.</p>
+                      <p className="text-xs text-muted-foreground mt-1">Your Telnyx phone number in E.164 format (e.g. <span className="font-mono">+15550001234</span>). Include the country code.</p>
                     </div>
 
                     <Button
                       className="w-full bg-brand-green hover:bg-brand-green-dark text-white h-11 gap-2"
-                      disabled={!twilioForm.accountSid || !twilioForm.authToken || !twilioForm.fromPhone || connectTwilio.isPending}
-                      onClick={() => connectTwilio.mutate(twilioForm)}
+                      disabled={!telnyxForm.apiKey || !telnyxForm.fromPhone || connectTelnyx.isPending}
+                      onClick={() => connectTelnyx.mutate(telnyxForm)}
                     >
-                      {connectTwilio.isPending ? (
+                      {connectTelnyx.isPending ? (
                         <><Loader2 className="h-4 w-4 animate-spin" /> Verifying credentials...</>
                       ) : (
-                        <><MessageSquare className="h-4 w-4" /> Connect Twilio</>
+                        <><MessageSquare className="h-4 w-4" /> Connect Telnyx</>
                       )}
                     </Button>
                   </div>

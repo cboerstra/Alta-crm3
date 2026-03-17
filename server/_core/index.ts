@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { processPendingReminders } from "../emailService";
+import { getIntegration, createSmsMessage, logActivity, getLeads } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -57,6 +58,76 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+
+  // ── Telnyx SMS Webhooks ──────────────────────────────────────────────────────
+  // Primary webhook: receives inbound SMS from Telnyx
+  app.post("/api/sms/webhook", async (req, res) => {
+    try {
+      const payload = req.body;
+      const eventType: string = payload?.data?.event_type ?? "";
+      if (eventType === "message.received") {
+        const msg = payload.data.payload;
+        const fromPhone: string = msg?.from?.phone_number ?? "";
+        const body: string = msg?.text ?? "";
+        const externalId: string = msg?.id ?? "";
+        // Find lead by phone number
+        const leadsResult = await getLeads();
+        const lead = leadsResult.items.find((l: any) => {
+          const clean = (p: string) => p?.replace(/\D/g, "").slice(-10);
+          return clean(l.phone ?? "") === clean(fromPhone);
+        });
+        if (lead) {
+          await createSmsMessage({
+            leadId: lead.id,
+            direction: "inbound",
+            body,
+            status: "received",
+          });
+          await logActivity({
+            leadId: lead.id,
+            type: "sms_received",
+            title: "SMS received",
+            content: body,
+          });
+        } else {
+          console.log(`[Telnyx] Inbound SMS from unknown number: ${fromPhone}`);
+        }
+      }
+      res.status(200).json({ received: true });
+    } catch (err) {
+      console.error("[Telnyx] Webhook error:", err);
+      res.status(200).json({ received: true }); // always 200 to prevent Telnyx retries
+    }
+  });
+
+  // Secondary webhook: delivery status callbacks from Telnyx
+  app.post("/api/sms/status", async (req, res) => {
+    try {
+      const payload = req.body;
+      const eventType: string = payload?.data?.event_type ?? "";
+      const externalId: string = payload?.data?.payload?.id ?? "";
+      if (externalId && (eventType === "message.sent" || eventType === "message.delivered" || eventType === "message.failed")) {
+        const statusMap: Record<string, string> = {
+          "message.sent": "sent",
+          "message.delivered": "delivered",
+          "message.failed": "failed",
+        };
+        const newStatus = statusMap[eventType] ?? "sent";
+        const { getDb } = await import("../db");
+        const { smsMessages } = await import("../../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const db = await getDb();
+        if (db) {
+          await db.update(smsMessages).set({ status: newStatus as any }).where(eq(smsMessages.externalId, externalId));
+        }
+      }
+      res.status(200).json({ received: true });
+    } catch (err) {
+      console.error("[Telnyx] Status callback error:", err);
+      res.status(200).json({ received: true });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",
