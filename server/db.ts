@@ -318,12 +318,21 @@ export async function createLandingPage(data: InsertLandingPage) {
   return (r as any).insertId as number;
 }
 
+// MySQL may return JSON columns as raw strings — normalise them into arrays/objects
+function normalizeLandingPage<T extends { enabledFields?: unknown }>(p: T): T {
+  return {
+    ...p,
+    enabledFields: typeof p.enabledFields === "string"
+      ? JSON.parse(p.enabledFields)
+      : (p.enabledFields ?? ["firstName", "lastName", "email", "phone"]),
+  };
+}
 export async function getLandingPages() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(landingPages).orderBy(desc(landingPages.createdAt));
+  const rows = await db.select().from(landingPages).orderBy(desc(landingPages.createdAt));
+  return rows.map(normalizeLandingPage);
 }
-
 export async function getLandingPagesWithLeadCount() {
   const db = await getDb();
   if (!db) return [];
@@ -334,21 +343,19 @@ export async function getLandingPagesWithLeadCount() {
     .where(isNotNull(leads.landingPageId))
     .groupBy(leads.landingPageId);
   const countMap = new Map(counts.map(c => [c.landingPageId, Number(c.count)]));
-  return pages.map(p => ({ ...p, leadCount: countMap.get(p.id) ?? 0 }));
+  return pages.map(p => ({ ...normalizeLandingPage(p), leadCount: countMap.get(p.id) ?? 0 }));
 }
-
 export async function getLandingPageBySlug(slug: string) {
   const db = await getDb();
   if (!db) return undefined;
   const r = await db.select().from(landingPages).where(eq(landingPages.slug, slug)).limit(1);
-  return r[0];
+  return r[0] ? normalizeLandingPage(r[0]) : undefined;
 }
-
 export async function getLandingPageById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
   const r = await db.select().from(landingPages).where(eq(landingPages.id, id)).limit(1);
-  return r[0];
+  return r[0] ? normalizeLandingPage(r[0]) : undefined;
 }
 
 export async function updateLandingPage(id: number, data: Partial<InsertLandingPage>) {

@@ -313,3 +313,7 @@
 - [x] Show full public URL preview in the form (e.g. https://altamortgagecrm.net/lp/spring-webinar-2026)
 - [x] Allow admin to manually edit the slug before saving
 - [x] Slug field locked/readonly after page is created (edit via separate edit flow)
+
+## Fix enabledFields JSON Parsing Error on Landing Page Update (User Report)
+- [x] Parse enabledFields from string to array when reading from MySQL (MySQL returns JSON columns as strings)
+- [x] Apply same fix to any other JSON columns returned from landing_pages
