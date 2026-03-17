@@ -365,3 +365,9 @@
 ## Default Registered SMS Template with Webinar Link (User Request)
 - [x] Update default "Registered" template body to include {{webinar_link}}
 - [x] Reset existing "registered" template rows in the DB to pick up the new default
+
+## Admin SMS Notification on Lead Registration (User Request)
+- [x] When a lead registers via a landing page, automatically send SMS to all admin users who have a phone number
+- [x] Admin notification message includes lead name, phone, email, and which landing page they registered on
+- [x] Only fires when Telnyx is configured and enabled
+- [x] Graceful failure — notification errors never block the lead capture response

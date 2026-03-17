@@ -4,7 +4,7 @@ import {
   createLead, getLeads, getLeadById, updateLead, updateLeadStage,
   logActivity, getActivityByLeadId, updateLeadScore,
   getLandingPageBySlug, getWebinarById, getWebinarSessionById,
-  createEmailReminder, deleteLead, deleteLeads,
+  createEmailReminder, deleteLead, deleteLeads, notifyAdminsBySms,
 } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { notifyOwner } from "../_core/notification";
@@ -280,7 +280,7 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
         }
       }
 
-      // Notify owner about new lead
+      // Notify owner about new lead (Manus platform notification)
       try {
         await notifyOwner({
           title: "New Lead Captured",
@@ -289,6 +289,15 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
       } catch (e) {
         // Non-critical, don't fail the capture
       }
+
+      // Notify admins via SMS (fire-and-forget — never blocks the response)
+      const adminSmsBody = [
+        `New lead registered: ${input.firstName} ${input.lastName}`,
+        input.phone ? `Phone: ${input.phone}` : null,
+        `Email: ${input.email}`,
+        `Source: ${page.title}`,
+      ].filter(Boolean).join(" | ");
+      notifyAdminsBySms(adminSmsBody).catch(() => {/* silently ignore */});
 
       return { id, webinarId: page.webinarId, joinUrl };
     }),

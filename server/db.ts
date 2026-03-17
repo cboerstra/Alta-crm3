@@ -905,3 +905,71 @@ export async function getNextWebinarForLead(leadId: number) {
 
   return null;
 }
+
+// ─── Admin SMS Notifications ──────────────────────────────────────────────────
+
+/**
+ * Returns the first active Telnyx integration row found in the database,
+ * regardless of which admin user created it. Telnyx is an org-wide integration
+ * so we don't need to scope it to a specific userId here.
+ */
+export async function getAnyTelnyxConfig() {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(integrations)
+    .where(eq(integrations.provider, "twilio")) // stored under "twilio" provider key
+    .limit(10);
+  // Return the first row that has both an API key (accessToken) and a from-number (accountEmail)
+  return rows.find((r) => r.accessToken && r.accountEmail) ?? null;
+}
+
+/**
+ * Returns all admin-role users who have a phone number stored on their profile.
+ * These are the recipients for internal admin SMS notifications.
+ */
+export async function getAdminUsersWithPhone() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({ id: users.id, name: users.name, phone: users.phone })
+    .from(users)
+    .where(and(eq(users.role, "admin"), isNotNull(users.phone)));
+}
+
+/**
+ * Fire-and-forget: sends an SMS to every admin who has a phone number,
+ * using the configured Telnyx integration. Errors are logged but never thrown.
+ *
+ * @param message  The text body to send (plain string, no placeholders).
+ */
+export async function notifyAdminsBySms(message: string): Promise<void> {
+  try {
+    const config = await getAnyTelnyxConfig();
+    if (!config) return; // Telnyx not configured — silently skip
+
+    const meta = config.metadata as { enabled?: boolean } | null;
+    if (meta?.enabled === false) return; // SMS disabled — silently skip
+
+    const admins = await getAdminUsersWithPhone();
+    if (admins.length === 0) return; // No admins with phone numbers — silently skip
+
+    const fromPhone = config.accountEmail!; // accountEmail stores the from-number
+    const apiKey = config.accessToken!;
+
+    await Promise.allSettled(
+      admins.map(async (admin) => {
+        let toPhone = admin.phone!.trim().replace(/[\s\-().]/g, "");
+        if (!toPhone.startsWith("+")) toPhone = `+1${toPhone}`;
+        await fetch("https://api.telnyx.com/v2/messages", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ from: fromPhone, to: toPhone, text: message }),
+        });
+      }),
+    );
+  } catch (err) {
+    console.error("[notifyAdminsBySms] Error sending admin notification:", err);
+  }
+}
