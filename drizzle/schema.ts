@@ -337,3 +337,25 @@ export const landingPageMedia = mysqlTable("landing_page_media", {
 });
 
 export type LandingPageMedia = typeof landingPageMedia.$inferSelect;
+
+// ─── SMS Templates ────────────────────────────────────────────────────────────
+export const smsTemplates = mysqlTable("sms_templates", {
+  id: int("id").autoincrement().primaryKey(),
+  trigger: mysqlEnum("trigger", [
+    "new_lead",
+    "registered",
+    "reminder_24h",
+    "reminder_1h",
+    "attended",
+    "no_show",
+    "consultation_booked",
+    "deal_closed",
+  ]).notNull().unique(),
+  body: text("body").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type SmsTemplate = typeof smsTemplates.$inferSelect;
+export type InsertSmsTemplate = typeof smsTemplates.$inferInsert;

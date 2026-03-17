@@ -339,3 +339,19 @@
 - [x] Update testTelnyx procedure to accept optional toPhone — default to the configured from number if omitted
 - [x] Replace the existing "enter a phone number" test panel with a single "Test SMS" button that sends to the from number
 - [x] Show the destination number in the button label so it's clear where the message is going
+
+## SMS Templates for Lead Stages (User Request)
+- [ ] Add sms_templates table to drizzle/schema.ts (trigger, body, isActive, createdBy)
+- [ ] Push migration to Manus sandbox DB
+- [ ] Add getSmsTemplates / upsertSmsTemplate DB helpers
+- [ ] Add smsTemplates tRPC router (list, upsert, reset to default)
+- [ ] Build SMS Templates tab in Settings with per-stage editor and live character count
+- [ ] Seed default templates for all lead stages
+- [ ] Generate ALTER TABLE SQL for Hostinger
+
+## Optional Webinar Link in SMS Compose (User Request)
+- [x] Add backend query to get next upcoming Zoom join URL for a lead (from their registered session, or next available session)
+- [x] Add "Include webinar link" toggle to SMS compose interface on lead profile
+- [x] When toggled on, append the join URL to the message body preview
+- [x] Show which webinar/session the link is for so the user knows what's being included
+- [x] All 82 tests passing

@@ -499,7 +499,7 @@ describe("SMS Router", () => {
   it("sms.send validates lead data before attempting Telnyx send", async () => {
     const ctx = createAuthContext();
     const caller = appRouter.createCaller(ctx);
-    // Lead with consent but no phone — should fail with phone error
+    // Lead with consent but no phone — should fail with phone error before any HTTP call
     const { id: noPhoneId } = await caller.leads.create({
       firstName: "Consent",
       lastName: "NoPhone",
@@ -518,8 +518,7 @@ describe("SMS Router", () => {
       phone: "+15550001234",
       smsConsent: true,
     });
-    // In test env, no Telnyx integration is stored, so it throws config error;
-    // if somehow a real Telnyx call is made, it will throw an API error — both are acceptable.
+    // No Telnyx integration stored in test DB → throws some error (config or API error)
     await expect(
       caller.sms.send({ leadId: withPhoneId, body: "Hello! Reminder about your consultation." })
     ).rejects.toThrow();

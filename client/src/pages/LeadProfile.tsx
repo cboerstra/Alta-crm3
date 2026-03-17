@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useLocation, useParams } from "wouter";
 import {
   ArrowLeft, Mail, Phone, MapPin, Calendar, MessageSquare, Send,
-  Sparkles, Clock, User, FileText, Zap, ChevronRight,
+  Sparkles, Clock, User, FileText, Zap, ChevronRight, Link,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,10 +49,12 @@ export default function LeadProfile() {
   const leadId = Number(params.id);
   const [noteText, setNoteText] = useState("");
   const [smsText, setSmsText] = useState("");
+  const [includeWebinarLink, setIncludeWebinarLink] = useState(false);
 
   const { data: lead, refetch } = trpc.leads.getById.useQuery({ id: leadId });
   const { data: activity, refetch: refetchActivity } = trpc.leads.getActivity.useQuery({ leadId });
   const { data: smsMessages, refetch: refetchSms } = trpc.sms.getByLead.useQuery({ leadId });
+  const { data: nextWebinar } = trpc.sms.getNextWebinarLink.useQuery({ leadId });
 
   const updateStage = trpc.leads.updateStage.useMutation({
     onSuccess: () => { toast.success("Stage updated"); refetch(); refetchActivity(); },
@@ -65,9 +67,17 @@ export default function LeadProfile() {
   });
 
   const sendSms = trpc.sms.send.useMutation({
-    onSuccess: () => { toast.success("SMS sent"); setSmsText(""); refetchSms(); refetchActivity(); },
+    onSuccess: () => { toast.success("SMS sent"); setSmsText(""); setIncludeWebinarLink(false); refetchSms(); refetchActivity(); },
     onError: (e) => toast.error(e.message),
   });
+
+  const buildSmsBody = () => {
+    let body = smsText;
+    if (includeWebinarLink && nextWebinar?.joinUrl) {
+      body = body.trim() + (body.trim() ? "\n" : "") + nextWebinar.joinUrl;
+    }
+    return body;
+  };
 
   const scoreLead = trpc.leads.scoreWithLLM.useMutation({
     onSuccess: (data) => { toast.success(`Score: ${data.score}/100`); refetch(); refetchActivity(); },
@@ -290,17 +300,44 @@ export default function LeadProfile() {
                           <p className="text-sm text-muted-foreground text-center py-4">No messages yet</p>
                         )}
                       </div>
+                      {/* Webinar link toggle */}
+                      {nextWebinar?.joinUrl && (
+                        <div className="flex items-center gap-2 mb-2 px-1">
+                          <Switch
+                            id="webinar-link-toggle"
+                            checked={includeWebinarLink}
+                            onCheckedChange={setIncludeWebinarLink}
+                          />
+                          <Label htmlFor="webinar-link-toggle" className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1">
+                            <Link className="h-3 w-3" />
+                            Include webinar link
+                            {nextWebinar.webinarTitle && (
+                              <span className="font-medium text-foreground ml-1">— {nextWebinar.webinarTitle}</span>
+                            )}
+                            {nextWebinar.sessionDate && (
+                              <span className="text-muted-foreground ml-1">({new Date(nextWebinar.sessionDate).toLocaleDateString()})</span>
+                            )}
+                          </Label>
+                        </div>
+                      )}
+                      {/* Preview of appended link */}
+                      {includeWebinarLink && nextWebinar?.joinUrl && (
+                        <div className="mb-2 px-1">
+                          <p className="text-xs text-muted-foreground font-medium mb-1">Link to be appended:</p>
+                          <p className="text-xs text-brand-green break-all bg-muted/50 rounded p-2">{nextWebinar.joinUrl}</p>
+                        </div>
+                      )}
                       <div className="flex gap-2">
                         <Input
                           placeholder="Type a message..."
                           value={smsText}
                           onChange={(e) => setSmsText(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === "Enter" && smsText.trim()) sendSms.mutate({ leadId, body: smsText }); }}
+                          onKeyDown={(e) => { if (e.key === "Enter" && buildSmsBody().trim()) sendSms.mutate({ leadId, body: buildSmsBody() }); }}
                         />
                         <Button
                           className="bg-brand-green hover:bg-brand-green-dark text-white"
-                          disabled={!smsText.trim() || sendSms.isPending}
-                          onClick={() => sendSms.mutate({ leadId, body: smsText })}
+                          disabled={!buildSmsBody().trim() || sendSms.isPending}
+                          onClick={() => sendSms.mutate({ leadId, body: buildSmsBody() })}
                         >
                           <Send className="h-4 w-4" />
                         </Button>

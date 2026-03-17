@@ -1,12 +1,18 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
-import { createSmsMessage, getSmsByLeadId, logActivity, getLeadById, getIntegration } from "../db";
+import { createSmsMessage, getSmsByLeadId, logActivity, getLeadById, getIntegration, getNextWebinarForLead } from "../db";
 
 export const smsRouter = router({
   getByLead: protectedProcedure
     .input(z.object({ leadId: z.number() }))
     .query(({ input }) => getSmsByLeadId(input.leadId)),
+
+  getNextWebinarLink: protectedProcedure
+    .input(z.object({ leadId: z.number() }))
+    .query(async ({ input }) => {
+      return getNextWebinarForLead(input.leadId);
+    }),
 
   send: protectedProcedure
     .input(z.object({

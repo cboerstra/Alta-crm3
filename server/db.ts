@@ -15,6 +15,7 @@ import {
   integrations,
   webinarSessions, InsertWebinarSession,
   pendingInvites, InsertPendingInvite,
+  smsTemplates, InsertSmsTemplate, SmsTemplate,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -712,4 +713,145 @@ export async function deleteInvite(id: number): Promise<void> {
   const db = await getDb();
   if (!db) return;
   await db.delete(pendingInvites).where(eq(pendingInvites.id, id));
+}
+
+// ─── SMS Templates ────────────────────────────────────────────────────────────
+
+const DEFAULT_SMS_TEMPLATES: Omit<InsertSmsTemplate, "createdBy">[] = [
+  {
+    trigger: "new_lead",
+    body: "Hi {{firstName}}, thanks for your interest in Alta Mortgage! We'll be in touch shortly. Reply STOP to opt out.",
+    isActive: true,
+  },
+  {
+    trigger: "registered",
+    body: "Hi {{firstName}}, you're registered for {{webinarTitle}} on {{sessionDate}}! Join link: {{joinUrl}}. Reply STOP to opt out.",
+    isActive: true,
+  },
+  {
+    trigger: "reminder_24h",
+    body: "Hi {{firstName}}, reminder: {{webinarTitle}} is tomorrow at {{sessionTime}}. Join: {{joinUrl}}. Reply STOP to opt out.",
+    isActive: true,
+  },
+  {
+    trigger: "reminder_1h",
+    body: "Hi {{firstName}}, {{webinarTitle}} starts in 1 hour! Join now: {{joinUrl}}. Reply STOP to opt out.",
+    isActive: true,
+  },
+  {
+    trigger: "attended",
+    body: "Hi {{firstName}}, thanks for attending {{webinarTitle}}! Ready to take the next step? Book a free consultation: {{schedulingUrl}}. Reply STOP to opt out.",
+    isActive: false,
+  },
+  {
+    trigger: "no_show",
+    body: "Hi {{firstName}}, we missed you at {{webinarTitle}}! Watch the replay: {{replayUrl}}. Questions? Reply here. Reply STOP to opt out.",
+    isActive: false,
+  },
+  {
+    trigger: "consultation_booked",
+    body: "Hi {{firstName}}, your consultation with Clarke & Associates is confirmed for {{consultationDate}}. We look forward to speaking with you! Reply STOP to opt out.",
+    isActive: true,
+  },
+  {
+    trigger: "deal_closed",
+    body: "Hi {{firstName}}, congratulations on your new home! It was a pleasure working with you. Please leave us a review: {{reviewUrl}}. Reply STOP to opt out.",
+    isActive: false,
+  },
+];
+
+export async function getSmsTemplates(): Promise<SmsTemplate[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.select().from(smsTemplates).orderBy(smsTemplates.trigger);
+  // If no templates exist yet, seed defaults and return them
+  if (rows.length === 0) {
+    await db.insert(smsTemplates).values(DEFAULT_SMS_TEMPLATES);
+    return db.select().from(smsTemplates).orderBy(smsTemplates.trigger);
+  }
+  return rows;
+}
+
+export async function getSmsTemplate(trigger: SmsTemplate["trigger"]): Promise<SmsTemplate | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const [row] = await db.select().from(smsTemplates).where(eq(smsTemplates.trigger, trigger)).limit(1);
+  return row ?? null;
+}
+
+export async function upsertSmsTemplate(
+  trigger: SmsTemplate["trigger"],
+  body: string,
+  isActive: boolean,
+  createdBy?: number,
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const existing = await getSmsTemplate(trigger);
+  if (existing) {
+    await db.update(smsTemplates).set({ body, isActive, updatedAt: new Date() }).where(eq(smsTemplates.trigger, trigger));
+  } else {
+    await db.insert(smsTemplates).values({ trigger, body, isActive, createdBy });
+  }
+}
+
+export async function resetSmsTemplate(trigger: SmsTemplate["trigger"]): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const def = DEFAULT_SMS_TEMPLATES.find((t) => t.trigger === trigger);
+  if (!def) return;
+  await db.update(smsTemplates).set({ body: def.body, isActive: def.isActive, updatedAt: new Date() }).where(eq(smsTemplates.trigger, trigger));
+}
+
+// ─── Next Webinar for Lead ────────────────────────────────────────────────────
+export async function getNextWebinarForLead(leadId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  // First check if the lead has a specific join URL stored (from registration)
+  const lead = await getLeadById(leadId);
+  if (!lead) return null;
+
+  // If lead has a stored join URL, return it with the webinar info
+  if (lead.zoomJoinUrl && lead.webinarId) {
+    const webinar = await getWebinarById(lead.webinarId);
+    let sessionDate: Date | null = null;
+    if (lead.webinarSessionId) {
+      const sessions = await getWebinarSessions(lead.webinarId);
+      const session = sessions.find((s) => s.id === lead.webinarSessionId);
+      if (session) sessionDate = new Date(session.sessionDate);
+    } else if (webinar?.scheduledAt) {
+      sessionDate = new Date(webinar.scheduledAt);
+    }
+    return {
+      joinUrl: lead.zoomJoinUrl,
+      webinarTitle: webinar?.title ?? "Upcoming Webinar",
+      sessionDate,
+    };
+  }
+
+  // Otherwise, find the next upcoming webinar session across all webinars
+  const now = new Date();
+  const upcomingSessions = await db
+    .select({
+      sessionId: webinarSessions.id,
+      sessionDate: webinarSessions.sessionDate,
+      zoomJoinUrl: webinarSessions.zoomJoinUrl,
+      webinarId: webinarSessions.webinarId,
+    })
+    .from(webinarSessions)
+    .where(sql`${webinarSessions.sessionDate} > ${now}`)
+    .orderBy(webinarSessions.sessionDate)
+    .limit(1);
+
+  if (upcomingSessions.length > 0) {
+    const s = upcomingSessions[0];
+    const webinar = s.webinarId ? await getWebinarById(s.webinarId) : undefined;
+    return {
+      joinUrl: s.zoomJoinUrl ?? webinar?.zoomJoinUrl ?? null,
+      webinarTitle: webinar?.title ?? "Upcoming Webinar",
+      sessionDate: s.sessionDate ? new Date(s.sessionDate) : null,
+    };
+  }
+
+  return null;
 }

@@ -64,6 +64,13 @@
       "when": 1773694925961,
       "tag": "0008_eager_shriek",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1773787978193,
+      "tag": "0009_daffy_madame_masque",
+      "breakpoints": true
     }
   ]
 }

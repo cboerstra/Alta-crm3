@@ -31,6 +31,7 @@ type MediaItem = {
 export default function SettingsPage() {
   const { data: status, refetch: refetchStatus } = trpc.integrations.getStatus.useQuery();
   const { data: mediaItems, isLoading: mediaLoading, refetch: refetchMedia } = trpc.media.list.useQuery();
+  const { data: smsTemplateList, isLoading: templatesLoading, refetch: refetchTemplates } = trpc.smsTemplates.list.useQuery();
 
   const [zoomForm, setZoomForm] = useState({ accessToken: "", accountId: "", accountEmail: "" });
   const [gcalForm, setGcalForm] = useState({ accessToken: "", accountEmail: "" });
@@ -46,6 +47,19 @@ export default function SettingsPage() {
   const [showAppPassword, setShowAppPassword] = useState(false);
   const [testEmail, setTestEmail] = useState("");
   const [showTestEmail, setShowTestEmail] = useState(false);
+
+  // SMS Templates state
+  const [editingTemplate, setEditingTemplate] = useState<string | null>(null);
+  const [templateDrafts, setTemplateDrafts] = useState<Record<string, { body: string; isActive: boolean }>>({});
+
+  const upsertTemplate = trpc.smsTemplates.upsert.useMutation({
+    onSuccess: () => { toast.success("Template saved"); refetchTemplates(); setEditingTemplate(null); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const resetTemplate = trpc.smsTemplates.reset.useMutation({
+    onSuccess: () => { toast.success("Template reset to default"); refetchTemplates(); setEditingTemplate(null); },
+    onError: (e: any) => toast.error(e.message),
+  });
 
   // Media upload state
   const [uploading, setUploading] = useState(false);
@@ -250,6 +264,7 @@ export default function SettingsPage() {
               <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-green-500" />
             )}
           </TabsTrigger>
+          <TabsTrigger value="sms-templates" className="gap-1"><MessageSquare className="h-3.5 w-3.5" /> SMS Templates</TabsTrigger>
           <TabsTrigger value="general" className="gap-1"><Settings className="h-3.5 w-3.5" /> General</TabsTrigger>
         </TabsList>
 
@@ -821,6 +836,138 @@ export default function SettingsPage() {
         </TabsContent>
 
         {/* ─── General Tab ─── */}
+        {/* ─── SMS Templates Tab ─── */}
+        <TabsContent value="sms-templates">
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base" style={{ fontFamily: "Raleway, sans-serif" }}>SMS Templates</CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Manage automated SMS messages sent at each lead stage. Use <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">{'{{firstName}}'}</span>, <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">{'{{webinarTitle}}'}</span>, and other variables to personalise messages.
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {/* Variable reference */}
+              <div className="p-3 rounded-lg bg-muted/30 border border-border/30 text-xs text-muted-foreground">
+                <p className="font-semibold text-foreground mb-1">Available variables</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {['{{firstName}}','{{lastName}}','{{webinarTitle}}','{{sessionDate}}','{{sessionTime}}','{{joinUrl}}','{{replayUrl}}','{{schedulingUrl}}','{{consultationDate}}','{{reviewUrl}}'].map(v => (
+                    <span key={v} className="font-mono bg-background border border-border/50 px-1.5 py-0.5 rounded">{v}</span>
+                  ))}
+                </div>
+              </div>
+
+              {templatesLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading templates...
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(smsTemplateList ?? []).map((tmpl) => {
+                    const isEditing = editingTemplate === tmpl.trigger;
+                    const draft = templateDrafts[tmpl.trigger];
+                    const currentBody = isEditing ? (draft?.body ?? tmpl.body) : tmpl.body;
+                    const currentActive = isEditing ? (draft?.isActive ?? tmpl.isActive) : tmpl.isActive;
+                    const charCount = currentBody.length;
+                    const smsCount = Math.ceil(charCount / 160);
+
+                    return (
+                      <div key={tmpl.trigger} className={`rounded-lg border p-4 space-y-3 transition-colors ${
+                        isEditing ? 'border-brand-green/40 bg-brand-green/5' : 'border-border/40 bg-muted/10'
+                      }`}>
+                        {/* Header row */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-sm" style={{ fontFamily: 'Raleway, sans-serif' }}>{tmpl.label}</span>
+                              <Badge variant={tmpl.isActive ? 'default' : 'secondary'} className={`text-xs ${
+                                tmpl.isActive ? 'bg-green-100 text-green-800 border-green-200' : ''
+                              }`}>
+                                {tmpl.isActive ? 'Active' : 'Inactive'}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">{tmpl.description}</p>
+                          </div>
+                          {!isEditing && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="shrink-0 gap-1"
+                              onClick={() => {
+                                setEditingTemplate(tmpl.trigger);
+                                setTemplateDrafts(prev => ({ ...prev, [tmpl.trigger]: { body: tmpl.body, isActive: tmpl.isActive } }));
+                              }}
+                            >
+                              <Edit className="h-3.5 w-3.5" /> Edit
+                            </Button>
+                          )}
+                        </div>
+
+                        {/* Body — textarea when editing, read-only preview otherwise */}
+                        {isEditing ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-xs">Message body</Label>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs ${ charCount > 1600 ? 'text-destructive font-semibold' : charCount > 160 ? 'text-amber-600' : 'text-muted-foreground' }`}>
+                                  {charCount} chars · {smsCount} SMS segment{smsCount !== 1 ? 's' : ''}
+                                </span>
+                                <Switch
+                                  checked={currentActive}
+                                  onCheckedChange={(v) => setTemplateDrafts(prev => ({ ...prev, [tmpl.trigger]: { ...prev[tmpl.trigger], isActive: v } }))}
+                                />
+                                <span className="text-xs text-muted-foreground">{currentActive ? 'Active' : 'Inactive'}</span>
+                              </div>
+                            </div>
+                            <textarea
+                              className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+                              value={currentBody}
+                              onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.trigger]: { ...prev[tmpl.trigger], body: e.target.value } }))}
+                            />
+                            <div className="flex gap-2 justify-end">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => { setEditingTemplate(null); }}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1"
+                                disabled={resetTemplate.isPending}
+                                onClick={() => resetTemplate.mutate({ trigger: tmpl.trigger as any })}
+                              >
+                                {resetTemplate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                                Reset to default
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="bg-brand-green hover:bg-brand-green-dark text-white gap-1"
+                                disabled={upsertTemplate.isPending || charCount === 0 || charCount > 1600}
+                                onClick={() => upsertTemplate.mutate({ trigger: tmpl.trigger as any, body: currentBody, isActive: currentActive })}
+                              >
+                                {upsertTemplate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                                Save
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground font-mono bg-muted/30 rounded px-3 py-2 whitespace-pre-wrap">{tmpl.body}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="general">
           <Card className="border-0 shadow-sm">
             <CardHeader>
