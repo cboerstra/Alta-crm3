@@ -51,6 +51,23 @@ type MediaSelection = {
   sortOrder: number;
 };
 
+const DEFAULT_EMAIL_SUBJECT = "You're registered for {{webinarTitle}}!";
+const DEFAULT_EMAIL_BODY = `Hi {{firstName}},
+
+Thank you for registering for {{webinarTitle}}! We're excited to have you join us.
+
+Here are your event details:
+
+  Date & Time: {{date}}
+  Join Link: {{joinUrl}}
+
+If you have any questions before the event, feel free to reply to this email — we're happy to help.
+
+We'll see you there!
+
+Warm regards,
+The Clarke & Associates Team`;
+
 const defaultForm: FormState = {
   title: "", slug: "", headline: "", subheadline: "", bodyText: "",
   ctaText: "Register Now", campaignTag: "", sourceTag: "",
@@ -58,8 +75,8 @@ const defaultForm: FormState = {
   enabledFields: ["firstName", "lastName", "email", "phone"],
   optInLabel: "I agree to receive communications about this event and future opportunities",
   showOptIn: true,
-  confirmationEmailSubject: "",
-  confirmationEmailBody: "",
+  confirmationEmailSubject: DEFAULT_EMAIL_SUBJECT,
+  confirmationEmailBody: DEFAULT_EMAIL_BODY,
 };
 
 function RequiredStar() {
@@ -210,8 +227,8 @@ export default function LandingPages() {
       enabledFields: (page.enabledFields as string[]) || ["firstName", "lastName", "email", "phone"],
       optInLabel: page.optInLabel || "I agree to receive communications about this event and future opportunities",
       showOptIn: page.showOptIn ?? true,
-      confirmationEmailSubject: page.confirmationEmailSubject || "",
-      confirmationEmailBody: page.confirmationEmailBody || "",
+      confirmationEmailSubject: page.confirmationEmailSubject || DEFAULT_EMAIL_SUBJECT,
+      confirmationEmailBody: page.confirmationEmailBody || DEFAULT_EMAIL_BODY,
     });
     setArtworkPreview(page.artworkUrl || null);
     setPdfName(page.confirmationPdfUrl ? "Attached PDF" : null);
@@ -748,22 +765,35 @@ export default function LandingPages() {
 
               {/* ─── Email Tab ─── */}
               <TabsContent value="email" className="space-y-4 mt-4">
-                <p className="text-sm text-muted-foreground">Configure the confirmation email sent to leads upon registration. If left blank, a default confirmation will be sent.</p>
+                <p className="text-sm text-muted-foreground">Configure the confirmation email sent to registrants. Placeholders are automatically replaced with the lead's real information when the email is sent.</p>
                 <div>
                   <Label>Email Subject</Label>
                   <Input value={form.confirmationEmailSubject} onChange={(e) => setForm({ ...form, confirmationEmailSubject: e.target.value })} placeholder="You're registered for our webinar!" />
                 </div>
                 <div>
-                  <Label>Email Body</Label>
-                  <Textarea value={form.confirmationEmailBody} onChange={(e) => setForm({ ...form, confirmationEmailBody: e.target.value })} placeholder="Thank you for registering! Here are the details..." rows={6} />
+                  <div className="flex items-center justify-between mb-1">
+                    <Label>Email Body</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-6 px-2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setForm({ ...form, confirmationEmailSubject: DEFAULT_EMAIL_SUBJECT, confirmationEmailBody: DEFAULT_EMAIL_BODY })}
+                    >
+                      Reset to default
+                    </Button>
+                  </div>
+                  <Textarea value={form.confirmationEmailBody} onChange={(e) => setForm({ ...form, confirmationEmailBody: e.target.value })} rows={12} className="font-mono text-sm" />
                 </div>
-                <div className="p-3 rounded-lg bg-muted/50 text-xs text-muted-foreground">
-                  <p className="font-medium mb-1">Available placeholders:</p>
-                  <p>{"{{firstName}}"} — Lead's first name</p>
-                  <p>{"{{lastName}}"} — Lead's last name</p>
-                  <p>{"{{webinarTitle}}"} — Webinar title</p>
-                  <p>{"{{joinUrl}}"} — Zoom join link</p>
-                  <p>{"{{date}}"} — Webinar date</p>
+                <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+                  <p className="text-xs font-semibold text-foreground mb-2">Available placeholders</p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span><code className="bg-muted px-1 rounded">{"{{firstName}}"}</code> — First name</span>
+                    <span><code className="bg-muted px-1 rounded">{"{{lastName}}"}</code> — Last name</span>
+                    <span><code className="bg-muted px-1 rounded">{"{{webinarTitle}}"}</code> — Webinar name</span>
+                    <span><code className="bg-muted px-1 rounded">{"{{joinUrl}}"}</code> — Zoom join link</span>
+                    <span><code className="bg-muted px-1 rounded">{"{{date}}"}</code> — Webinar date &amp; time</span>
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>

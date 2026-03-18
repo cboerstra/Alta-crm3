@@ -396,3 +396,8 @@
 - [x] After a webinar session ends, auto-send No-Show SMS to leads marked as no_show
 - [x] Only send to leads with SMS consent and a valid phone number
 - [x] Log each auto-send in activity log
+
+## Landing Page Email Template Defaults (User Request)
+- [x] Pre-fill default subject and body in the Email tab with a natural-sounding confirmation template
+- [x] Show available placeholders as a reference guide below the body field
+- [x] Ensure new landing pages start with the default template pre-filled

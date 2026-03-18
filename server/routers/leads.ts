@@ -239,9 +239,30 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
 
         // Schedule email reminders for the webinar
         if (webinar) {
+          // Resolve session date for placeholder
+          let sessionDateStr = webinar.scheduledAt.toLocaleString("en-US", {
+            month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+          });
+          if (input.webinarSessionId) {
+            const sess = await getWebinarSessionById(input.webinarSessionId);
+            if (sess) {
+              sessionDateStr = sess.sessionDate.toLocaleString("en-US", {
+                month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+              });
+            }
+          }
+          // Helper to resolve all placeholders in a template string
+          const resolve = (tpl: string) => tpl
+            .replace(/\{\{firstName\}\}/g, input.firstName)
+            .replace(/\{\{lastName\}\}/g, input.lastName)
+            .replace(/\{\{fullName\}\}/g, `${input.firstName} ${input.lastName}`)
+            .replace(/\{\{webinarTitle\}\}/g, webinar.title)
+            .replace(/\{\{joinUrl\}\}/g, joinUrl ?? "")
+            .replace(/\{\{date\}\}/g, sessionDateStr);
+
           const webinarTime = webinar.scheduledAt.getTime();
           const reminders = [
-            { type: "registration_confirmation" as const, offset: 0, subject: page.confirmationEmailSubject || `You're registered for ${webinar.title}!` },
+            { type: "registration_confirmation" as const, offset: 0, subject: resolve(page.confirmationEmailSubject || `You're registered for ${webinar.title}!`) },
             { type: "reminder_24h" as const, offset: -24 * 60 * 60 * 1000, subject: `Reminder: ${webinar.title} is tomorrow` },
             { type: "reminder_1h" as const, offset: -60 * 60 * 1000, subject: `Starting soon: ${webinar.title}` },
             { type: "reminder_10min" as const, offset: -10 * 60 * 1000, subject: `Starting in 10 minutes: ${webinar.title}` },
@@ -258,7 +279,7 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
                 scheduledAt,
                 subject: r.subject,
                 body: r.type === "registration_confirmation"
-                  ? (page.confirmationEmailBody || `Thank you for registering for ${webinar.title}!`)
+                  ? resolve(page.confirmationEmailBody || `Thank you for registering for ${webinar.title}!`)
                   : `Join link: ${joinUrl ?? "TBD"}`,
                 attachmentUrl: r.type === "registration_confirmation" ? (page.confirmationPdfUrl ?? undefined) : undefined,
               });
@@ -268,13 +289,17 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
       } else {
         // Non-webinar landing page: send confirmation email
         if (page.confirmationEmailSubject) {
+          const resolveNonWebinar = (tpl: string) => tpl
+            .replace(/\{\{firstName\}\}/g, input.firstName)
+            .replace(/\{\{lastName\}\}/g, input.lastName)
+            .replace(/\{\{fullName\}\}/g, `${input.firstName} ${input.lastName}`);
           await createEmailReminder({
             leadId: id,
             webinarId: 0,
             type: "registration_confirmation",
             scheduledAt: new Date(),
-            subject: page.confirmationEmailSubject,
-            body: page.confirmationEmailBody ?? "Thank you for your interest!",
+            subject: resolveNonWebinar(page.confirmationEmailSubject),
+            body: resolveNonWebinar(page.confirmationEmailBody ?? "Thank you for your interest!"),
             attachmentUrl: page.confirmationPdfUrl ?? undefined,
           });
         }
