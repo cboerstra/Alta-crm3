@@ -401,3 +401,12 @@
 - [x] Pre-fill default subject and body in the Email tab with a natural-sounding confirmation template
 - [x] Show available placeholders as a reference guide below the body field
 - [x] Ensure new landing pages start with the default template pre-filled
+
+## Telnyx E.164 Normalization Bug Fix (User Request)
+- [ ] Fix normalization so 10-digit US numbers get +1 prefix (not just +)
+- [ ] Fix normalization so 11-digit numbers starting with 1 get + prefix correctly
+- [ ] Update stored from number in DB to correct E.164 format
+
+## Test SMS Source=Destination Bug Fix (User Request)
+- [x] Fix testSms to use admin user's phone number as default destination (not the from number)
+- [x] If admin has no phone number, show a clear error message instead of sending to self

@@ -241,8 +241,18 @@ export const integrationsRouter = router({
       if (!telnyx?.accessToken || !telnyx.accountEmail) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Telnyx is not configured." });
       }
-      // Default to the configured from number if no toPhone provided
-      const rawPhone = (input.toPhone ?? telnyx.accountEmail).trim();
+      // Default to the admin user's own phone number — never fall back to the from number
+      // (source === destination is rejected by carriers)
+      const { getUserById } = await import("../db");
+      const adminUser = await getUserById(ctx.user.id);
+      const defaultTo = adminUser?.phone?.trim() ?? "";
+      if (!input.toPhone && !defaultTo) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No destination phone number found. Please add your mobile number in User Management → Edit your profile, then try again.",
+        });
+      }
+      const rawPhone = (input.toPhone ?? defaultTo).trim();
       let toPhone = rawPhone.replace(/[\s\-().]/g, "");
       if (!toPhone.startsWith("+")) toPhone = `+1${toPhone}`;
       if (!/^\+[1-9]\d{6,14}$/.test(toPhone)) {
