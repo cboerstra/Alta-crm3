@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
-import { createSmsMessage, getSmsByLeadId, logActivity, getLeadById, getIntegration, getNextWebinarForLead } from "../db";
+import { createSmsMessage, getSmsByLeadId, logActivity, getLeadById, getIntegration, getNextWebinarForLead, getSmsConversations, markSmsRead } from "../db";
 
 export const smsRouter = router({
   getByLead: protectedProcedure
@@ -90,6 +90,65 @@ export const smsRouter = router({
         content: resolvedBody,
       });
       return { success: true, externalId };
+    }),
+
+  // ─── Inbox ────────────────────────────────────────────────────────────────────
+  getConversations: protectedProcedure.query(() => getSmsConversations()),
+
+  markRead: protectedProcedure
+    .input(z.object({ leadId: z.number() }))
+    .mutation(({ input }) => markSmsRead(input.leadId)),
+
+  replyToLead: protectedProcedure
+    .input(z.object({ leadId: z.number(), body: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const lead = await getLeadById(input.leadId);
+      if (!lead?.phone) throw new TRPCError({ code: "BAD_REQUEST", message: "Lead has no phone number." });
+      const telnyx = await getIntegration(ctx.user.id, "twilio");
+      if (!telnyx?.accessToken || !telnyx.accountEmail) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Telnyx is not configured." });
+      }
+      const enabled = (telnyx.metadata as { enabled?: boolean } | null)?.enabled !== false;
+      if (!enabled) throw new TRPCError({ code: "BAD_REQUEST", message: "SMS sending is disabled." });
+
+      const normalizePhone = (p: string) => {
+        const digits = p.replace(/\D/g, "");
+        if (digits.length === 10) return `+1${digits}`;
+        if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+        return `+${digits}`;
+      };
+      const toPhone = normalizePhone(lead.phone);
+      const fromPhone = normalizePhone(telnyx.accountEmail);
+
+      const res = await fetch("https://api.telnyx.com/v2/messages", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${telnyx.accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: fromPhone, to: toPhone, text: input.body }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { errors?: Array<{ detail?: string }> };
+        const detail = err.errors?.[0]?.detail ?? "Failed to send SMS.";
+        throw new TRPCError({ code: "BAD_REQUEST", message: detail });
+      }
+      const data = await res.json() as { data?: { id?: string } };
+      const externalId = data?.data?.id;
+
+      await createSmsMessage({
+        leadId: input.leadId,
+        direction: "outbound",
+        body: input.body,
+        status: "sent",
+        externalId,
+        sentBy: ctx.user.id,
+      });
+      await logActivity({
+        leadId: input.leadId,
+        userId: ctx.user.id,
+        type: "sms_sent",
+        title: "SMS sent (inbox reply)",
+        content: input.body,
+      });
+      return { success: true };
     }),
 
   receiveWebhook: protectedProcedure

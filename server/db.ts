@@ -398,6 +398,7 @@ export async function createSmsMessage(data: {
   body: string;
   status?: "queued" | "sent" | "delivered" | "failed" | "received";
   sentBy?: number;
+  externalId?: string;
 }) {
   const db = await getDb();
   if (!db) return;
@@ -1069,4 +1070,67 @@ export async function sendLeadSms(
   } catch (err) {
     console.error(`[sendLeadSms] Unexpected error for lead ${leadId} trigger ${trigger}:`, err);
   }
+}
+
+// ─── SMS Inbox helpers ────────────────────────────────────────────────────────
+
+/** Returns one row per lead that has at least one SMS message, with the latest message body/time and unread count */
+export async function getSmsConversations() {
+  const db = await getDb();
+  if (!db) return [];
+  // Get all leads that have SMS messages
+  const rows = await db
+    .select({
+      leadId: smsMessages.leadId,
+      lastBody: smsMessages.body,
+      lastDirection: smsMessages.direction,
+      lastAt: smsMessages.createdAt,
+    })
+    .from(smsMessages)
+    .orderBy(desc(smsMessages.createdAt));
+
+  // Deduplicate: keep only the latest message per lead
+  const seen = new Set<number>();
+  const latest: typeof rows = [];
+  for (const row of rows) {
+    if (!seen.has(row.leadId)) {
+      seen.add(row.leadId);
+      latest.push(row);
+    }
+  }
+
+  // Count unread (inbound + no readAt) per lead
+  const unreadRows = await db
+    .select({ leadId: smsMessages.leadId, count: smsMessages.id })
+    .from(smsMessages)
+    .where(and(eq(smsMessages.direction, "inbound"), eq(smsMessages.status, "received")));
+
+  const unreadMap: Record<number, number> = {};
+  for (const r of unreadRows) {
+    unreadMap[r.leadId] = (unreadMap[r.leadId] ?? 0) + 1;
+  }
+
+  // Attach lead info
+  const allLeads = await db.select().from(leads);
+  const leadMap = Object.fromEntries(allLeads.map((l) => [l.id, l]));
+
+  return latest.map((row) => ({
+    leadId: row.leadId,
+    leadName: leadMap[row.leadId] ? `${leadMap[row.leadId].firstName} ${leadMap[row.leadId].lastName}` : "Unknown",
+    leadPhone: leadMap[row.leadId]?.phone ?? "",
+    lastBody: row.lastBody,
+    lastDirection: row.lastDirection,
+    lastAt: row.lastAt,
+    unread: unreadMap[row.leadId] ?? 0,
+  }));
+}
+
+/** Mark all inbound messages for a lead as read (status -> delivered) */
+export async function markSmsRead(leadId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(smsMessages)
+    .set({ status: "delivered" })
+    .where(and(eq(smsMessages.leadId, leadId), eq(smsMessages.direction, "inbound"), eq(smsMessages.status, "received")));
 }

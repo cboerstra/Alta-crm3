@@ -410,3 +410,12 @@
 ## Test SMS Source=Destination Bug Fix (User Request)
 - [x] Fix testSms to use admin user's phone number as default destination (not the from number)
 - [x] If admin has no phone number, show a clear error message instead of sending to self
+
+## Two-Way SMS Inbox for Admins (User Request)
+- [x] SMS Inbox page with conversation list (one row per lead phone number)
+- [x] Message thread view showing sent and received messages in chat bubble style
+- [x] Reply box to send a message directly from the inbox
+- [x] Inbound webhook stores messages in sms_messages table with direction=inbound
+- [x] Unread badge on sidebar nav item when new inbound messages arrive
+- [x] Link each conversation to the matching lead profile
+- [x] Both admin users can see and reply to all conversations

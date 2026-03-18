@@ -21,6 +21,7 @@ import PublicLandingPage from "./pages/PublicLandingPage";
 import PublicBooking from "./pages/PublicBooking";
 import Login from "./pages/Login";
 import Setup from "./pages/Setup";
+import SmsInbox from "./pages/SmsInbox";
 import { useAuth } from "./_core/hooks/useAuth";
 import { ShieldAlert } from "lucide-react";
 
@@ -68,6 +69,7 @@ function CRMRoutes() {
         <Route path="/scheduling" component={Scheduling} />
         <Route path="/deals" component={Deals} />
         <Route path="/revenue" component={Revenue} />
+        <Route path="/sms-inbox" component={SmsInbox} />
         {/* Admin-only routes */}
         <Route path="/users">
           {() => <AdminRoute component={UserManagement} />}
