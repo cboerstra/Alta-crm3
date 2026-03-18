@@ -598,6 +598,18 @@ export async function getIntegration(userId: number, provider: "zoom" | "google_
   return r[0];
 }
 
+/**
+ * Find an integration by provider regardless of which user saved it.
+ * Useful for shared org-wide credentials like Zoom S2S OAuth.
+ */
+export async function getGlobalIntegration(provider: "zoom" | "google_calendar" | "twilio" | "gmail") {
+  const db = await getDb();
+  if (!db) return undefined;
+  const r = await db.select().from(integrations)
+    .where(eq(integrations.provider, provider)).limit(1);
+  return r[0];
+}
+
 export async function upsertIntegration(data: {
   userId: number;
   provider: "zoom" | "google_calendar" | "twilio" | "gmail";

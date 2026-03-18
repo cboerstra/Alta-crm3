@@ -1,18 +1,20 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { adminProcedure, router } from "../_core/trpc";
-import { getIntegration, upsertIntegration } from "../db";
+import { getIntegration, getGlobalIntegration, upsertIntegration } from "../db";
 import { verifyGmailCredentials, sendEmail } from "../email";
 import { getZoomAccessToken, createZoomMeeting } from "../zoom";
 
 export const integrationsRouter = router({
   getStatus: adminProcedure.query(async ({ ctx }) => {
-    const [zoom, google, telnyx, gmail] = await Promise.all([
+    const [zoomUser, google, telnyx, gmail] = await Promise.all([
       getIntegration(ctx.user.id, "zoom"),
       getIntegration(ctx.user.id, "google_calendar"),
       getIntegration(ctx.user.id, "twilio"), // stored as "twilio" provider key for backwards compat
       getIntegration(ctx.user.id, "gmail"),
     ]);
+    // Zoom is org-wide, so fall back to any user's Zoom credentials
+    const zoom = zoomUser ?? await getGlobalIntegration("zoom");
     return {
       zoom: zoom
         ? { connected: true, email: zoom.accountEmail, accountId: zoom.accountId }

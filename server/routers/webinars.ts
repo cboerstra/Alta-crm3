@@ -6,7 +6,7 @@ import {
   createEmailReminder, getRemindersByLead,
   createWebinarSession, getWebinarSessions, deleteWebinarSessions, getWebinarSessionById,
   createLandingPage, getLandingPageBySlug, updateLandingPage,
-  deleteWebinar, deleteWebinars, sendLeadSms, getIntegration,
+  deleteWebinar, deleteWebinars, sendLeadSms, getIntegration, getGlobalIntegration,
 } from "../db";
 import { createZoomMeeting } from "../zoom";
 
@@ -64,10 +64,14 @@ export const webinarsRouter = router({
       landingPageSlug: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      // Check if Zoom is connected so we can auto-create meetings
+      // Check if Zoom is connected — try user-specific first, then global fallback
       let zoomCreds: { accountId: string; clientId: string; clientSecret: string } | null = null;
       try {
-        const zoomIntegration = await getIntegration(ctx.user.id, "zoom");
+        let zoomIntegration = await getIntegration(ctx.user.id, "zoom");
+        if (!zoomIntegration) {
+          zoomIntegration = await getGlobalIntegration("zoom");
+        }
+        console.log(`[Zoom] Integration lookup: userId=${ctx.user.id}, found=${!!zoomIntegration}, accountId=${zoomIntegration?.accountId ?? "none"}, hasToken=${!!zoomIntegration?.accessToken}, hasSecret=${!!zoomIntegration?.refreshToken}`);
         if (zoomIntegration?.accountId && zoomIntegration.accessToken && zoomIntegration.refreshToken) {
           zoomCreds = {
             accountId: zoomIntegration.accountId,
@@ -100,8 +104,10 @@ export const webinarsRouter = router({
           console.log(`[Zoom] Created meeting ${zoomResult.meetingId} for webinar "${input.title}"`);
         } catch (zoomErr) {
           console.error("[Zoom] Failed to create primary meeting:", zoomErr);
-          // Continue without Zoom — user's manual values (if any) will be used
+          throw new Error(`Zoom meeting creation failed: ${zoomErr instanceof Error ? zoomErr.message : String(zoomErr)}`);
         }
+      } else {
+        console.warn("[Zoom] No Zoom credentials found. Webinar will be created without Zoom meeting.");
       }
 
       // Create the webinar with Zoom-populated fields
@@ -277,7 +283,11 @@ export const webinarsRouter = router({
       let zoomMeetingId: string | undefined;
 
       // Try to create a real Zoom meeting if Zoom is connected
-      const zoomIntegration = await getIntegration(ctx.user.id, "zoom");
+      let zoomIntegration = await getIntegration(ctx.user.id, "zoom");
+      if (!zoomIntegration) {
+        zoomIntegration = await getGlobalIntegration("zoom");
+      }
+      console.log(`[Zoom addSession] Integration lookup: userId=${ctx.user.id}, found=${!!zoomIntegration}, accountId=${zoomIntegration?.accountId ?? "none"}`);
       if (zoomIntegration?.accountId && zoomIntegration.accessToken && zoomIntegration.refreshToken) {
         try {
           const sessionLabel = input.label ? ` — ${input.label}` : "";
@@ -297,10 +307,13 @@ export const webinarsRouter = router({
           zoomJoinUrl = zoomResult.joinUrl;
           zoomStartUrl = zoomResult.startUrl;
           zoomMeetingId = zoomResult.meetingId;
+          console.log(`[Zoom addSession] Created meeting ${zoomResult.meetingId}`);
         } catch (zoomErr) {
-          // Log but don't block session creation — user can add URLs manually
           console.error("[Zoom] Failed to create meeting:", zoomErr);
+          throw new Error(`Zoom meeting creation failed: ${zoomErr instanceof Error ? zoomErr.message : String(zoomErr)}`);
         }
+      } else {
+        console.warn("[Zoom addSession] No Zoom credentials found. Session will be created without Zoom meeting.");
       }
 
       const sessionId = await createWebinarSession({
