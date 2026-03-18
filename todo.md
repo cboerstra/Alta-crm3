@@ -450,3 +450,14 @@
 - [x] Added runAutoMigrations() that runs on every server start to auto-add missing columns
 - [x] Migration SQL file 0010_right_paibok.sql exists in drizzle folder
 - [x] All 82 tests pass, 0 TypeScript errors
+
+## Create Webinar Zoom Integration Bug (User Report)
+- [x] The "Schedule New Webinar" create flow now calls Zoom API to create a meeting
+- [x] Fix create webinar procedure to call Zoom API when Zoom is connected
+- [x] Store Zoom-returned zoomWebinarId, zoomJoinUrl, zoomStartUrl on the webinar AND primary session
+- [x] Frontend: after webinar creation, navigate to detail page showing Zoom-populated fields
+- [x] Zoom Integration section shows auto-create messaging with manual fallback fields
+
+## Rename "Primary Session" to "Add Zoom Session" (User Request)
+- [x] Rename "Primary Session" label in the create webinar form to "Add Zoom Session"
+- [x] Ensure the "Add Zoom Session" section triggers the Zoom API call on create

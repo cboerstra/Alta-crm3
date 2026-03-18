@@ -53,11 +53,19 @@ export default function Webinars() {
 
   const createMutation = trpc.webinars.create.useMutation({
     onSuccess: (data) => {
-      toast.success("Webinar created successfully!");
+      if (data.zoomCreated) {
+        toast.success(`Zoom meeting created! ID: ${data.zoomWebinarId}`, { duration: 5000 });
+      } else if (!data.zoomCreated && data.zoomWebinarId) {
+        toast.success("Webinar created with manual Zoom details");
+      } else {
+        toast.success("Webinar created successfully!");
+      }
       if (data.landingPageId) toast.success("Landing page auto-created and linked", { duration: 4000 });
       setShowCreate(false);
       resetForm();
       refetch();
+      // Navigate to the webinar detail page so user can see the populated Zoom fields
+      setLocation(`/webinars/${data.id}`);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -195,7 +203,8 @@ export default function Webinars() {
               </div>
               <Separator />
               <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Primary Session <span className="text-red-500">*</span></h3>
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2"><Video className="h-4 w-4" /> Add Zoom Session <span className="text-red-500">*</span></h3>
+                <p className="text-xs text-muted-foreground -mt-2">Set the date & time below. A Zoom meeting will be created automatically when Zoom is connected.</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label>Date & Time <span className="text-red-500">*</span></Label>
@@ -234,17 +243,25 @@ export default function Webinars() {
               <Separator />
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Zoom Integration</h3>
+                <div className="p-3 rounded-lg border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Video className="h-4 w-4 text-green-600" />
+                    <p className="text-sm font-medium text-green-700 dark:text-green-300">Auto-create Zoom Meeting</p>
+                  </div>
+                  <p className="text-xs text-green-600 dark:text-green-400">When Zoom is connected in Settings, a Zoom meeting will be automatically created for the primary session and each additional session. The Zoom Webinar ID, Join URL, and Start URL will be populated automatically.</p>
+                </div>
+                <p className="text-xs text-muted-foreground">Or enter Zoom details manually (these will be overridden if Zoom auto-creates the meeting):</p>
                 <div>
                   <Label>Zoom Webinar ID</Label>
-                  <Input value={form.zoomWebinarId} onChange={(e) => setForm({ ...form, zoomWebinarId: e.target.value })} placeholder="123 456 7890" />
+                  <Input value={form.zoomWebinarId} onChange={(e) => setForm({ ...form, zoomWebinarId: e.target.value })} placeholder="Auto-populated from Zoom" />
                 </div>
                 <div>
                   <Label>Zoom Join URL</Label>
-                  <Input value={form.zoomJoinUrl} onChange={(e) => setForm({ ...form, zoomJoinUrl: e.target.value })} placeholder="https://zoom.us/j/..." />
+                  <Input value={form.zoomJoinUrl} onChange={(e) => setForm({ ...form, zoomJoinUrl: e.target.value })} placeholder="Auto-populated from Zoom" />
                 </div>
                 <div>
                   <Label>Replay URL (for no-show follow-up)</Label>
-                  <Input value={form.replayUrl} onChange={(e) => setForm({ ...form, replayUrl: e.target.value })} placeholder="https://..." />
+                  <Input value={form.replayUrl} onChange={(e) => setForm({ ...form, replayUrl: e.target.value })} placeholder="Available after webinar ends" />
                 </div>
               </div>
               <Separator />
@@ -274,7 +291,7 @@ export default function Webinars() {
                 disabled={!form.title || !form.scheduledAt || createMutation.isPending}
                 onClick={handleCreate}
               >
-                {createMutation.isPending ? "Creating..." : "Schedule Webinar & Create Event"}
+                {createMutation.isPending ? "Creating Webinar & Zoom Meeting..." : "Schedule Webinar & Create Event"}
               </Button>
             </div>
           </DialogContent>

@@ -64,38 +64,104 @@ export const webinarsRouter = router({
       landingPageSlug: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      // Create the webinar
+      // Check if Zoom is connected so we can auto-create meetings
+      let zoomCreds: { accountId: string; clientId: string; clientSecret: string } | null = null;
+      try {
+        const zoomIntegration = await getIntegration(ctx.user.id, "zoom");
+        if (zoomIntegration?.accountId && zoomIntegration.accessToken && zoomIntegration.refreshToken) {
+          zoomCreds = {
+            accountId: zoomIntegration.accountId,
+            clientId: zoomIntegration.accessToken,
+            clientSecret: zoomIntegration.refreshToken,
+          };
+        }
+      } catch (e) {
+        console.error("[Zoom] Failed to load integration:", e);
+      }
+
+      // --- Create Zoom meeting for the primary session ---
+      let primaryZoomJoinUrl = input.zoomJoinUrl;
+      let primaryZoomStartUrl = input.zoomStartUrl;
+      let primaryZoomWebinarId = input.zoomWebinarId;
+      let primaryZoomCreated = false;
+
+      if (zoomCreds) {
+        try {
+          const zoomResult = await createZoomMeeting(zoomCreds, {
+            topic: input.title,
+            startTime: new Date(input.scheduledAt),
+            durationMinutes: input.durationMinutes,
+            agenda: input.description ?? undefined,
+          });
+          primaryZoomJoinUrl = zoomResult.joinUrl;
+          primaryZoomStartUrl = zoomResult.startUrl;
+          primaryZoomWebinarId = zoomResult.meetingId;
+          primaryZoomCreated = true;
+          console.log(`[Zoom] Created meeting ${zoomResult.meetingId} for webinar "${input.title}"`);
+        } catch (zoomErr) {
+          console.error("[Zoom] Failed to create primary meeting:", zoomErr);
+          // Continue without Zoom — user's manual values (if any) will be used
+        }
+      }
+
+      // Create the webinar with Zoom-populated fields
       const webinarId = await createWebinar({
         title: input.title,
         description: input.description,
         scheduledAt: new Date(input.scheduledAt),
         durationMinutes: input.durationMinutes,
-        zoomJoinUrl: input.zoomJoinUrl,
-        zoomStartUrl: input.zoomStartUrl,
-        zoomWebinarId: input.zoomWebinarId,
+        zoomJoinUrl: primaryZoomJoinUrl,
+        zoomStartUrl: primaryZoomStartUrl,
+        zoomWebinarId: primaryZoomWebinarId,
         replayUrl: input.replayUrl,
         createdBy: ctx.user.id,
         status: "scheduled",
       });
 
-      // Create the primary session
+      // Create the primary session with Zoom data
       await createWebinarSession({
         webinarId,
         sessionDate: new Date(input.scheduledAt),
         durationMinutes: input.durationMinutes,
-        label: "Primary Session",
-        zoomJoinUrl: input.zoomJoinUrl,
+        label: "Zoom Session",
+        zoomWebinarId: primaryZoomWebinarId,
+        zoomJoinUrl: primaryZoomJoinUrl,
+        zoomStartUrl: primaryZoomStartUrl,
       });
 
-      // Create additional sessions
+      // Create additional sessions (each gets its own Zoom meeting if connected)
       if (input.additionalSessions?.length) {
         for (const s of input.additionalSessions) {
+          let sessZoomJoinUrl = s.zoomJoinUrl;
+          let sessZoomStartUrl: string | undefined;
+          let sessZoomWebinarId: string | undefined;
+
+          if (zoomCreds) {
+            try {
+              const sessLabel = s.label ? ` — ${s.label}` : "";
+              const sessZoom = await createZoomMeeting(zoomCreds, {
+                topic: `${input.title}${sessLabel}`,
+                startTime: new Date(s.sessionDate),
+                durationMinutes: s.durationMinutes,
+                agenda: input.description ?? undefined,
+              });
+              sessZoomJoinUrl = sessZoom.joinUrl;
+              sessZoomStartUrl = sessZoom.startUrl;
+              sessZoomWebinarId = sessZoom.meetingId;
+              console.log(`[Zoom] Created meeting ${sessZoom.meetingId} for session "${s.label || "Additional"}"`);
+            } catch (zoomErr) {
+              console.error(`[Zoom] Failed to create meeting for session "${s.label}":`, zoomErr);
+            }
+          }
+
           await createWebinarSession({
             webinarId,
             sessionDate: new Date(s.sessionDate),
             durationMinutes: s.durationMinutes,
             label: s.label,
-            zoomJoinUrl: s.zoomJoinUrl,
+            zoomWebinarId: sessZoomWebinarId,
+            zoomJoinUrl: sessZoomJoinUrl,
+            zoomStartUrl: sessZoomStartUrl,
           });
         }
       }
@@ -129,7 +195,14 @@ export const webinarsRouter = router({
         await updateWebinar(webinarId, { landingPageId });
       }
 
-      return { id: webinarId, landingPageId };
+      return {
+        id: webinarId,
+        landingPageId,
+        zoomWebinarId: primaryZoomWebinarId,
+        zoomJoinUrl: primaryZoomJoinUrl,
+        zoomStartUrl: primaryZoomStartUrl,
+        zoomCreated: primaryZoomCreated,
+      };
     }),
 
   update: protectedProcedure
