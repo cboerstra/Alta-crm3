@@ -425,9 +425,14 @@ describe("Integrations Router", () => {
   it("integrations.connectZoom stores zoom credentials", async () => {
     const ctx = createAuthContext();
     const caller = appRouter.createCaller(ctx);
+    // Mock getZoomAccessToken so the test doesn't hit the real Zoom API
+    const { vi } = await import("vitest");
+    const zoomModule = await import("./zoom");
+    vi.spyOn(zoomModule, "getZoomAccessToken").mockResolvedValueOnce("mock_token");
     const result = await caller.integrations.connectZoom({
-      accessToken: "test_zoom_token",
-      refreshToken: "test_refresh",
+      accountId: "test_account_id",
+      clientId: "test_client_id",
+      clientSecret: "test_client_secret",
       accountEmail: "zoom@clarke.com",
     });
     expect(result).toEqual({ success: true });
@@ -439,9 +444,15 @@ describe("Integrations Router", () => {
   it("integrations.disconnect removes integration", async () => {
     const ctx = createAuthContext();
     const caller = appRouter.createCaller(ctx);
+    // Mock getZoomAccessToken so the test doesn't hit the real Zoom API
+    const { vi } = await import("vitest");
+    const zoomModule = await import("./zoom");
+    vi.spyOn(zoomModule, "getZoomAccessToken").mockResolvedValueOnce("mock_token");
     // First connect
     await caller.integrations.connectZoom({
-      accessToken: "test_token",
+      accountId: "test_account_id",
+      clientId: "test_client_id",
+      clientSecret: "test_client_secret",
       accountEmail: "zoom@clarke.com",
     });
     // Then disconnect

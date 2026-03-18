@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { adminProcedure, router } from "../_core/trpc";
 import { getIntegration, upsertIntegration } from "../db";
 import { verifyGmailCredentials, sendEmail } from "../email";
+import { getZoomAccessToken, createZoomMeeting } from "../zoom";
 
 export const integrationsRouter = router({
   getStatus: adminProcedure.query(async ({ ctx }) => {
@@ -125,19 +126,31 @@ export const integrationsRouter = router({
 
   connectZoom: adminProcedure
     .input(z.object({
-      accessToken: z.string(),
-      refreshToken: z.string().optional(),
-      accountId: z.string().optional(),
+      accountId: z.string().min(1, "Account ID is required"),
+      clientId: z.string().min(1, "Client ID is required"),
+      clientSecret: z.string().min(1, "Client Secret is required"),
       accountEmail: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
+      // Validate credentials by fetching a test token
+      try {
+        await getZoomAccessToken({
+          accountId: input.accountId.trim(),
+          clientId: input.clientId.trim(),
+          clientSecret: input.clientSecret.trim(),
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new TRPCError({ code: "BAD_REQUEST", message: msg });
+      }
+      // Store: accountId → accountId, clientId → accessToken, clientSecret → refreshToken
       await upsertIntegration({
         userId: ctx.user.id,
         provider: "zoom",
-        accessToken: input.accessToken,
-        refreshToken: input.refreshToken,
-        accountId: input.accountId,
-        accountEmail: input.accountEmail,
+        accountId: input.accountId.trim(),
+        accessToken: input.clientId.trim(),
+        refreshToken: input.clientSecret.trim(),
+        accountEmail: input.accountEmail?.trim(),
       });
       return { success: true };
     }),
@@ -324,23 +337,38 @@ export const integrationsRouter = router({
       return { success: true };
     }),
 
-  // Simulate creating a Zoom webinar (in production, call Zoom API)
   createZoomWebinar: adminProcedure
     .input(z.object({
       title: z.string(),
-      scheduledAt: z.number(),
+      scheduledAt: z.number(), // unix ms
       durationMinutes: z.number(),
       description: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const integration = await getIntegration(ctx.user.id, "zoom");
-      if (!integration) throw new Error("Zoom not connected");
-      // In production: call Zoom API with integration.accessToken
-      const mockId = `zoom_${Date.now()}`;
+      if (!integration?.accountId || !integration.accessToken || !integration.refreshToken) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Zoom is not connected. Go to Settings → Integrations → Zoom and enter your Server-to-Server OAuth credentials.",
+        });
+      }
+      const result = await createZoomMeeting(
+        {
+          accountId: integration.accountId,
+          clientId: integration.accessToken,
+          clientSecret: integration.refreshToken,
+        },
+        {
+          topic: input.title,
+          startTime: new Date(input.scheduledAt),
+          durationMinutes: input.durationMinutes,
+          agenda: input.description,
+        }
+      );
       return {
-        zoomWebinarId: mockId,
-        joinUrl: `https://zoom.us/j/${mockId}`,
-        startUrl: `https://zoom.us/s/${mockId}`,
+        zoomWebinarId: result.meetingId,
+        joinUrl: result.joinUrl,
+        startUrl: result.startUrl,
       };
     }),
 });

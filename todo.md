@@ -425,3 +425,13 @@
 - [x] Fix webinar detail page to refresh/display new session immediately after creation
 - [x] Add "Add Session" button directly on the Webinar Detail page (not just in create dialog)
 - [x] Sessions panel shows all sessions with date, time, duration, Zoom join link, and delete button
+
+## Real Zoom API Integration for Add Session (User Request)
+- [x] Create server/zoom.ts helper: getZoomAccessToken (Server-to-Server OAuth), createZoomMeeting (POST /users/me/meetings)
+- [x] Update Settings Zoom connect form to collect Account ID, Client ID, Client Secret (S2S OAuth credentials)
+- [x] Update connectZoom procedure to store Account ID, Client ID, Client Secret
+- [x] Replace createZoomWebinar stub with real Zoom API call
+- [x] Wire addSession mutation to call Zoom API and populate zoomWebinarId, zoomJoinUrl, zoomStartUrl on the session
+- [x] Frontend: Add Session dialog shows "Creating Zoom meeting..." loading state
+- [x] Frontend: After session created, display the Zoom join URL and meeting ID returned from Zoom
+- [x] Graceful fallback: if Zoom not connected, show amber warning and allow manual URL entry (existing behavior)

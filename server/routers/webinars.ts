@@ -6,8 +6,9 @@ import {
   createEmailReminder, getRemindersByLead,
   createWebinarSession, getWebinarSessions, deleteWebinarSessions, getWebinarSessionById,
   createLandingPage, getLandingPageBySlug, updateLandingPage,
-  deleteWebinar, deleteWebinars, sendLeadSms,
+  deleteWebinar, deleteWebinars, sendLeadSms, getIntegration,
 } from "../db";
+import { createZoomMeeting } from "../zoom";
 
 export const webinarsRouter = router({
   list: protectedProcedure
@@ -190,19 +191,61 @@ export const webinarsRouter = router({
       sessionDate: z.number(), // unix ms
       durationMinutes: z.number().default(60),
       label: z.string().optional(),
+      // These are overridden by Zoom API if Zoom is connected
       zoomJoinUrl: z.string().optional(),
       zoomStartUrl: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const webinar = await getWebinarById(input.webinarId);
+      if (!webinar) throw new Error("Webinar not found");
+
+      let zoomJoinUrl = input.zoomJoinUrl;
+      let zoomStartUrl = input.zoomStartUrl;
+      let zoomMeetingId: string | undefined;
+
+      // Try to create a real Zoom meeting if Zoom is connected
+      const zoomIntegration = await getIntegration(ctx.user.id, "zoom");
+      if (zoomIntegration?.accountId && zoomIntegration.accessToken && zoomIntegration.refreshToken) {
+        try {
+          const sessionLabel = input.label ? ` — ${input.label}` : "";
+          const zoomResult = await createZoomMeeting(
+            {
+              accountId: zoomIntegration.accountId,
+              clientId: zoomIntegration.accessToken,
+              clientSecret: zoomIntegration.refreshToken,
+            },
+            {
+              topic: `${webinar.title}${sessionLabel}`,
+              startTime: new Date(input.sessionDate),
+              durationMinutes: input.durationMinutes,
+              agenda: webinar.description ?? undefined,
+            }
+          );
+          zoomJoinUrl = zoomResult.joinUrl;
+          zoomStartUrl = zoomResult.startUrl;
+          zoomMeetingId = zoomResult.meetingId;
+        } catch (zoomErr) {
+          // Log but don't block session creation — user can add URLs manually
+          console.error("[Zoom] Failed to create meeting:", zoomErr);
+        }
+      }
+
       const sessionId = await createWebinarSession({
         webinarId: input.webinarId,
         sessionDate: new Date(input.sessionDate),
         durationMinutes: input.durationMinutes,
         label: input.label,
-        zoomJoinUrl: input.zoomJoinUrl,
-        zoomStartUrl: input.zoomStartUrl,
+        zoomJoinUrl,
+        zoomStartUrl,
       });
-      return { id: sessionId };
+
+      return {
+        id: sessionId,
+        zoomMeetingId,
+        zoomJoinUrl,
+        zoomStartUrl,
+        zoomCreated: !!zoomMeetingId,
+      };
     }),
 
   deleteSession: protectedProcedure

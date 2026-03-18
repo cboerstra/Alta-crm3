@@ -33,7 +33,7 @@ export default function SettingsPage() {
   const { data: mediaItems, isLoading: mediaLoading, refetch: refetchMedia } = trpc.media.list.useQuery();
   const { data: smsTemplateList, isLoading: templatesLoading, refetch: refetchTemplates } = trpc.smsTemplates.list.useQuery();
 
-  const [zoomForm, setZoomForm] = useState({ accessToken: "", accountId: "", accountEmail: "" });
+  const [zoomForm, setZoomForm] = useState({ accountId: "", clientId: "", clientSecret: "", accountEmail: "" });
   const [gcalForm, setGcalForm] = useState({ accessToken: "", accountEmail: "" });
   const [telnyxForm, setTelnyxForm] = useState({ apiKey: "", fromPhone: "+18017840672" });
   const [editFromPhone, setEditFromPhone] = useState("");
@@ -365,7 +365,10 @@ export default function SettingsPage() {
           <Card className="border-0 shadow-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base" style={{ fontFamily: "Raleway, sans-serif" }}>Zoom Integration</CardTitle>
+                <CardTitle className="text-base flex items-center gap-2" style={{ fontFamily: "Raleway, sans-serif" }}>
+                  <Video className="h-5 w-5 text-brand-green" />
+                  Zoom Integration
+                </CardTitle>
                 {status?.zoom.connected ? (
                   <Badge className="bg-green-100 text-green-700 gap-1"><CheckCircle className="h-3 w-3" /> Connected</Badge>
                 ) : (
@@ -375,14 +378,17 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Connect your Zoom account to create webinars and auto-register leads.
+                Connect your Zoom account using Server-to-Server OAuth. When connected, clicking "Add Session" on any webinar will automatically create a Zoom meeting and populate the join link.
               </p>
               {status?.zoom.connected ? (
                 <div className="space-y-3">
                   <div className="p-3 rounded-lg bg-green-50 border border-green-200">
-                    <p className="text-sm font-medium text-green-800">Zoom is connected</p>
+                    <p className="text-sm font-medium text-green-800">✓ Zoom is connected</p>
                     {"email" in status.zoom && status.zoom.email && (
                       <p className="text-xs text-green-600 mt-1">Account: {status.zoom.email}</p>
+                    )}
+                    {"accountId" in status.zoom && status.zoom.accountId && (
+                      <p className="text-xs text-green-600">Account ID: {status.zoom.accountId}</p>
                     )}
                   </div>
                   <Button variant="outline" className="text-destructive" onClick={() => disconnect.mutate({ provider: "zoom" })}>
@@ -391,25 +397,58 @@ export default function SettingsPage() {
                 </div>
               ) : (
                 <>
-                  <div>
-                    <Label>Access Token</Label>
-                    <Input type="password" value={zoomForm.accessToken} onChange={(e) => setZoomForm({ ...zoomForm, accessToken: e.target.value })} placeholder="Enter Zoom access token" />
+                  <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-800 space-y-1">
+                    <p className="font-medium">How to get Server-to-Server OAuth credentials:</p>
+                    <ol className="list-decimal list-inside space-y-0.5 text-xs">
+                      <li>Go to <a href="https://marketplace.zoom.us" target="_blank" rel="noopener noreferrer" className="underline">marketplace.zoom.us</a> → Develop → Build App</li>
+                      <li>Choose <strong>Server-to-Server OAuth</strong> and create the app</li>
+                      <li>Under <strong>App Credentials</strong>, copy your Account ID, Client ID, and Client Secret</li>
+                      <li>Under <strong>Scopes</strong>, add: <code>meeting:write:admin</code> and <code>meeting:read:admin</code></li>
+                      <li>Activate the app, then paste the credentials below</li>
+                    </ol>
                   </div>
-                  <div>
-                    <Label>Account ID (optional)</Label>
-                    <Input value={zoomForm.accountId} onChange={(e) => setZoomForm({ ...zoomForm, accountId: e.target.value })} placeholder="Zoom Account ID" />
+                  <div className="space-y-3">
+                    <div>
+                      <Label>Account ID <span className="text-destructive">*</span></Label>
+                      <Input
+                        value={zoomForm.accountId}
+                        onChange={(e) => setZoomForm({ ...zoomForm, accountId: e.target.value })}
+                        placeholder="e.g. AbCdEfGhIj1234567890"
+                      />
+                    </div>
+                    <div>
+                      <Label>Client ID <span className="text-destructive">*</span></Label>
+                      <Input
+                        value={zoomForm.clientId}
+                        onChange={(e) => setZoomForm({ ...zoomForm, clientId: e.target.value })}
+                        placeholder="e.g. AbCdEfGhIjKlMnOpQrSt"
+                      />
+                    </div>
+                    <div>
+                      <Label>Client Secret <span className="text-destructive">*</span></Label>
+                      <Input
+                        type="password"
+                        value={zoomForm.clientSecret}
+                        onChange={(e) => setZoomForm({ ...zoomForm, clientSecret: e.target.value })}
+                        placeholder="Your Client Secret"
+                      />
+                    </div>
+                    <div>
+                      <Label>Account Email (optional)</Label>
+                      <Input
+                        value={zoomForm.accountEmail}
+                        onChange={(e) => setZoomForm({ ...zoomForm, accountEmail: e.target.value })}
+                        placeholder="zoom@company.com"
+                      />
+                    </div>
+                    <Button
+                      className="bg-brand-green hover:bg-brand-green-dark text-white w-full"
+                      disabled={!zoomForm.accountId || !zoomForm.clientId || !zoomForm.clientSecret || connectZoom.isPending}
+                      onClick={() => connectZoom.mutate(zoomForm)}
+                    >
+                      {connectZoom.isPending ? "Verifying & Connecting..." : "Connect Zoom"}
+                    </Button>
                   </div>
-                  <div>
-                    <Label>Account Email (optional)</Label>
-                    <Input value={zoomForm.accountEmail} onChange={(e) => setZoomForm({ ...zoomForm, accountEmail: e.target.value })} placeholder="zoom@company.com" />
-                  </div>
-                  <Button
-                    className="bg-brand-green hover:bg-brand-green-dark text-white"
-                    disabled={!zoomForm.accessToken || connectZoom.isPending}
-                    onClick={() => connectZoom.mutate(zoomForm)}
-                  >
-                    {connectZoom.isPending ? "Connecting..." : "Connect Zoom"}
-                  </Button>
                 </>
               )}
             </CardContent>
