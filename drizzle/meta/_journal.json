@@ -71,6 +71,13 @@
       "when": 1773787978193,
       "tag": "0009_daffy_madame_masque",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1773864632160,
+      "tag": "0010_right_paibok",
+      "breakpoints": true
     }
   ]
 }

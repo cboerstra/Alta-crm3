@@ -435,3 +435,12 @@
 - [x] Frontend: Add Session dialog shows "Creating Zoom meeting..." loading state
 - [x] Frontend: After session created, display the Zoom join URL and meeting ID returned from Zoom
 - [x] Graceful fallback: if Zoom not connected, show amber warning and allow manual URL entry (existing behavior)
+
+## Zoom Session Fields & Landing Page Editor Integration (User Request)
+- [x] Add zoomWebinarId and replayUrl columns to webinarSessions schema
+- [x] Update addSession mutation to store zoomWebinarId from Zoom API response
+- [x] Update createWebinarSession DB helper to accept zoomWebinarId and replayUrl
+- [x] Display Zoom Webinar ID, Join URL, and Replay URL on session rows in WebinarDetail
+- [x] Make session Zoom fields (webinarId, joinUrl, replayUrl) available in Landing Page Editor
+- [x] Auto-populate landing page Zoom fields from the selected session's data
+- [x] Update tests for new schema fields

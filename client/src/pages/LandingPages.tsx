@@ -109,11 +109,17 @@ export default function LandingPages() {
   const { data: webinars } = trpc.webinars.list.useQuery();
   const { data: mediaLibraryItems } = trpc.media.list.useQuery();
 
+  // Fetch sessions for the currently selected webinar
+  const { data: selectedWebinarSessions } = trpc.webinars.getSessions.useQuery(
+    { webinarId: form.webinarId! },
+    { enabled: !!form.webinarId }
+  );
+
   const webinarMap = useMemo(() => {
-    const map = new Map<number, { title: string; scheduledAt: Date; durationMinutes: number | null; status: string }>();
+    const map = new Map<number, { title: string; scheduledAt: Date; durationMinutes: number | null; status: string; zoomWebinarId: string | null; zoomJoinUrl: string | null; replayUrl: string | null }>();
     if (webinars) {
       for (const w of webinars) {
-        map.set(w.id, { title: w.title, scheduledAt: w.scheduledAt, durationMinutes: w.durationMinutes, status: w.status });
+        map.set(w.id, { title: w.title, scheduledAt: w.scheduledAt, durationMinutes: w.durationMinutes, status: w.status, zoomWebinarId: w.zoomWebinarId, zoomJoinUrl: w.zoomJoinUrl, replayUrl: w.replayUrl });
       }
     }
     return map;
@@ -533,15 +539,71 @@ export default function LandingPages() {
                     </SelectContent>
                   </Select>
                   {form.webinarId && webinarMap.get(form.webinarId) && (
-                    <div className="mt-2 p-2.5 rounded-md bg-muted/50 flex items-center gap-2 text-xs text-muted-foreground">
-                      <Calendar className="h-3.5 w-3.5 text-brand-green" />
-                      <span>{formatWebinarDate(webinarMap.get(form.webinarId)!.scheduledAt)}</span>
-                      {webinarMap.get(form.webinarId)!.durationMinutes && (
-                        <>
-                          <span className="mx-1">·</span>
-                          <Clock className="h-3.5 w-3.5" />
-                          <span>{webinarMap.get(form.webinarId)!.durationMinutes} min</span>
-                        </>
+                    <div className="mt-2 space-y-2">
+                      <div className="p-2.5 rounded-md bg-muted/50 flex items-center gap-2 text-xs text-muted-foreground">
+                        <Calendar className="h-3.5 w-3.5 text-brand-green" />
+                        <span>{formatWebinarDate(webinarMap.get(form.webinarId)!.scheduledAt)}</span>
+                        {webinarMap.get(form.webinarId)!.durationMinutes && (
+                          <>
+                            <span className="mx-1">·</span>
+                            <Clock className="h-3.5 w-3.5" />
+                            <span>{webinarMap.get(form.webinarId)!.durationMinutes} min</span>
+                          </>
+                        )}
+                      </div>
+                      {/* Zoom fields from sessions */}
+                      {selectedWebinarSessions && selectedWebinarSessions.length > 0 && (
+                        <div className="p-3 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 space-y-2">
+                          <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+                            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                            Zoom Session Details (auto-populated)
+                          </p>
+                          {selectedWebinarSessions.map((sess: any) => (
+                            <div key={sess.id} className="text-xs space-y-1 p-2 rounded bg-background/60">
+                              <p className="font-medium text-foreground">{sess.label ?? "Session"} — {new Date(sess.sessionDate).toLocaleDateString()} at {new Date(sess.sessionDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+                              <div className="grid grid-cols-1 gap-1 text-muted-foreground">
+                                {sess.zoomWebinarId && (
+                                  <p><span className="font-medium text-foreground">Zoom Webinar ID:</span> <span className="font-mono">{sess.zoomWebinarId}</span></p>
+                                )}
+                                {sess.zoomJoinUrl && (
+                                  <p className="truncate"><span className="font-medium text-foreground">Zoom Join URL:</span>{" "}
+                                    <a href={sess.zoomJoinUrl} target="_blank" rel="noopener noreferrer" className="text-brand-green underline">{sess.zoomJoinUrl}</a>
+                                  </p>
+                                )}
+                                {sess.replayUrl ? (
+                                  <p className="truncate"><span className="font-medium text-foreground">Replay URL:</span>{" "}
+                                    <a href={sess.replayUrl} target="_blank" rel="noopener noreferrer" className="text-brand-green underline">{sess.replayUrl}</a>
+                                  </p>
+                                ) : (
+                                  <p><span className="font-medium text-foreground">Replay URL:</span> <span className="italic">Not yet available</span></p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Webinar-level Zoom fields fallback when no sessions */}
+                      {(!selectedWebinarSessions || selectedWebinarSessions.length === 0) && (webinarMap.get(form.webinarId)!.zoomWebinarId || webinarMap.get(form.webinarId)!.zoomJoinUrl) && (
+                        <div className="p-3 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 space-y-1">
+                          <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Zoom Details (webinar-level)</p>
+                          <div className="text-xs text-muted-foreground space-y-0.5">
+                            {webinarMap.get(form.webinarId)!.zoomWebinarId && (
+                              <p><span className="font-medium text-foreground">Zoom Webinar ID:</span> <span className="font-mono">{webinarMap.get(form.webinarId)!.zoomWebinarId}</span></p>
+                            )}
+                            {webinarMap.get(form.webinarId)!.zoomJoinUrl && (
+                              <p className="truncate"><span className="font-medium text-foreground">Zoom Join URL:</span>{" "}
+                                <a href={webinarMap.get(form.webinarId)!.zoomJoinUrl!} target="_blank" rel="noopener noreferrer" className="text-brand-green underline">{webinarMap.get(form.webinarId)!.zoomJoinUrl}</a>
+                              </p>
+                            )}
+                            {webinarMap.get(form.webinarId)!.replayUrl ? (
+                              <p className="truncate"><span className="font-medium text-foreground">Replay URL:</span>{" "}
+                                <a href={webinarMap.get(form.webinarId)!.replayUrl!} target="_blank" rel="noopener noreferrer" className="text-brand-green underline">{webinarMap.get(form.webinarId)!.replayUrl}</a>
+                              </p>
+                            ) : (
+                              <p><span className="font-medium text-foreground">Replay URL:</span> <span className="italic">Not yet available</span></p>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}

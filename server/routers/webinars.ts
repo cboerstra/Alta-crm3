@@ -235,9 +235,21 @@ export const webinarsRouter = router({
         sessionDate: new Date(input.sessionDate),
         durationMinutes: input.durationMinutes,
         label: input.label,
+        zoomWebinarId: zoomMeetingId,
         zoomJoinUrl,
         zoomStartUrl,
       });
+
+      // Also update the parent webinar with Zoom fields if this is the first session with Zoom data
+      if (zoomMeetingId && webinar) {
+        const updates: Record<string, any> = {};
+        if (!webinar.zoomWebinarId) updates.zoomWebinarId = zoomMeetingId;
+        if (!webinar.zoomJoinUrl && zoomJoinUrl) updates.zoomJoinUrl = zoomJoinUrl;
+        if (!webinar.zoomStartUrl && zoomStartUrl) updates.zoomStartUrl = zoomStartUrl;
+        if (Object.keys(updates).length > 0) {
+          await updateWebinar(input.webinarId, updates);
+        }
+      }
 
       return {
         id: sessionId,

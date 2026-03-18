@@ -77,8 +77,10 @@ export const webinarSessions = mysqlTable("webinar_sessions", {
   sessionDate: timestamp("sessionDate").notNull(),
   durationMinutes: int("durationMinutes").default(60),
   maxAttendees: int("maxAttendees"),
+  zoomWebinarId: varchar("zoomWebinarId", { length: 256 }),
   zoomJoinUrl: text("zoomJoinUrl"),
   zoomStartUrl: text("zoomStartUrl"),
+  replayUrl: text("replayUrl"),
   label: varchar("label", { length: 256 }), // e.g. "Morning Session", "Evening Session"
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });

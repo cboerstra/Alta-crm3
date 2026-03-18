@@ -334,58 +334,84 @@ export default function WebinarDetail() {
           ) : (
             <div className="space-y-2">
               {sessions.map((session) => (
-                <div key={session.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-9 w-9 rounded-lg bg-brand-green/10 flex items-center justify-center flex-shrink-0">
-                      <Video className="h-4 w-4 text-brand-green" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {session.label ?? "Session"}{" "}
-                        <span className="text-muted-foreground font-normal">
-                          — {new Date(session.sessionDate).toLocaleDateString()} at{" "}
-                          {new Date(session.sessionDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
-                      </p>
-                      <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                <div key={session.id} className="p-3 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-9 w-9 rounded-lg bg-brand-green/10 flex items-center justify-center flex-shrink-0">
+                        <Video className="h-4 w-4 text-brand-green" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {session.label ?? "Session"}{" "}
+                          <span className="text-muted-foreground font-normal">
+                            — {new Date(session.sessionDate).toLocaleDateString()} at{" "}
+                            {new Date(session.sessionDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </p>
                         <p className="text-xs text-muted-foreground">{session.durationMinutes} min</p>
-                        {session.zoomJoinUrl && (
-                          <p className="text-xs text-muted-foreground truncate max-w-[220px]">
-                            <span className="text-brand-green font-medium">Zoom</span>{" "}
-                            {session.zoomJoinUrl.replace("https://", "")}
-                          </p>
-                        )}
                       </div>
                     </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {session.zoomJoinUrl && (
+                        <a href={session.zoomJoinUrl} target="_blank" rel="noopener noreferrer">
+                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
+                            <ExternalLink className="h-3 w-3" /> Join
+                          </Button>
+                        </a>
+                      )}
+                      {session.zoomStartUrl && (
+                        <a href={session.zoomStartUrl} target="_blank" rel="noopener noreferrer">
+                          <Button size="sm" className="h-7 text-xs gap-1 bg-brand-green hover:bg-brand-green-dark text-white">
+                            <Video className="h-3 w-3" /> Start
+                          </Button>
+                        </a>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => {
+                          if (confirm("Delete this session?")) {
+                            deleteSession.mutate({ sessionId: session.id });
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {session.zoomJoinUrl && (
-                      <a href={session.zoomJoinUrl} target="_blank" rel="noopener noreferrer">
-                        <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
-                          <ExternalLink className="h-3 w-3" /> Join
-                        </Button>
-                      </a>
-                    )}
-                    {session.zoomStartUrl && (
-                      <a href={session.zoomStartUrl} target="_blank" rel="noopener noreferrer">
-                        <Button size="sm" className="h-7 text-xs gap-1 bg-brand-green hover:bg-brand-green-dark text-white">
-                          <Video className="h-3 w-3" /> Start
-                        </Button>
-                      </a>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => {
-                        if (confirm("Delete this session?")) {
-                          deleteSession.mutate({ sessionId: session.id });
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                  {/* Zoom details row */}
+                  {(session.zoomWebinarId || session.zoomJoinUrl || session.replayUrl) && (
+                    <div className="ml-12 grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-1 text-xs">
+                      {session.zoomWebinarId && (
+                        <div>
+                          <span className="text-muted-foreground">Zoom Webinar ID:</span>{" "}
+                          <span className="font-mono font-semibold">{session.zoomWebinarId}</span>
+                        </div>
+                      )}
+                      {session.zoomJoinUrl && (
+                        <div className="truncate">
+                          <span className="text-muted-foreground">Join URL:</span>{" "}
+                          <a href={session.zoomJoinUrl} target="_blank" rel="noopener noreferrer" className="text-brand-green underline break-all">
+                            {session.zoomJoinUrl.replace("https://", "")}
+                          </a>
+                        </div>
+                      )}
+                      {session.replayUrl ? (
+                        <div className="truncate">
+                          <span className="text-muted-foreground">Replay URL:</span>{" "}
+                          <a href={session.replayUrl} target="_blank" rel="noopener noreferrer" className="text-brand-green underline break-all">
+                            {session.replayUrl.replace("https://", "")}
+                          </a>
+                        </div>
+                      ) : (
+                        <div>
+                          <span className="text-muted-foreground">Replay URL:</span>{" "}
+                          <span className="text-muted-foreground italic">Not yet available</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
