@@ -419,3 +419,9 @@
 - [x] Unread badge on sidebar nav item when new inbound messages arrive
 - [x] Link each conversation to the matching lead profile
 - [x] Both admin users can see and reply to all conversations
+
+## Add Session Bug Fix (User Request)
+- [x] Fix "Add Session" so the new session is saved to the DB after Zoom meeting is created
+- [x] Fix webinar detail page to refresh/display new session immediately after creation
+- [x] Add "Add Session" button directly on the Webinar Detail page (not just in create dialog)
+- [x] Sessions panel shows all sessions with date, time, duration, Zoom join link, and delete button

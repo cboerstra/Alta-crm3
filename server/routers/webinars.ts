@@ -184,6 +184,39 @@ export const webinarsRouter = router({
     .input(z.object({ webinarId: z.number() }))
     .query(({ input }) => getWebinarSessions(input.webinarId)),
 
+  addSession: protectedProcedure
+    .input(z.object({
+      webinarId: z.number(),
+      sessionDate: z.number(), // unix ms
+      durationMinutes: z.number().default(60),
+      label: z.string().optional(),
+      zoomJoinUrl: z.string().optional(),
+      zoomStartUrl: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const sessionId = await createWebinarSession({
+        webinarId: input.webinarId,
+        sessionDate: new Date(input.sessionDate),
+        durationMinutes: input.durationMinutes,
+        label: input.label,
+        zoomJoinUrl: input.zoomJoinUrl,
+        zoomStartUrl: input.zoomStartUrl,
+      });
+      return { id: sessionId };
+    }),
+
+  deleteSession: protectedProcedure
+    .input(z.object({ sessionId: z.number() }))
+    .mutation(async ({ input }) => {
+      const { getDb } = await import("../db");
+      const { webinarSessions } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+      await db.delete(webinarSessions).where(eq(webinarSessions.id, input.sessionId));
+      return { success: true };
+    }),
+
   registerLead: protectedProcedure
     .input(z.object({
       leadId: z.number(),
