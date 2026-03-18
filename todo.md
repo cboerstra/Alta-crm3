@@ -502,3 +502,5 @@
 - [x] Add "Update Media" save button to Media tab to persist foreground selections and background image
 - [x] Fix media tab changes not saving to DB (background image + foreground selections)
 - [x] Add explicit "Save Media" button to Media tab
+- [x] Update default confirmation email template with all placeholders (professional copy)
+- [x] Add background image preview with headline/subheadline text overlay on Media tab

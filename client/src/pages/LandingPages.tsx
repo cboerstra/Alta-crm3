@@ -51,22 +51,38 @@ type MediaSelection = {
   sortOrder: number;
 };
 
-const DEFAULT_EMAIL_SUBJECT = "You're registered for {{webinarTitle}}!";
-const DEFAULT_EMAIL_BODY = `Hi {{firstName}},
+const DEFAULT_EMAIL_SUBJECT = "You're Registered — {{webinarTitle}}";
+const DEFAULT_EMAIL_BODY = `Dear {{firstName}} {{lastName}},
 
-Thank you for registering for {{webinarTitle}}! We're excited to have you join us.
+Thank you for registering for {{webinarTitle}}! We are thrilled to have you join us and look forward to sharing valuable insights with you.
 
-Here are your event details:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+YOUR EVENT DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  Date & Time: {{date}}
-  Join Link: {{joinUrl}}
+  Event:      {{webinarTitle}}
+  Date/Time:  {{date}}
+  Join Link:  {{joinUrl}}
 
-If you have any questions before the event, feel free to reply to this email — we're happy to help.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-We'll see you there!
+To join the webinar, simply click your personal join link above at the scheduled date and time. We recommend joining 5 minutes early to ensure your audio and video are working properly.
+
+WHAT TO EXPECT:
+• Expert guidance on navigating today's real estate market
+• Answers to your most important homebuying questions
+• Exclusive resources available only to registered attendees
+
+If you have any questions prior to the event, please do not hesitate to reply to this email — our team is happy to assist.
+
+We look forward to seeing you there!
 
 Warm regards,
-The Clarke & Associates Team`;
+
+The Clarke & Associates Team
+Clarke & Associates CRM
+
+P.S. Add this event to your calendar now so you don't miss it. Your join link is: {{joinUrl}}`;
 
 const defaultForm: FormState = {
   title: "", slug: "", headline: "", subheadline: "", bodyText: "",
@@ -688,19 +704,52 @@ export default function LandingPages() {
 
               {/* ─── Media Tab ─── */}
               <TabsContent value="media" className="space-y-5 mt-4">
-                {/* Background Image Upload */}
+                {/* Background Image Upload + Live Preview */}
                 <div>
                   <Label className="mb-2 block font-semibold">Background Image</Label>
                   <p className="text-xs text-muted-foreground mb-3">This image fills the entire landing page background. Recommended: 1920x1080px or larger, JPG or PNG.</p>
                   {artworkPreview ? (
-                    <div className="relative rounded-lg overflow-hidden border">
-                      <img src={artworkPreview} alt="Background preview" className="w-full h-48 object-cover" />
-                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                        <span className="text-white text-sm font-medium">Full-bleed background</span>
+                    <div className="space-y-2">
+                      {/* Live preview with text overlay */}
+                      <div
+                        className="relative rounded-lg overflow-hidden border shadow-md"
+                        style={{ height: "200px", background: artworkPreview ? `url(${artworkPreview}) center/cover no-repeat` : "#1a1a1a" }}
+                      >
+                        {/* Dark gradient overlay */}
+                        <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.75) 100%)" }} />
+                        {/* Text content */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
+                          {form.headline ? (
+                            <h2 className="text-white font-bold text-lg leading-tight drop-shadow-lg" style={{ fontFamily: "Raleway, sans-serif", textShadow: "0 2px 8px rgba(0,0,0,0.7)" }}>
+                              {form.headline}
+                            </h2>
+                          ) : (
+                            <p className="text-white/50 text-sm italic">Headline will appear here</p>
+                          )}
+                          {form.subheadline && (
+                            <p className="text-white/85 text-sm mt-2 leading-snug drop-shadow" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.6)" }}>
+                              {form.subheadline}
+                            </p>
+                          )}
+                          {form.ctaText && (
+                            <div
+                              className="mt-3 px-4 py-1.5 rounded text-sm font-semibold text-white shadow"
+                              style={{ backgroundColor: form.accentColor || "#C9A84C" }}
+                            >
+                              {form.ctaText}
+                            </div>
+                          )}
+                        </div>
+                        {/* Remove button */}
+                        <Button variant="secondary" size="sm" className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white border-0" onClick={() => { setArtworkPreview(null); setPendingArtworkFile(null); if (editId) updateMutation.mutate({ id: editId, artworkUrl: null }); }}>
+                          <X className="h-3 w-3 mr-1" /> Remove
+                        </Button>
+                        {/* Change button */}
+                        <button onClick={() => artworkRef.current?.click()} className="absolute bottom-2 right-2 text-[10px] text-white/70 hover:text-white underline">
+                          Change image
+                        </button>
                       </div>
-                      <Button variant="secondary" size="sm" className="absolute top-2 right-2" onClick={() => { setArtworkPreview(null); setPendingArtworkFile(null); if (editId) updateMutation.mutate({ id: editId, artworkUrl: null }); }}>
-                        <X className="h-3 w-3 mr-1" /> Remove
-                      </Button>
+                      <p className="text-[10px] text-muted-foreground">Preview shows how your headline and CTA button will appear over the background.</p>
                     </div>
                   ) : (
                     <button onClick={() => artworkRef.current?.click()} className="w-full h-40 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-brand-green/50 hover:text-brand-green transition-colors cursor-pointer">
