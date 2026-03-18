@@ -65,7 +65,19 @@ import {
   Link,
   AlertCircle,
   CalendarDays,
+  Pencil,
+  Phone,
+  KeyRound,
 } from "lucide-react";
+
+type EditForm = {
+  userId: number;
+  name: string;
+  email: string;
+  phone: string;
+  role: "admin" | "user";
+  newPassword: string;
+};
 
 export default function UserManagement() {
   const { user: currentUser } = useAuth();
@@ -77,6 +89,12 @@ export default function UserManagement() {
   const [inviteForm, setInviteForm] = useState({ name: "", email: "", role: "user" as "admin" | "user" });
   const [inviteResult, setInviteResult] = useState<{ token: string; expiresAt: Date } | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // Edit user dialog state
+  const [editDialog, setEditDialog] = useState(false);
+  const [editForm, setEditForm] = useState<EditForm>({
+    userId: 0, name: "", email: "", phone: "", role: "user", newPassword: "",
+  });
 
   // Confirm dialogs
   const [confirmRole, setConfirmRole] = useState<{
@@ -107,6 +125,16 @@ export default function UserManagement() {
     onError: (err) => toast.error(err.message || "Failed to update role"),
   });
 
+  const updateUser = trpc.userManagement.updateUser.useMutation({
+    onSuccess: () => {
+      utils.userManagement.list.invalidate();
+      utils.userManagement.stats.invalidate();
+      setEditDialog(false);
+      toast.success("User updated successfully");
+    },
+    onError: (err) => toast.error(err.message || "Failed to update user"),
+  });
+
   const deleteUser = trpc.userManagement.deleteUser.useMutation({
     onSuccess: () => {
       utils.userManagement.list.invalidate();
@@ -127,9 +155,9 @@ export default function UserManagement() {
   const revokeInvite = trpc.userManagement.deleteInvite.useMutation({
     onSuccess: () => {
       utils.userManagement.listInvites.invalidate();
-      toast.success("Invite revoked");
+      toast.success("Invite deleted");
     },
-    onError: (err) => toast.error(err.message || "Failed to revoke invite"),
+    onError: (err) => toast.error(err.message || "Failed to delete invite"),
   });
 
   const handleCreateInvite = () => {
@@ -152,6 +180,31 @@ export default function UserManagement() {
     setInviteResult(null);
     setInviteForm({ name: "", email: "", role: "user" });
     setCopied(false);
+  };
+
+  const openEditDialog = (u: NonNullable<typeof usersList>[number]) => {
+    setEditForm({
+      userId: u.id,
+      name: u.name || "",
+      email: u.email || "",
+      phone: (u as any).phone || "",
+      role: u.role as "admin" | "user",
+      newPassword: "",
+    });
+    setEditDialog(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editForm.name.trim()) { toast.error("Name is required"); return; }
+    if (!editForm.email.trim()) { toast.error("Email is required"); return; }
+    updateUser.mutate({
+      userId: editForm.userId,
+      name: editForm.name.trim(),
+      email: editForm.email.trim(),
+      phone: editForm.phone.trim() || undefined,
+      role: editForm.role,
+      newPassword: editForm.newPassword || undefined,
+    });
   };
 
   const formatDate = (date: Date | string | null) => {
@@ -297,6 +350,7 @@ export default function UserManagement() {
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="pl-6">User</TableHead>
                         <TableHead>Email</TableHead>
+                        <TableHead>Phone</TableHead>
                         <TableHead>Role</TableHead>
                         <TableHead>Last Sign In</TableHead>
                         <TableHead>Joined</TableHead>
@@ -331,8 +385,14 @@ export default function UserManagement() {
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                                <Mail className="h-3.5 w-3.5" />
+                                <Mail className="h-3.5 w-3.5 shrink-0" />
                                 {u.email || "—"}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                                <Phone className="h-3.5 w-3.5 shrink-0" />
+                                {(u as any).phone || "—"}
                               </div>
                             </TableCell>
                             <TableCell>
@@ -358,45 +418,58 @@ export default function UserManagement() {
                               <span className="text-sm text-muted-foreground">{formatDate(u.createdAt)}</span>
                             </TableCell>
                             <TableCell className="text-right pr-6">
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                  {u.role === "user" ? (
-                                    <DropdownMenuItem
-                                      onClick={() => setConfirmRole({ open: true, userId: u.id, userName: u.name || "this user", newRole: "admin" })}
-                                      className="gap-2"
-                                    >
-                                      <ShieldCheck className="h-4 w-4 text-brand-gold" />
-                                      Promote to Admin
-                                    </DropdownMenuItem>
-                                  ) : (
-                                    <DropdownMenuItem
-                                      onClick={() => !isCurrentUser && setConfirmRole({ open: true, userId: u.id, userName: u.name || "this user", newRole: "user" })}
-                                      disabled={isCurrentUser}
-                                      className="gap-2"
-                                    >
-                                      <Shield className="h-4 w-4 text-blue-500" />
-                                      Demote to User
-                                    </DropdownMenuItem>
-                                  )}
-                                  {!isCurrentUser && (
-                                    <>
-                                      <DropdownMenuSeparator />
+                              <div className="flex items-center justify-end gap-1">
+                                {/* Always-visible Edit button */}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                                  onClick={() => openEditDialog(u)}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                  Edit
+                                </Button>
+                                {/* More actions dropdown */}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-48">
+                                    {u.role === "user" ? (
                                       <DropdownMenuItem
-                                        onClick={() => setConfirmDelete({ open: true, userId: u.id, userName: u.name || "this user" })}
-                                        className="gap-2 text-destructive focus:text-destructive"
+                                        onClick={() => setConfirmRole({ open: true, userId: u.id, userName: u.name || "this user", newRole: "admin" })}
+                                        className="gap-2"
                                       >
-                                        <Trash2 className="h-4 w-4" />
-                                        Remove User
+                                        <ShieldCheck className="h-4 w-4 text-brand-gold" />
+                                        Promote to Admin
                                       </DropdownMenuItem>
-                                    </>
-                                  )}
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                                    ) : (
+                                      <DropdownMenuItem
+                                        onClick={() => !isCurrentUser && setConfirmRole({ open: true, userId: u.id, userName: u.name || "this user", newRole: "user" })}
+                                        disabled={isCurrentUser}
+                                        className="gap-2"
+                                      >
+                                        <Shield className="h-4 w-4 text-blue-500" />
+                                        Demote to User
+                                      </DropdownMenuItem>
+                                    )}
+                                    {!isCurrentUser && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          onClick={() => setConfirmDelete({ open: true, userId: u.id, userName: u.name || "this user" })}
+                                          className="gap-2 text-destructive focus:text-destructive"
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                          Remove User
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -493,7 +566,7 @@ export default function UserManagement() {
                         const expired = isExpired(inv.expiresAt);
                         const accepted = !!inv.acceptedAt;
                         return (
-                          <TableRow key={inv.id} className="group">
+                          <TableRow key={inv.id}>
                             <TableCell className="pl-6 font-medium text-sm">{inv.name || "—"}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -537,7 +610,8 @@ export default function UserManagement() {
                               <span className="text-sm text-muted-foreground">{formatDate(inv.createdAt)}</span>
                             </TableCell>
                             <TableCell className="text-right pr-6">
-                              <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {/* Always-visible action buttons — no hover required */}
+                              <div className="flex items-center justify-end gap-2">
                                 {!accepted && !expired && (
                                   <Button
                                     variant="ghost"
@@ -552,8 +626,9 @@ export default function UserManagement() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                  className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                                   onClick={() => setConfirmRevokeInvite({ open: true, inviteId: inv.id, inviteEmail: inv.email })}
+                                  title="Delete invitation"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
@@ -571,7 +646,133 @@ export default function UserManagement() {
         </TabsContent>
       </Tabs>
 
-      {/* Add Employee / Create Invite Dialog */}
+      {/* ── Edit User Dialog ─────────────────────────────────────────────────── */}
+      <Dialog open={editDialog} onOpenChange={setEditDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5 text-brand-green" />
+              Edit Team Member
+            </DialogTitle>
+            <DialogDescription>
+              Update profile information. Leave the password field blank to keep the existing password.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-1">
+            {/* Name */}
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-name">
+                Full Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="edit-name"
+                placeholder="e.g. Jane Smith"
+                value={editForm.name}
+                onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+
+            {/* Email */}
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-email">
+                Email Address <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="edit-email"
+                type="email"
+                placeholder="e.g. jane@clarkeassociates.com"
+                value={editForm.email}
+                onChange={(e) => setEditForm(f => ({ ...f, email: e.target.value }))}
+              />
+            </div>
+
+            {/* Phone */}
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-phone" className="flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                Phone Number
+                <span className="text-xs text-muted-foreground font-normal">(used for admin SMS alerts)</span>
+              </Label>
+              <Input
+                id="edit-phone"
+                type="tel"
+                placeholder="e.g. +1 801 555 0100"
+                value={editForm.phone}
+                onChange={(e) => setEditForm(f => ({ ...f, phone: e.target.value }))}
+              />
+            </div>
+
+            {/* Role */}
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-role">Access Level</Label>
+              <Select
+                value={editForm.role}
+                onValueChange={(v) => setEditForm(f => ({ ...f, role: v as "admin" | "user" }))}
+                disabled={editForm.userId === currentUser?.id}
+              >
+                <SelectTrigger id="edit-role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-blue-500" />
+                      User
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="admin">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-brand-gold" />
+                      Admin
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {editForm.userId === currentUser?.id && (
+                <p className="text-xs text-muted-foreground">You cannot change your own role.</p>
+              )}
+            </div>
+
+            {/* New Password */}
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-password" className="flex items-center gap-1.5">
+                <KeyRound className="h-3.5 w-3.5 text-muted-foreground" />
+                New Password
+                <span className="text-xs text-muted-foreground font-normal">(leave blank to keep current)</span>
+              </Label>
+              <Input
+                id="edit-password"
+                type="password"
+                placeholder="Min. 6 characters"
+                value={editForm.newPassword}
+                onChange={(e) => setEditForm(f => ({ ...f, newPassword: e.target.value }))}
+                autoComplete="new-password"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setEditDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveEdit}
+              disabled={updateUser.isPending}
+              className="bg-brand-green hover:bg-brand-green-dark text-white gap-2"
+            >
+              {updateUser.isPending ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Add Employee / Create Invite Dialog ─────────────────────────────── */}
       <Dialog open={inviteDialog} onOpenChange={(open) => { if (!open) handleCloseInviteDialog(); else setInviteDialog(true); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -587,7 +788,6 @@ export default function UserManagement() {
           </DialogHeader>
 
           {inviteResult ? (
-            // Show the invite link after creation
             <div className="space-y-4">
               <div className="rounded-lg bg-green-50 border border-green-200 p-4">
                 <div className="flex items-center gap-2 text-green-700 mb-2">
@@ -626,7 +826,6 @@ export default function UserManagement() {
               </DialogFooter>
             </div>
           ) : (
-            // Show the invite form
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="invite-name">
@@ -707,7 +906,7 @@ export default function UserManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Confirm Role Change */}
+      {/* ── Confirm Role Change ──────────────────────────────────────────────── */}
       <AlertDialog open={confirmRole.open} onOpenChange={(open) => !open && setConfirmRole(p => ({ ...p, open: false }))}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -735,7 +934,7 @@ export default function UserManagement() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Confirm Delete User */}
+      {/* ── Confirm Delete User ──────────────────────────────────────────────── */}
       <AlertDialog open={confirmDelete.open} onOpenChange={(open) => !open && setConfirmDelete(p => ({ ...p, open: false }))}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -763,13 +962,16 @@ export default function UserManagement() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Confirm Revoke Invite */}
+      {/* ── Confirm Delete Invite ────────────────────────────────────────────── */}
       <AlertDialog open={confirmRevokeInvite.open} onOpenChange={(open) => !open && setConfirmRevokeInvite(p => ({ ...p, open: false }))}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Revoke Invite</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" />
+              Delete Invitation
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to revoke the invite for <strong>{confirmRevokeInvite.inviteEmail}</strong>?
+              Are you sure you want to delete the invitation for <strong>{confirmRevokeInvite.inviteEmail}</strong>?
               The invite link will no longer work.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -782,7 +984,7 @@ export default function UserManagement() {
               }}
               className="bg-destructive hover:bg-destructive/90 text-white"
             >
-              Revoke Invite
+              Delete Invitation
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import bcrypt from "bcrypt";
 import { adminProcedure, router } from "../_core/trpc";
 import { getDb, createInvite, listInvites, deleteInvite } from "../db";
 import { users, pendingInvites } from "../../drizzle/schema";
@@ -108,6 +109,42 @@ export const userManagementRouter = router({
         .where(eq(users.id, input.userId))
         .limit(1);
       return user ?? null;
+    }),
+
+  // Update a user's profile (name, email, phone, role, optional new password)
+  updateUser: adminProcedure
+    .input(
+      z.object({
+        userId: z.number(),
+        name: z.string().min(1, "Name is required"),
+        email: z.string().email("Invalid email"),
+        phone: z.string().optional(),
+        role: z.enum(["admin", "user"]),
+        newPassword: z.string().min(6, "Password must be at least 6 characters").optional().or(z.literal("")),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+
+      // Prevent self-demotion
+      if (input.userId === ctx.user.id && input.role === "user") {
+        throw new Error("You cannot demote yourself from admin.");
+      }
+
+      const updateData: Record<string, unknown> = {
+        name: input.name,
+        email: input.email,
+        phone: input.phone || null,
+        role: input.role,
+      };
+
+      if (input.newPassword && input.newPassword.trim().length >= 6) {
+        updateData.passwordHash = await bcrypt.hash(input.newPassword, 10);
+      }
+
+      await db.update(users).set(updateData as any).where(eq(users.id, input.userId));
+      return { success: true };
     }),
 
   // Remove a user from the system

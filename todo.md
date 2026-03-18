@@ -371,3 +371,11 @@
 - [x] Admin notification message includes lead name, phone, email, and which landing page they registered on
 - [x] Only fires when Telnyx is configured and enabled
 - [x] Graceful failure — notification errors never block the lead capture response
+
+## Edit Team Member in User Management (User Request)
+- [x] Add Edit button to each row in User Management
+- [x] Edit dialog: name, email, phone, role fields
+- [x] Optional new password field (leave blank to keep existing)
+- [x] Backend: userManagement.updateUser admin procedure
+- [x] Show success/error toast on save
+- [x] Make Delete/Revoke button always visible on pending invitations (not hover-only)
