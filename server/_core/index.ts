@@ -169,6 +169,38 @@ async function startServer() {
     },
   });
 
+  // Multer for PDF uploads (separate instance with larger limit and PDF filter)
+  const pdfUpload = multer({
+    storage,
+    limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype === "application/pdf") {
+        cb(null, true);
+      } else {
+        cb(new Error(`Only PDF files are allowed, got: ${file.mimetype}`));
+      }
+    },
+  });
+
+  // POST /api/upload-pdf — authenticated PDF upload (up to 25MB)
+  app.post("/api/upload-pdf", pdfUpload.single("file"), async (req, res) => {
+    try {
+      const { sdk } = await import("./sdk");
+      let userId: number | null = null;
+      try {
+        const user = await sdk.authenticateRequest(req as any);
+        userId = user?.id ?? null;
+      } catch { /* not authenticated */ }
+      if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+      if (!req.file) { res.status(400).json({ error: "No file provided" }); return; }
+      const fileUrl = `/uploads/${req.file.filename}`;
+      res.json({ url: fileUrl, filename: req.file.filename, size: req.file.size });
+    } catch (err: any) {
+      console.error("[Upload-PDF] Error:", err);
+      res.status(500).json({ error: err.message ?? "Upload failed" });
+    }
+  });
+
   // POST /api/upload — authenticated multipart upload
   app.post("/api/upload", upload.single("file"), async (req, res) => {
     try {

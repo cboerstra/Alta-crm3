@@ -494,3 +494,8 @@
 - [x] Update frontend Media Library to use /api/upload multipart endpoint
 - [x] Removed dependency on BUILT_IN_FORGE_API_URL/BUILT_IN_FORGE_API_KEY for uploads
 - [x] All 82 tests pass, 0 TypeScript errors
+
+## Bug Fixes
+- [x] Fix background image upload not persisting (switch from storagePut tRPC to /api/upload multipart endpoint)
+- [x] Fix PDF upload not persisting (switch from storagePut tRPC to /api/upload-pdf multipart endpoint)
+- [x] Add "Set as Background" button on media library images in Landing Page editor

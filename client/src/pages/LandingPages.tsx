@@ -167,22 +167,12 @@ export default function LandingPages() {
     onError: (e) => toast.error(e.message),
   });
 
-  const uploadArtwork = trpc.landingPages.uploadArtwork.useMutation({
-    onSuccess: () => { toast.success("Artwork uploaded"); refetch(); },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const uploadPdf = trpc.landingPages.uploadPdf.useMutation({
-    onSuccess: () => { toast.success("PDF uploaded"); refetch(); },
-    onError: (e) => toast.error(e.message),
-  });
-
   const setMediaMutation = trpc.media.setForLandingPage.useMutation({
     onError: (e) => toast.error("Failed to save media: " + e.message),
   });
 
-  const [pendingArtwork, setPendingArtwork] = useState<{ base64: string; name: string; type: string } | null>(null);
-  const [pendingPdf, setPendingPdf] = useState<{ base64: string; name: string } | null>(null);
+  const [pendingArtworkFile, setPendingArtworkFile] = useState<File | null>(null);
+  const [pendingPdfFile, setPendingPdfFile] = useState<File | null>(null);
 
   // Load existing media selections when editing
   const { data: existingMedia } = trpc.media.getForLandingPage.useQuery(
@@ -201,13 +191,31 @@ export default function LandingPages() {
   }, [existingMedia, editId]);
 
   async function handlePostCreateUploads(pageId: number) {
-    if (pendingArtwork) {
-      uploadArtwork.mutate({ landingPageId: pageId, fileBase64: pendingArtwork.base64, fileName: pendingArtwork.name, contentType: pendingArtwork.type });
-      setPendingArtwork(null);
+    if (pendingArtworkFile) {
+      try {
+        const formData = new FormData();
+        formData.append("file", pendingArtworkFile);
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error ?? "Upload failed"); }
+        const { url } = await res.json();
+        updateMutation.mutate({ id: pageId, artworkUrl: url });
+      } catch (err: any) {
+        toast.error("Failed to upload background image: " + err.message);
+      }
+      setPendingArtworkFile(null);
     }
-    if (pendingPdf) {
-      uploadPdf.mutate({ landingPageId: pageId, fileBase64: pendingPdf.base64, fileName: pendingPdf.name });
-      setPendingPdf(null);
+    if (pendingPdfFile) {
+      try {
+        const formData = new FormData();
+        formData.append("file", pendingPdfFile);
+        const res = await fetch("/api/upload-pdf", { method: "POST", body: formData });
+        if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error ?? "Upload failed"); }
+        const { url } = await res.json();
+        updateMutation.mutate({ id: pageId, confirmationPdfUrl: url });
+      } catch (err: any) {
+        toast.error("Failed to upload PDF: " + err.message);
+      }
+      setPendingPdfFile(null);
     }
   }
 
@@ -215,8 +223,8 @@ export default function LandingPages() {
     setForm({ ...defaultForm });
     setArtworkPreview(null);
     setPdfName(null);
-    setPendingArtwork(null);
-    setPendingPdf(null);
+    setPendingArtworkFile(null);
+    setPendingPdfFile(null);
     setTouched({});
     setSubmitAttempted(false);
     setSelectedMedia([]);
@@ -243,40 +251,61 @@ export default function LandingPages() {
     setSubmitAttempted(false);
   }
 
-  const handleArtworkSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleArtworkSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) { toast.error("Image must be under 10MB"); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = (reader.result as string).split(",")[1];
-      setArtworkPreview(URL.createObjectURL(file));
-      if (editId) {
-        setUploading(true);
-        uploadArtwork.mutate({ landingPageId: editId, fileBase64: base64, fileName: file.name, contentType: file.type }, { onSettled: () => setUploading(false) });
-      } else {
-        setPendingArtwork({ base64, name: file.name, type: file.type });
+    // Show local preview immediately
+    setArtworkPreview(URL.createObjectURL(file));
+    if (editId) {
+      // Upload now and save URL to DB
+      setUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error ?? "Upload failed"); }
+        const { url } = await res.json();
+        updateMutation.mutate({ id: editId, artworkUrl: url });
+      } catch (err: any) {
+        toast.error("Failed to upload background image: " + err.message);
+        setArtworkPreview(null);
+      } finally {
+        setUploading(false);
       }
-    };
-    reader.readAsDataURL(file);
+    } else {
+      // Store file for upload after page is created
+      setPendingArtworkFile(file);
+    }
+    // Reset input so same file can be re-selected
+    if (artworkRef.current) artworkRef.current.value = "";
   };
 
-  const handlePdfSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePdfSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 25 * 1024 * 1024) { toast.error("PDF must be under 25MB"); return; }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = (reader.result as string).split(",")[1];
-      setPdfName(file.name);
-      if (editId) {
-        setUploading(true);
-        uploadPdf.mutate({ landingPageId: editId, fileBase64: base64, fileName: file.name }, { onSettled: () => setUploading(false) });
-      } else {
-        setPendingPdf({ base64, name: file.name });
+    setPdfName(file.name);
+    if (editId) {
+      setUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/upload-pdf", { method: "POST", body: formData });
+        if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error ?? "Upload failed"); }
+        const { url } = await res.json();
+        updateMutation.mutate({ id: editId, confirmationPdfUrl: url });
+        toast.success("PDF uploaded");
+      } catch (err: any) {
+        toast.error("Failed to upload PDF: " + err.message);
+        setPdfName(null);
+      } finally {
+        setUploading(false);
       }
-    };
-    reader.readAsDataURL(file);
+    } else {
+      setPendingPdfFile(file);
+    }
+    if (pdfRef.current) pdfRef.current.value = "";
   };
 
   const toggleField = (key: string) => {
@@ -668,7 +697,7 @@ export default function LandingPages() {
                       <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                         <span className="text-white text-sm font-medium">Full-bleed background</span>
                       </div>
-                      <Button variant="secondary" size="sm" className="absolute top-2 right-2" onClick={() => { setArtworkPreview(null); setPendingArtwork(null); if (editId) updateMutation.mutate({ id: editId, artworkUrl: null }); }}>
+                      <Button variant="secondary" size="sm" className="absolute top-2 right-2" onClick={() => { setArtworkPreview(null); setPendingArtworkFile(null); if (editId) updateMutation.mutate({ id: editId, artworkUrl: null }); }}>
                         <X className="h-3 w-3 mr-1" /> Remove
                       </Button>
                     </div>
@@ -736,28 +765,46 @@ export default function LandingPages() {
                       {images.length > 0 && (
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">Images</p>
+                          <p className="text-[10px] text-muted-foreground mb-2">Click to add to foreground · hover for background option</p>
                           <ScrollArea className="w-full">
                             <div className="flex gap-3 pb-2">
                               {images.map((item) => (
-                                <button
-                                  key={item.id}
-                                  onClick={() => toggleMediaSelection(item.id, "foreground_image")}
-                                  className={`relative flex-shrink-0 w-28 h-20 rounded-lg border-2 overflow-hidden transition-all ${
-                                    isMediaSelected(item.id)
-                                      ? "border-brand-green ring-2 ring-brand-green/30 shadow-md"
-                                      : "border-muted hover:border-brand-green/40"
-                                  }`}
-                                >
-                                  <img src={item.fileUrl} alt={item.label || ""} className="w-full h-full object-cover" />
-                                  {isMediaSelected(item.id) && (
-                                    <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-brand-green flex items-center justify-center">
-                                      <Check className="h-3 w-3 text-white" />
+                                <div key={item.id} className="relative flex-shrink-0 group">
+                                  <button
+                                    onClick={() => toggleMediaSelection(item.id, "foreground_image")}
+                                    className={`relative w-28 h-20 rounded-lg border-2 overflow-hidden transition-all ${
+                                      isMediaSelected(item.id)
+                                        ? "border-brand-green ring-2 ring-brand-green/30 shadow-md"
+                                        : "border-muted hover:border-brand-green/40"
+                                    }`}
+                                  >
+                                    <img src={item.fileUrl} alt={item.label || ""} className="w-full h-full object-cover" />
+                                    {isMediaSelected(item.id) && (
+                                      <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-brand-green flex items-center justify-center">
+                                        <Check className="h-3 w-3 text-white" />
+                                      </div>
+                                    )}
+                                    <div className="absolute bottom-0 inset-x-0 bg-black/60 px-1 py-0.5">
+                                      <p className="text-[9px] text-white truncate text-center">{item.label}</p>
                                     </div>
-                                  )}
-                                  <div className="absolute bottom-0 inset-x-0 bg-black/60 px-1 py-0.5">
-                                    <p className="text-[9px] text-white truncate text-center">{item.label}</p>
-                                  </div>
-                                </button>
+                                  </button>
+                                  {/* Set as Background button — shown on hover */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setArtworkPreview(item.fileUrl);
+                                      setPendingArtworkFile(null);
+                                      if (editId) {
+                                        updateMutation.mutate({ id: editId, artworkUrl: item.fileUrl });
+                                        toast.success("Background image set");
+                                      }
+                                    }}
+                                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-brand-gold text-white shadow-md opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10"
+                                    title="Set as background image"
+                                  >
+                                    <Image className="h-3 w-3" />
+                                  </button>
+                                </div>
                               ))}
                             </div>
                           </ScrollArea>
@@ -811,7 +858,7 @@ export default function LandingPages() {
                     <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
                       <FileIcon className="h-5 w-5 text-red-500" />
                       <span className="text-sm font-medium flex-1">{pdfName}</span>
-                      <Button variant="ghost" size="sm" onClick={() => { setPdfName(null); setPendingPdf(null); if (editId) updateMutation.mutate({ id: editId, confirmationPdfUrl: null }); }}>
+                      <Button variant="ghost" size="sm" onClick={() => { setPdfName(null); setPendingPdfFile(null); if (editId) updateMutation.mutate({ id: editId, confirmationPdfUrl: null }); }}>
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
