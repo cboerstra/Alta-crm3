@@ -379,3 +379,9 @@
 - [x] Backend: userManagement.updateUser admin procedure
 - [x] Show success/error toast on save
 - [x] Make Delete/Revoke button always visible on pending invitations (not hover-only)
+
+## Telnyx Invalid Source Number Fix (User Request)
+- [x] Add dedicated updateTelnyxFromPhone procedure that only updates the phone, never the API key
+- [x] Normalize from phone to E.164 (+1XXXXXXXXXX) on save in the backend
+- [x] Normalize stored from phone to E.164 on every SMS send (belt-and-suspenders)
+- [x] Fix Settings UI to call the new procedure instead of re-calling connectTelnyx with masked API key

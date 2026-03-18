@@ -55,10 +55,14 @@ export const smsRouter = router({
       let toPhone = lead.phone.trim().replace(/[\s\-().]/g, "");
       if (!toPhone.startsWith("+")) toPhone = `+1${toPhone}`;
 
+      // Normalize the stored from number to E.164 as a safety net
+      let fromPhone = (telnyx.accountEmail ?? "").trim().replace(/[\s\-().]/g, "");
+      if (!fromPhone.startsWith("+")) fromPhone = `+1${fromPhone}`;
+
       const res = await fetch("https://api.telnyx.com/v2/messages", {
         method: "POST",
         headers: { Authorization: `Bearer ${telnyx.accessToken}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: telnyx.accountEmail, to: toPhone, text: resolvedBody }),
+        body: JSON.stringify({ from: fromPhone, to: toPhone, text: resolvedBody }),
       });
 
       let externalId: string | undefined;

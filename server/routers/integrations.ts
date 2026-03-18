@@ -194,14 +194,44 @@ export const integrationsRouter = router({
           message: detail ? `Telnyx error: ${detail}` : `Telnyx returned an unexpected error (HTTP ${res.status}).`,
         });
       }
+      // Normalize to E.164 (+1XXXXXXXXXX) before saving
+      let fromPhone = input.fromPhone.trim().replace(/[\s\-().]/g, "");
+      if (!fromPhone.startsWith("+")) fromPhone = `+1${fromPhone}`;
       await upsertIntegration({
         userId: ctx.user.id,
         provider: "twilio", // reuse existing provider key for backwards compat
         accessToken: apiKey,
-        accountEmail: input.fromPhone.trim(),
+        accountEmail: fromPhone,
         metadata: { enabled: true, provider: "telnyx" },
       });
       return { success: true };
+    }),
+
+  updateTelnyxFromPhone: adminProcedure
+    .input(z.object({ fromPhone: z.string().min(1, "From phone number is required") }))
+    .mutation(async ({ input, ctx }) => {
+      const telnyx = await getIntegration(ctx.user.id, "twilio");
+      if (!telnyx?.accessToken) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Telnyx is not configured. Connect it first." });
+      }
+      // Normalize to E.164
+      let fromPhone = input.fromPhone.trim().replace(/[\s\-().]/g, "");
+      if (!fromPhone.startsWith("+")) fromPhone = `+1${fromPhone}`;
+      if (!/^\+[1-9]\d{6,14}$/.test(fromPhone)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `"${input.fromPhone}" is not a valid phone number. Use E.164 format, e.g. +18016487711.`,
+        });
+      }
+      await upsertIntegration({
+        userId: ctx.user.id,
+        provider: "twilio",
+        accessToken: telnyx.accessToken,
+        accountId: telnyx.accountId ?? undefined,
+        accountEmail: fromPhone,
+        metadata: (telnyx.metadata as Record<string, unknown>) ?? { enabled: true, provider: "telnyx" },
+      });
+      return { success: true, fromPhone };
     }),
 
   testTelnyx: adminProcedure

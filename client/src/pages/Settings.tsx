@@ -115,7 +115,7 @@ export default function SettingsPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const updateFromPhone = trpc.integrations.connectTelnyx.useMutation({
+  const updateFromPhone = trpc.integrations.updateTelnyxFromPhone.useMutation({
     onSuccess: () => {
       toast.success("From phone number updated!");
       refetchStatus();
@@ -520,7 +520,7 @@ export default function SettingsPage() {
                             type="button"
                             className="text-xs bg-green-700 text-white rounded px-2 py-1 hover:bg-green-800 disabled:opacity-50"
                             disabled={!editFromPhone || updateFromPhone.isPending}
-                            onClick={() => updateFromPhone.mutate({ apiKey: telnyxDetails.apiKeyHint, fromPhone: editFromPhone })}
+                            onClick={() => updateFromPhone.mutate({ fromPhone: editFromPhone })}
                           >
                             {updateFromPhone.isPending ? "Saving..." : "Save"}
                           </button>
