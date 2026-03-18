@@ -134,26 +134,35 @@ export const integrationsRouter = router({
       accountEmail: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
+      console.log(`[connectZoom] Attempting to connect Zoom for userId=${ctx.user.id}, accountId=${input.accountId.trim()}`);
       // Validate credentials by fetching a test token
       try {
-        await getZoomAccessToken({
+        const token = await getZoomAccessToken({
           accountId: input.accountId.trim(),
           clientId: input.clientId.trim(),
           clientSecret: input.clientSecret.trim(),
         });
+        console.log(`[connectZoom] Token validation successful, token length=${token.length}`);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
+        console.error(`[connectZoom] Token validation FAILED: ${msg}`);
         throw new TRPCError({ code: "BAD_REQUEST", message: msg });
       }
       // Store: accountId → accountId, clientId → accessToken, clientSecret → refreshToken
-      await upsertIntegration({
-        userId: ctx.user.id,
-        provider: "zoom",
-        accountId: input.accountId.trim(),
-        accessToken: input.clientId.trim(),
-        refreshToken: input.clientSecret.trim(),
-        accountEmail: input.accountEmail?.trim(),
-      });
+      try {
+        await upsertIntegration({
+          userId: ctx.user.id,
+          provider: "zoom",
+          accountId: input.accountId.trim(),
+          accessToken: input.clientId.trim(),
+          refreshToken: input.clientSecret.trim(),
+          accountEmail: input.accountEmail?.trim(),
+        });
+        console.log(`[connectZoom] Zoom credentials saved to DB for userId=${ctx.user.id}`);
+      } catch (dbErr) {
+        console.error(`[connectZoom] DB save FAILED:`, dbErr);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Zoom credentials validated but failed to save to database. Please try again." });
+      }
       return { success: true };
     }),
 

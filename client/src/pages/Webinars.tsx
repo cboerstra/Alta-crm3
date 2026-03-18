@@ -50,6 +50,8 @@ export default function Webinars() {
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
   const { data: webinars, isLoading, refetch } = trpc.webinars.list.useQuery();
+  const { data: integrationStatus } = trpc.integrations.getStatus.useQuery();
+  const zoomConnected = integrationStatus?.zoom?.connected === true;
 
   const createMutation = trpc.webinars.create.useMutation({
     onSuccess: (data) => {
@@ -243,14 +245,24 @@ export default function Webinars() {
               <Separator />
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Zoom Integration</h3>
-                <div className="p-3 rounded-lg border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Video className="h-4 w-4 text-green-600" />
-                    <p className="text-sm font-medium text-green-700 dark:text-green-300">Auto-create Zoom Meeting</p>
+                {zoomConnected ? (
+                  <div className="p-3 rounded-lg border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Video className="h-4 w-4 text-green-600" />
+                      <p className="text-sm font-medium text-green-700 dark:text-green-300">Zoom Connected — Meeting will be auto-created</p>
+                    </div>
+                    <p className="text-xs text-green-600 dark:text-green-400">A Zoom meeting will be automatically created for the primary session and each additional session. The Zoom Webinar ID, Join URL, and Start URL will be populated automatically.</p>
                   </div>
-                  <p className="text-xs text-green-600 dark:text-green-400">When Zoom is connected in Settings, a Zoom meeting will be automatically created for the primary session and each additional session. The Zoom Webinar ID, Join URL, and Start URL will be populated automatically.</p>
-                </div>
-                <p className="text-xs text-muted-foreground">Or enter Zoom details manually (these will be overridden if Zoom auto-creates the meeting):</p>
+                ) : (
+                  <div className="p-3 rounded-lg border bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Video className="h-4 w-4 text-amber-600" />
+                      <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Zoom Not Connected</p>
+                    </div>
+                    <p className="text-xs text-amber-600 dark:text-amber-400">Go to <a href="/settings" className="underline font-medium">Settings → Zoom</a> to connect your Zoom account. Without Zoom connected, you must enter the Zoom details manually below.</p>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">{zoomConnected ? "Or override with manual Zoom details:" : "Enter Zoom details manually:"}:</p>
                 <div>
                   <Label>Zoom Webinar ID</Label>
                   <Input value={form.zoomWebinarId} onChange={(e) => setForm({ ...form, zoomWebinarId: e.target.value })} placeholder="Auto-populated from Zoom" />

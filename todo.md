@@ -461,3 +461,11 @@
 ## Rename "Primary Session" to "Add Zoom Session" (User Request)
 - [x] Rename "Primary Session" label in the create webinar form to "Add Zoom Session"
 - [x] Ensure the "Add Zoom Session" section triggers the Zoom API call on create
+
+## Zoom Credential Storage Bug (User Report - 3 fields entered, only 2 showing)
+- [x] Audited connectZoom mutation - all 3 fields stored correctly (accountId, accessToken=ClientID, refreshToken=ClientSecret)
+- [x] DB columns map correctly verified
+- [x] Added dynamic Zoom status check to Schedule Webinar dialog (green=connected, amber=not connected)
+- [x] Added detailed logging to connectZoom for debugging
+- [x] Added DB save error handling with clear error message
+- [x] Root cause: user deleted Zoom creds, Settings showed stale cached state, DB had 0 Zoom rows

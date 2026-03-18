@@ -1,0 +1,28 @@
+{
+  "query": "SELECT id, userId, provider, accountId, accountEmail, LEFT(accessToken, 10) as tokenHint, LEFT(refreshToken, 10) as secretHint FROM integrations ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dDnpezfLjGa5dS.c6434c886c49 --database 29hRXSpda4mmakt4QeiCJh --execute SELECT id, userId, provider, accountId, accountEmail, LEFT(accessToken, 10) as tokenHint, LEFT(refreshToken, 10) as secretHint FROM integrations ORDER BY id;",
+  "rows": [
+    {
+      "id": "180001",
+      "userId": "1",
+      "provider": "twilio",
+      "accountId": "AC49e55a11170240d5782a23a691c17dbd",
+      "accountEmail": "+18447306708",
+      "tokenHint": "e418c7ca6c",
+      "secretHint": "NULL"
+    },
+    {
+      "id": "180003",
+      "userId": "1",
+      "provider": "google_calendar",
+      "accountId": "NULL",
+      "accountEmail": "sboerstra@gmail.com",
+      "tokenHint": "1//04MfGLa",
+      "secretHint": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tuserId\tprovider\taccountId\taccountEmail\ttokenHint\tsecretHint\n180001\t1\ttwilio\tAC49e55a11170240d5782a23a691c17dbd\t+18447306708\te418c7ca6c\tNULL\n180003\t1\tgoogle_calendar\tNULL\tsboerstra@gmail.com\t1//04MfGLa\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 53
+}
