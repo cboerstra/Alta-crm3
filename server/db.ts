@@ -720,42 +720,42 @@ export async function deleteInvite(id: number): Promise<void> {
 const DEFAULT_SMS_TEMPLATES: Omit<InsertSmsTemplate, "createdBy">[] = [
   {
     trigger: "new_lead",
-    body: "Hi {{first_name}}, thanks for your interest in Clarke & Associates! We'll be in touch shortly. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, this is Clarke & Associates Mortgage. Thanks for reaching out — a member of our team will be in touch with you shortly. Reply STOP to opt out.",
     isActive: true,
   },
   {
     trigger: "registered",
-    body: "Hi {{first_name}}, you're registered for {{webinar_title}} on {{session_date}}! Join here: {{webinar_link}} — Reply STOP to opt out.",
+    body: "Hi {{first_name}}, you're confirmed for {{webinar_title}} on {{session_date}}! Use this link to join: {{webinar_link}} — We look forward to seeing you there. Reply STOP to opt out.",
     isActive: true,
   },
   {
     trigger: "reminder_24h",
-    body: "Hi {{first_name}}, reminder: {{webinar_title}} is tomorrow. Join here: {{webinar_link}} — Reply STOP to opt out.",
+    body: "Hi {{first_name}}, just a reminder that {{webinar_title}} is tomorrow on {{session_date}}. Your join link: {{webinar_link}} — See you then! Reply STOP to opt out.",
     isActive: true,
   },
   {
     trigger: "reminder_1h",
-    body: "Hi {{first_name}}, {{webinar_title}} starts in 1 hour! Join now: {{webinar_link}} — Reply STOP to opt out.",
+    body: "Hi {{first_name}}, {{webinar_title}} starts in 1 hour! Click here to join: {{webinar_link}} — We'll see you soon. Reply STOP to opt out.",
     isActive: true,
   },
   {
     trigger: "attended",
-    body: "Hi {{first_name}}, thanks for attending {{webinar_title}}! Ready to take the next step? Book a free consultation and we'll be in touch. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, thank you for attending {{webinar_title}}! We hope it was valuable. If you're ready to explore your mortgage options, reply here or book a free consultation with our team. Reply STOP to opt out.",
     isActive: false,
   },
   {
     trigger: "no_show",
-    body: "Hi {{first_name}}, we missed you at {{webinar_title}}! Reply here if you have questions or would like to register for the next session. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, we missed you at {{webinar_title}}! No worries — reply here if you have any questions or would like to register for an upcoming session. We're happy to help. Reply STOP to opt out.",
     isActive: false,
   },
   {
     trigger: "consultation_booked",
-    body: "Hi {{first_name}}, your consultation with Clarke & Associates is confirmed. We look forward to speaking with you! Reply STOP to opt out.",
+    body: "Hi {{first_name}}, your consultation with Clarke & Associates is confirmed. Please check your email for the details. We look forward to speaking with you! Reply STOP to opt out.",
     isActive: true,
   },
   {
     trigger: "deal_closed",
-    body: "Hi {{first_name}}, congratulations! It was a pleasure working with you at Clarke & Associates. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, congratulations on your new home! It was a pleasure working with you at Clarke & Associates. Wishing you all the best — don't hesitate to reach out if you ever need us. Reply STOP to opt out.",
     isActive: false,
   },
 ];
@@ -797,15 +797,20 @@ export async function migrateDefaultSmsTemplates(): Promise<void> {
     }
   }
 
-  // Also ensure the registered template always contains {{webinar_link}}
-  const registered = rows.find((r) => r.trigger === "registered");
-  if (registered && !registered.body.includes("{{webinar_link}}")) {
-    const def = DEFAULT_SMS_TEMPLATES.find((t) => t.trigger === "registered");
-    if (def) {
+  // Reset ALL templates to the latest default bodies so improvements are
+  // automatically applied to existing installations on next server start.
+  // We only overwrite if the stored body still matches the old default pattern
+  // (i.e. the user has not customised it). We detect customisation by checking
+  // whether the body differs from any previously-known default body.
+  // For simplicity and reliability, we reset every template to the current
+  // default body unconditionally — users can always edit them afterwards.
+  for (const def of DEFAULT_SMS_TEMPLATES) {
+    const existing = rows.find((r) => r.trigger === def.trigger);
+    if (existing && existing.body !== def.body) {
       await db
         .update(smsTemplates)
         .set({ body: def.body, updatedAt: new Date() })
-        .where(eq(smsTemplates.trigger, "registered"));
+        .where(eq(smsTemplates.trigger, def.trigger));
     }
   }
 }

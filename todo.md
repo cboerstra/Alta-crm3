@@ -385,3 +385,7 @@
 - [x] Normalize from phone to E.164 (+1XXXXXXXXXX) on save in the backend
 - [x] Normalize stored from phone to E.164 on every SMS send (belt-and-suspenders)
 - [x] Fix Settings UI to call the new procedure instead of re-calling connectTelnyx with masked API key
+
+## Improved Default SMS Templates (User Request)
+- [x] Update all five default template bodies with professional messages using correct placeholders
+- [x] DB migration auto-updates existing rows to new defaults on server start
