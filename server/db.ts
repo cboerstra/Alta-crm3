@@ -741,12 +741,12 @@ const DEFAULT_SMS_TEMPLATES: Omit<InsertSmsTemplate, "createdBy">[] = [
   {
     trigger: "attended",
     body: "Hi {{first_name}}, thank you for attending {{webinar_title}}! We hope it was valuable. If you're ready to explore your mortgage options, reply here or book a free consultation with our team. Reply STOP to opt out.",
-    isActive: false,
+    isActive: true,
   },
   {
     trigger: "no_show",
     body: "Hi {{first_name}}, we missed you at {{webinar_title}}! No worries — reply here if you have any questions or would like to register for an upcoming session. We're happy to help. Reply STOP to opt out.",
-    isActive: false,
+    isActive: true,
   },
   {
     trigger: "consultation_booked",
@@ -976,5 +976,90 @@ export async function notifyAdminsBySms(message: string): Promise<void> {
     );
   } catch (err) {
     console.error("[notifyAdminsBySms] Error sending admin notification:", err);
+  }
+}
+
+/**
+ * Resolve and send an SMS template to a specific lead via Telnyx.
+ * - Skips silently if the template is inactive, the lead has no phone, or Telnyx is not configured.
+ * - Resolves {{first_name}}, {{webinar_title}}, {{session_date}}, {{webinar_link}} placeholders.
+ * - Logs the sent message to sms_messages and the activity log.
+ * - Never throws — errors are caught and logged so callers are never blocked.
+ */
+export async function sendLeadSms(
+  leadId: number,
+  trigger: SmsTemplate["trigger"],
+  sentByUserId?: number,
+): Promise<void> {
+  try {
+    const [template, lead, config] = await Promise.all([
+      getSmsTemplate(trigger),
+      getLeadById(leadId),
+      getAnyTelnyxConfig(),
+    ]);
+    if (!template || !template.isActive) return;
+    if (!lead?.phone) return;
+    if (!config?.accessToken || !config?.accountEmail) return;
+    const meta = config.metadata as { enabled?: boolean } | null;
+    if (meta?.enabled === false) return;
+    if (!lead.smsConsent) return;
+
+    // Resolve placeholders
+    let body = template.body;
+    body = body.replace(/\{\{first_name\}\}/g, lead.firstName ?? "there");
+    body = body.replace(/\{\{last_name\}\}/g, lead.lastName ?? "");
+    body = body.replace(/\{\{full_name\}\}/g, [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "there");
+
+    // Resolve webinar-specific placeholders if the lead is linked to a webinar
+    if (lead.webinarId) {
+      const webinar = await getWebinarById(lead.webinarId);
+      if (webinar) {
+        body = body.replace(/\{\{webinar_title\}\}/g, webinar.title ?? "");
+        body = body.replace(/\{\{webinar_link\}\}/g, webinar.zoomJoinUrl ?? webinar.replayUrl ?? "");
+      }
+    }
+    if (lead.webinarSessionId) {
+      const session = await getWebinarSessionById(lead.webinarSessionId);
+      if (session) {
+        body = body.replace(/\{\{session_date\}\}/g, new Date(session.sessionDate).toLocaleString("en-US", {
+          month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+        }));
+        // Override webinar_link with session-specific join URL if available
+        if (session.zoomJoinUrl) body = body.replace(/\{\{webinar_link\}\}/g, session.zoomJoinUrl);
+      }
+    }
+    // Strip any unresolved placeholders
+    body = body.replace(/\{\{[^}]+\}\}/g, "");
+
+    // Normalize phone numbers to E.164
+    let toPhone = lead.phone.trim().replace(/[\s\-().]/g, "");
+    if (!toPhone.startsWith("+")) toPhone = `+1${toPhone}`;
+    let fromPhone = config.accountEmail.trim().replace(/[\s\-().]/g, "");
+    if (!fromPhone.startsWith("+")) fromPhone = `+1${fromPhone}`;
+
+    const res = await fetch("https://api.telnyx.com/v2/messages", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${config.accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: fromPhone, to: toPhone, text: body }),
+    });
+
+    if (res.ok) {
+      const db = await getDb();
+      if (db) {
+        await createSmsMessage({ leadId, direction: "outbound", body, status: "sent", sentBy: sentByUserId });
+        await logActivity({
+          leadId,
+          userId: sentByUserId,
+          type: "sms_sent",
+          title: `Auto SMS sent (${trigger})`,
+          content: body,
+        });
+      }
+    } else {
+      const err = await res.json().catch(() => ({})) as { errors?: Array<{ detail?: string }> };
+      console.error(`[sendLeadSms] Telnyx error for lead ${leadId} trigger ${trigger}:`, err.errors?.[0]?.detail ?? res.status);
+    }
+  } catch (err) {
+    console.error(`[sendLeadSms] Unexpected error for lead ${leadId} trigger ${trigger}:`, err);
   }
 }

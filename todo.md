@@ -389,3 +389,10 @@
 ## Improved Default SMS Templates (User Request)
 - [x] Update all five default template bodies with professional messages using correct placeholders
 - [x] DB migration auto-updates existing rows to new defaults on server start
+
+## Attended & No-Show Auto-Send SMS (User Request)
+- [x] Enable Attended and No-Show templates by default (isActive: true)
+- [x] After a webinar session ends, auto-send Attended SMS to leads marked as attended
+- [x] After a webinar session ends, auto-send No-Show SMS to leads marked as no_show
+- [x] Only send to leads with SMS consent and a valid phone number
+- [x] Log each auto-send in activity log

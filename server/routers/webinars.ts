@@ -6,7 +6,7 @@ import {
   createEmailReminder, getRemindersByLead,
   createWebinarSession, getWebinarSessions, deleteWebinarSessions, getWebinarSessionById,
   createLandingPage, getLandingPageBySlug, updateLandingPage,
-  deleteWebinar, deleteWebinars,
+  deleteWebinar, deleteWebinars, sendLeadSms,
 } from "../db";
 
 export const webinarsRouter = router({
@@ -265,7 +265,11 @@ export const webinarsRouter = router({
           : "webinar_registered",
         title: `Attendance updated: ${input.status.replace("_", " ")}`,
       });
-      // Schedule no-show follow-up
+      // Auto-send attended or no-show SMS template (fire-and-forget)
+      if (input.status === "attended" || input.status === "no_show") {
+        sendLeadSms(input.leadId, input.status, ctx.user.id).catch(() => {});
+      }
+      // Schedule no-show follow-up email
       if (input.status === "no_show" && lead.webinarId) {
         const webinar = await getWebinarById(lead.webinarId);
         if (webinar) {
