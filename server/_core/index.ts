@@ -8,7 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { processPendingReminders } from "../emailService";
-import { getIntegration, createSmsMessage, logActivity, getLeads, migrateDefaultSmsTemplates } from "../db";
+import { getIntegration, createSmsMessage, logActivity, getLeads, migrateDefaultSmsTemplates, runAutoMigrations } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -153,6 +153,11 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+
+  // Auto-run schema migrations to keep production DB in sync
+  runAutoMigrations().catch((err) =>
+    console.error("[Startup] Auto-migration error:", err)
+  );
 
   // One-time migration: upgrade legacy placeholder names in SMS templates
   migrateDefaultSmsTemplates().catch((err) =>

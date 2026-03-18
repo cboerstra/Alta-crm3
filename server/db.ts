@@ -1134,3 +1134,53 @@ export async function markSmsRead(leadId: number) {
     .set({ status: "delivered" })
     .where(and(eq(smsMessages.leadId, leadId), eq(smsMessages.direction, "inbound"), eq(smsMessages.status, "received")));
 }
+
+
+// ─── Auto-Migrations ─────────────────────────────────────────────────────────
+// Runs safe ALTER TABLE statements on startup to ensure the production DB
+// schema matches what the code expects. Each migration checks if the column
+// already exists before adding it, so it's idempotent and safe to run
+// on every server start.
+export async function runAutoMigrations(): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  const migrations: { table: string; column: string; sql: string }[] = [
+    // 0010: Add zoomWebinarId to webinar_sessions
+    {
+      table: "webinar_sessions",
+      column: "zoomWebinarId",
+      sql: "ALTER TABLE `webinar_sessions` ADD COLUMN `zoomWebinarId` varchar(256) DEFAULT NULL",
+    },
+    // 0010: Add replayUrl to webinar_sessions
+    {
+      table: "webinar_sessions",
+      column: "replayUrl",
+      sql: "ALTER TABLE `webinar_sessions` ADD COLUMN `replayUrl` text DEFAULT NULL",
+    },
+  ];
+
+  for (const m of migrations) {
+    try {
+      // Check if column already exists
+      const [rows] = await (db as any).execute(
+        `SELECT COUNT(*) as cnt FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '${m.table}' AND COLUMN_NAME = '${m.column}'`
+      );
+      const exists = Array.isArray(rows) && (rows as any)[0]?.cnt > 0;
+      if (!exists) {
+        await (db as any).execute(m.sql);
+        console.log(`[Auto-Migration] Added column ${m.table}.${m.column}`);
+      }
+    } catch (err) {
+      // Column might already exist (duplicate column error 1060) — that's fine
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("Duplicate column")) {
+        // Already exists, skip
+      } else {
+        console.error(`[Auto-Migration] Failed to add ${m.table}.${m.column}:`, msg);
+      }
+    }
+  }
+
+  console.log("[Auto-Migration] Schema check complete");
+}

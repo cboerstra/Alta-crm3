@@ -444,3 +444,9 @@
 - [x] Make session Zoom fields (webinarId, joinUrl, replayUrl) available in Landing Page Editor
 - [x] Auto-populate landing page Zoom fields from the selected session's data
 - [x] Update tests for new schema fields
+
+## Production DB Schema Mismatch Bug (User Report)
+- [x] Production webinar_sessions table missing zoomWebinarId, replayUrl columns
+- [x] Added runAutoMigrations() that runs on every server start to auto-add missing columns
+- [x] Migration SQL file 0010_right_paibok.sql exists in drizzle folder
+- [x] All 82 tests pass, 0 TypeScript errors
