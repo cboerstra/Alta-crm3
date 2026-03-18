@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
-import { Plus, Video, Calendar, Clock, ExternalLink, Trash2, FileText, Search, Filter, Users, X } from "lucide-react";
+import { Plus, Video, Calendar, Clock, ExternalLink, Trash2, FileText, Search, Filter, Users, X, CheckCircle, Loader2, Copy, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 const statusColors: Record<string, string> = {
@@ -24,12 +24,25 @@ const statusColors: Record<string, string> = {
   cancelled: "bg-red-100 text-red-700",
 };
 
-type SessionDraft = {
-  id: string;
-  date: string;
-  durationMinutes: number;
+// Created webinar result with Zoom data
+type CreatedWebinar = {
+  id: number;
+  zoomWebinarId?: string;
+  zoomJoinUrl?: string;
+  zoomStartUrl?: string;
+  zoomCreated: boolean;
+  landingPageId?: number;
+};
+
+// Additional session result with Zoom data
+type CreatedSession = {
+  sessionId: number;
   label: string;
-  zoomJoinUrl: string;
+  zoomWebinarId?: string;
+  zoomJoinUrl?: string;
+  zoomStartUrl?: string;
+  zoomCreated: boolean;
+  sessionDate: string;
 };
 
 export default function Webinars() {
@@ -38,12 +51,20 @@ export default function Webinars() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
+
+  // Form state for step 1
   const [form, setForm] = useState({
     title: "", description: "", scheduledAt: "", durationMinutes: 60,
-    zoomJoinUrl: "", zoomWebinarId: "", replayUrl: "",
     createLandingPage: true, landingPageSlug: "",
   });
-  const [additionalSessions, setAdditionalSessions] = useState<SessionDraft[]>([]);
+
+  // Step 2 state: after webinar is created
+  const [createdWebinar, setCreatedWebinar] = useState<CreatedWebinar | null>(null);
+  const [createdSessions, setCreatedSessions] = useState<CreatedSession[]>([]);
+
+  // Additional session form (shown after primary is created)
+  const [addSessionForm, setAddSessionForm] = useState({ date: "", durationMinutes: 60, label: "" });
+  const [addingSession, setAddingSession] = useState(false);
 
   // Selection state
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -55,21 +76,42 @@ export default function Webinars() {
 
   const createMutation = trpc.webinars.create.useMutation({
     onSuccess: (data) => {
+      setCreatedWebinar(data);
       if (data.zoomCreated) {
         toast.success(`Zoom meeting created! ID: ${data.zoomWebinarId}`, { duration: 5000 });
-      } else if (!data.zoomCreated && data.zoomWebinarId) {
-        toast.success("Webinar created with manual Zoom details");
-      } else {
-        toast.success("Webinar created successfully!");
       }
-      if (data.landingPageId) toast.success("Landing page auto-created and linked", { duration: 4000 });
-      setShowCreate(false);
-      resetForm();
+      if (data.landingPageId) {
+        toast.success("Landing page auto-created and linked", { duration: 4000 });
+      }
       refetch();
-      // Navigate to the webinar detail page so user can see the populated Zoom fields
-      setLocation(`/webinars/${data.id}`);
     },
     onError: (e) => toast.error(e.message),
+  });
+
+  const addSessionMutation = trpc.webinars.addSession.useMutation({
+    onSuccess: (data) => {
+      setCreatedSessions(prev => [...prev, {
+        sessionId: data.id,
+        label: addSessionForm.label || "Additional Session",
+        zoomWebinarId: data.zoomMeetingId ?? undefined,
+        zoomJoinUrl: data.zoomJoinUrl ?? undefined,
+        zoomStartUrl: data.zoomStartUrl ?? undefined,
+        zoomCreated: data.zoomCreated ?? false,
+        sessionDate: addSessionForm.date,
+      }]);
+      setAddSessionForm({ date: "", durationMinutes: 60, label: "" });
+      setAddingSession(false);
+      if (data.zoomCreated) {
+        toast.success(`Zoom meeting created for additional session! ID: ${data.zoomMeetingId}`);
+      } else {
+        toast.success("Session added");
+      }
+      refetch();
+    },
+    onError: (e) => {
+      toast.error(e.message);
+      setAddingSession(false);
+    },
   });
 
   const deleteMutation = trpc.webinars.delete.useMutation({
@@ -91,20 +133,11 @@ export default function Webinars() {
   });
 
   function resetForm() {
-    setForm({ title: "", description: "", scheduledAt: "", durationMinutes: 60, zoomJoinUrl: "", zoomWebinarId: "", replayUrl: "", createLandingPage: true, landingPageSlug: "" });
-    setAdditionalSessions([]);
-  }
-
-  function addSession() {
-    setAdditionalSessions(prev => [...prev, { id: crypto.randomUUID(), date: "", durationMinutes: 60, label: "", zoomJoinUrl: "" }]);
-  }
-
-  function updateSession(id: string, field: keyof SessionDraft, value: string | number) {
-    setAdditionalSessions(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
-  }
-
-  function removeSession(id: string) {
-    setAdditionalSessions(prev => prev.filter(s => s.id !== id));
+    setForm({ title: "", description: "", scheduledAt: "", durationMinutes: 60, createLandingPage: true, landingPageSlug: "" });
+    setCreatedWebinar(null);
+    setCreatedSessions([]);
+    setAddSessionForm({ date: "", durationMinutes: 60, label: "" });
+    setAddingSession(false);
   }
 
   const handleCreate = () => {
@@ -115,18 +148,26 @@ export default function Webinars() {
       description: form.description || undefined,
       scheduledAt: new Date(form.scheduledAt).getTime(),
       durationMinutes: form.durationMinutes,
-      zoomJoinUrl: form.zoomJoinUrl || undefined,
-      zoomWebinarId: form.zoomWebinarId || undefined,
-      replayUrl: form.replayUrl || undefined,
       createLandingPage: form.createLandingPage,
       landingPageSlug: form.landingPageSlug || undefined,
-      additionalSessions: additionalSessions.filter(s => s.date).map(s => ({
-        sessionDate: new Date(s.date).getTime(),
-        durationMinutes: s.durationMinutes,
-        label: s.label || undefined,
-        zoomJoinUrl: s.zoomJoinUrl || undefined,
-      })),
     });
+  };
+
+  const handleAddSession = () => {
+    if (!createdWebinar) return;
+    if (!addSessionForm.date) return toast.error("Session date & time is required");
+    setAddingSession(true);
+    addSessionMutation.mutate({
+      webinarId: createdWebinar.id,
+      sessionDate: new Date(addSessionForm.date).getTime(),
+      durationMinutes: addSessionForm.durationMinutes,
+      label: addSessionForm.label || undefined,
+    });
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard`);
   };
 
   const autoSlug = form.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -171,6 +212,69 @@ export default function Webinars() {
     setSelected(next);
   };
 
+  // Zoom credentials display component
+  const ZoomCredentialsPanel = ({ label, zoomWebinarId, zoomJoinUrl, zoomStartUrl, zoomCreated }: {
+    label: string;
+    zoomWebinarId?: string;
+    zoomJoinUrl?: string;
+    zoomStartUrl?: string;
+    zoomCreated: boolean;
+  }) => (
+    <div className="rounded-lg border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <CheckCircle className="h-5 w-5 text-green-600" />
+        <p className="text-sm font-semibold text-green-700 dark:text-green-300">{label} — Zoom Meeting Created</p>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground font-medium">Zoom Webinar ID</p>
+            <p className="text-sm font-mono font-semibold truncate">{zoomWebinarId || "—"}</p>
+          </div>
+          {zoomWebinarId && (
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => copyToClipboard(zoomWebinarId, "Zoom Webinar ID")}>
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground font-medium">Zoom Join URL</p>
+            {zoomJoinUrl ? (
+              <a href={zoomJoinUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-green underline break-all">{zoomJoinUrl}</a>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">—</p>
+            )}
+          </div>
+          {zoomJoinUrl && (
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => copyToClipboard(zoomJoinUrl, "Join URL")}>
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground font-medium">Zoom Start URL (Host)</p>
+            {zoomStartUrl ? (
+              <a href={zoomStartUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-green underline break-all line-clamp-1">{zoomStartUrl.substring(0, 80)}...</a>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">—</p>
+            )}
+          </div>
+          {zoomStartUrl && (
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => copyToClipboard(zoomStartUrl, "Start URL")}>
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground font-medium">Replay URL</p>
+          <p className="text-sm text-muted-foreground italic">Available after webinar ends — edit on the webinar detail page</p>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -189,123 +293,259 @@ export default function Webinars() {
           </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle style={{ fontFamily: "Raleway, sans-serif" }}>Schedule New Webinar</DialogTitle>
+              <DialogTitle style={{ fontFamily: "Raleway, sans-serif" }}>
+                {createdWebinar ? "Webinar Created" : "Schedule New Webinar"}
+              </DialogTitle>
             </DialogHeader>
-            <div className="space-y-5 py-2">
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Event Details</h3>
-                <div>
-                  <Label>Webinar Title <span className="text-red-500">*</span></Label>
-                  <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="First-Time Homebuyer Webinar" />
-                </div>
-                <div>
-                  <Label>Description</Label>
-                  <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="What attendees will learn..." rows={3} />
-                </div>
-              </div>
-              <Separator />
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2"><Video className="h-4 w-4" /> Add Zoom Session <span className="text-red-500">*</span></h3>
-                <p className="text-xs text-muted-foreground -mt-2">Set the date & time below. A Zoom meeting will be created automatically when Zoom is connected.</p>
-                <div className="grid grid-cols-2 gap-3">
+
+            {/* ─── STEP 1: Create Webinar Form ─── */}
+            {!createdWebinar && (
+              <div className="space-y-5 py-2">
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Event Details</h3>
                   <div>
-                    <Label>Date & Time <span className="text-red-500">*</span></Label>
-                    <Input type="datetime-local" value={form.scheduledAt} onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })} />
+                    <Label>Webinar Title <span className="text-red-500">*</span></Label>
+                    <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="First-Time Homebuyer Webinar" />
                   </div>
                   <div>
-                    <Label>Duration (minutes)</Label>
-                    <Input type="number" value={form.durationMinutes} onChange={(e) => setForm({ ...form, durationMinutes: Number(e.target.value) })} />
+                    <Label>Description</Label>
+                    <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="What attendees will learn..." rows={3} />
                   </div>
                 </div>
+                <Separator />
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                    <Video className="h-4 w-4" /> Zoom Session <span className="text-red-500">*</span>
+                  </h3>
+                  <p className="text-xs text-muted-foreground -mt-2">Set the date & time for your webinar session.</p>
+
+                  {/* Zoom status banner */}
+                  {zoomConnected ? (
+                    <div className="p-3 rounded-lg border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        <p className="text-sm font-medium text-green-700 dark:text-green-300">Zoom Connected</p>
+                      </div>
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-1">A Zoom meeting will be automatically created and the Zoom Webinar ID, Join URL, and Start URL will be displayed after you click "Create."</p>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-lg border bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-amber-600" />
+                        <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Zoom Not Connected</p>
+                      </div>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        Go to <a href="/settings" className="underline font-medium">Settings → Zoom</a> to connect your Zoom account. Without Zoom, the session will be created without Zoom meeting details.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Date & Time <span className="text-red-500">*</span></Label>
+                      <Input type="datetime-local" value={form.scheduledAt} onChange={(e) => setForm({ ...form, scheduledAt: e.target.value })} />
+                    </div>
+                    <div>
+                      <Label>Duration (minutes)</Label>
+                      <Input type="number" value={form.durationMinutes} onChange={(e) => setForm({ ...form, durationMinutes: Number(e.target.value) })} />
+                    </div>
+                  </div>
+                </div>
+                <Separator />
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Landing Page</h3>
+                  <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
+                    <div>
+                      <p className="text-sm font-medium">Auto-create registration landing page</p>
+                      <p className="text-xs text-muted-foreground">A lead capture page will be created and linked to this webinar</p>
+                    </div>
+                    <Switch checked={form.createLandingPage} onCheckedChange={(v) => setForm({ ...form, createLandingPage: v })} />
+                  </div>
+                  {form.createLandingPage && (
+                    <div>
+                      <Label>Custom URL Slug (optional)</Label>
+                      <div className="text-xs text-muted-foreground mb-1">/lp/<span className="font-mono">{form.landingPageSlug || autoSlug || "auto-generated"}</span></div>
+                      <Input
+                        value={form.landingPageSlug}
+                        onChange={(e) => setForm({ ...form, landingPageSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })}
+                        placeholder={autoSlug || "custom-slug"}
+                      />
+                    </div>
+                  )}
+                </div>
+                <Button
+                  className="w-full bg-brand-green hover:bg-brand-green-dark text-white h-11"
+                  disabled={!form.title || !form.scheduledAt || createMutation.isPending}
+                  onClick={handleCreate}
+                >
+                  {createMutation.isPending ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      {zoomConnected ? "Creating Webinar & Zoom Meeting..." : "Creating Webinar..."}
+                    </span>
+                  ) : (
+                    zoomConnected ? "Create Webinar & Zoom Session" : "Create Webinar"
+                  )}
+                </Button>
               </div>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Additional Sessions</h3>
-                  <Button variant="outline" size="sm" onClick={addSession} className="gap-1">
-                    <Plus className="h-3 w-3" /> Add Session
+            )}
+
+            {/* ─── STEP 2: Webinar Created — Show Zoom Credentials ─── */}
+            {createdWebinar && (
+              <div className="space-y-5 py-2">
+                {/* Success header */}
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                  <CheckCircle className="h-6 w-6 text-green-600 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-green-700 dark:text-green-300">Webinar "{form.title}" created successfully!</p>
+                    {createdWebinar.landingPageId && (
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">Landing page auto-created and linked.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Primary Session Zoom Credentials */}
+                <div>
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Primary Session — Zoom Credentials</h3>
+                  {createdWebinar.zoomCreated ? (
+                    <ZoomCredentialsPanel
+                      label="Primary Session"
+                      zoomWebinarId={createdWebinar.zoomWebinarId}
+                      zoomJoinUrl={createdWebinar.zoomJoinUrl}
+                      zoomStartUrl={createdWebinar.zoomStartUrl}
+                      zoomCreated={true}
+                    />
+                  ) : (
+                    <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 p-4">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-5 w-5 text-amber-600" />
+                        <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Zoom meeting was not created</p>
+                      </div>
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        {zoomConnected
+                          ? "Zoom is connected but the meeting creation failed. Check your Zoom credentials in Settings → Zoom, or add Zoom details manually on the webinar detail page."
+                          : "Zoom is not connected. Go to Settings → Zoom to connect, then add sessions from the webinar detail page."}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Additional Sessions Created */}
+                {createdSessions.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Additional Sessions</h3>
+                    {createdSessions.map((session, idx) => (
+                      <div key={session.sessionId}>
+                        {session.zoomCreated ? (
+                          <ZoomCredentialsPanel
+                            label={session.label || `Session ${idx + 2}`}
+                            zoomWebinarId={session.zoomWebinarId}
+                            zoomJoinUrl={session.zoomJoinUrl}
+                            zoomStartUrl={session.zoomStartUrl}
+                            zoomCreated={true}
+                          />
+                        ) : (
+                          <div className="rounded-lg border p-3 bg-muted/20">
+                            <p className="text-sm font-medium">{session.label || `Session ${idx + 2}`}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(session.sessionDate).toLocaleString()} — No Zoom meeting created
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <Separator />
+
+                {/* Add Additional Session Form */}
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                    <Plus className="h-4 w-4" /> Add Additional Session
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Offer multiple dates so leads can choose the session that works best for them.
+                    {zoomConnected && " A Zoom meeting will be automatically created for each additional session."}
+                  </p>
+                  <div className="p-3 rounded-lg border bg-card space-y-3">
+                    <div>
+                      <Label>Session Label (optional)</Label>
+                      <Input
+                        value={addSessionForm.label}
+                        onChange={(e) => setAddSessionForm({ ...addSessionForm, label: e.target.value })}
+                        placeholder="e.g., Evening Session, Saturday Session"
+                        className="text-sm"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>Date & Time <span className="text-red-500">*</span></Label>
+                        <Input
+                          type="datetime-local"
+                          value={addSessionForm.date}
+                          onChange={(e) => setAddSessionForm({ ...addSessionForm, date: e.target.value })}
+                          className="text-sm"
+                        />
+                      </div>
+                      <div>
+                        <Label>Duration (minutes)</Label>
+                        <Input
+                          type="number"
+                          value={addSessionForm.durationMinutes}
+                          onChange={(e) => setAddSessionForm({ ...addSessionForm, durationMinutes: Number(e.target.value) })}
+                          className="text-sm"
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full gap-2"
+                      disabled={!addSessionForm.date || addSessionMutation.isPending}
+                      onClick={handleAddSession}
+                    >
+                      {addSessionMutation.isPending ? (
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          {zoomConnected ? "Creating Session & Zoom Meeting..." : "Adding Session..."}
+                        </span>
+                      ) : (
+                        <>
+                          <Plus className="h-4 w-4" />
+                          {zoomConnected ? "Add Session & Create Zoom Meeting" : "Add Session"}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Done button */}
+                <div className="flex gap-3">
+                  <Button
+                    className="flex-1 bg-brand-green hover:bg-brand-green-dark text-white h-11"
+                    onClick={() => {
+                      setShowCreate(false);
+                      resetForm();
+                      setLocation(`/webinars/${createdWebinar.id}`);
+                    }}
+                  >
+                    Go to Webinar Detail Page
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-11"
+                    onClick={() => {
+                      setShowCreate(false);
+                      resetForm();
+                    }}
+                  >
+                    Close
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">Offer multiple dates so leads can choose the session that works best for them.</p>
-                {additionalSessions.map((session) => (
-                  <div key={session.id} className="p-3 rounded-lg border bg-card space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Input placeholder="Session label (e.g., Evening Session)" value={session.label} onChange={(e) => updateSession(session.id, "label", e.target.value)} className="text-sm h-8" />
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive ml-2" onClick={() => removeSession(session.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input type="datetime-local" value={session.date} onChange={(e) => updateSession(session.id, "date", e.target.value)} className="text-sm h-8" />
-                      <Input type="number" placeholder="Duration (min)" value={session.durationMinutes} onChange={(e) => updateSession(session.id, "durationMinutes", Number(e.target.value))} className="text-sm h-8" />
-                    </div>
-                    <Input placeholder="Zoom join URL (optional)" value={session.zoomJoinUrl} onChange={(e) => updateSession(session.id, "zoomJoinUrl", e.target.value)} className="text-sm h-8" />
-                  </div>
-                ))}
               </div>
-              <Separator />
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Zoom Integration</h3>
-                {zoomConnected ? (
-                  <div className="p-3 rounded-lg border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Video className="h-4 w-4 text-green-600" />
-                      <p className="text-sm font-medium text-green-700 dark:text-green-300">Zoom Connected — Meeting will be auto-created</p>
-                    </div>
-                    <p className="text-xs text-green-600 dark:text-green-400">A Zoom meeting will be automatically created for the primary session and each additional session. The Zoom Webinar ID, Join URL, and Start URL will be populated automatically.</p>
-                  </div>
-                ) : (
-                  <div className="p-3 rounded-lg border bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Video className="h-4 w-4 text-amber-600" />
-                      <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Zoom Not Connected</p>
-                    </div>
-                    <p className="text-xs text-amber-600 dark:text-amber-400">Go to <a href="/settings" className="underline font-medium">Settings → Zoom</a> to connect your Zoom account. Without Zoom connected, you must enter the Zoom details manually below.</p>
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground">{zoomConnected ? "Or override with manual Zoom details:" : "Enter Zoom details manually:"}:</p>
-                <div>
-                  <Label>Zoom Webinar ID</Label>
-                  <Input value={form.zoomWebinarId} onChange={(e) => setForm({ ...form, zoomWebinarId: e.target.value })} placeholder="Auto-populated from Zoom" />
-                </div>
-                <div>
-                  <Label>Zoom Join URL</Label>
-                  <Input value={form.zoomJoinUrl} onChange={(e) => setForm({ ...form, zoomJoinUrl: e.target.value })} placeholder="Auto-populated from Zoom" />
-                </div>
-                <div>
-                  <Label>Replay URL (for no-show follow-up)</Label>
-                  <Input value={form.replayUrl} onChange={(e) => setForm({ ...form, replayUrl: e.target.value })} placeholder="Available after webinar ends" />
-                </div>
-              </div>
-              <Separator />
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Landing Page</h3>
-                <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
-                  <div>
-                    <p className="text-sm font-medium">Auto-create registration landing page</p>
-                    <p className="text-xs text-muted-foreground">A lead capture page will be created and linked to this webinar</p>
-                  </div>
-                  <Switch checked={form.createLandingPage} onCheckedChange={(v) => setForm({ ...form, createLandingPage: v })} />
-                </div>
-                {form.createLandingPage && (
-                  <div>
-                    <Label>Custom URL Slug (optional)</Label>
-                    <div className="text-xs text-muted-foreground mb-1">/lp/<span className="font-mono">{form.landingPageSlug || autoSlug || "auto-generated"}</span></div>
-                    <Input
-                      value={form.landingPageSlug}
-                      onChange={(e) => setForm({ ...form, landingPageSlug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })}
-                      placeholder={autoSlug || "custom-slug"}
-                    />
-                  </div>
-                )}
-              </div>
-              <Button
-                className="w-full bg-brand-green hover:bg-brand-green-dark text-white h-11"
-                disabled={!form.title || !form.scheduledAt || createMutation.isPending}
-                onClick={handleCreate}
-              >
-                {createMutation.isPending ? "Creating Webinar & Zoom Meeting..." : "Schedule Webinar & Create Event"}
-              </Button>
-            </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>

@@ -469,3 +469,18 @@
 - [x] Added detailed logging to connectZoom for debugging
 - [x] Added DB save error handling with clear error message
 - [x] Root cause: user deleted Zoom creds, Settings showed stale cached state, DB had 0 Zoom rows
+
+## Zoom fields not populating after Add Session (User Report)
+- [ ] The "+ Add Session" button in Schedule Webinar dialog only adds a blank form row — it does NOT call Zoom API
+- [ ] The Zoom API should be called when user clicks "Schedule Webinar & Create Event" and results should display on the detail page
+- [ ] Verify the backend create mutation actually calls Zoom API and returns the Zoom fields
+- [ ] Verify the WebinarDetail page displays the Zoom fields from the created sessions
+
+## Redesign Schedule Webinar Flow (User Request)
+- [x] After clicking "Create Webinar & Zoom Session", stay in dialog and show Zoom credentials (Webinar ID, Join URL, Start URL, Replay URL)
+- [x] Move "Add Additional Session" form below the Zoom credentials display
+- [x] Remove the pre-creation "Additional Sessions" section — sessions are added after the primary is created
+- [x] Each additional session also calls Zoom API and shows its credentials inline
+- [x] Added copy-to-clipboard buttons for all Zoom fields
+- [x] Dynamic Zoom status banner (green=connected, amber=not connected)
+- [x] All 82 tests pass, 0 TypeScript errors
