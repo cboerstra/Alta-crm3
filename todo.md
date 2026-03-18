@@ -484,3 +484,13 @@
 - [x] Added copy-to-clipboard buttons for all Zoom fields
 - [x] Dynamic Zoom status banner (green=connected, amber=not connected)
 - [x] All 82 tests pass, 0 TypeScript errors
+
+## Local File System Storage for Media Library (Hostinger)
+- [x] Audit current Media Library upload code and storage implementation
+- [x] Add multer dependency for multipart file uploads
+- [x] Create /uploads directory served as static files by Express
+- [x] Add POST /api/upload endpoint that saves files to /uploads
+- [x] Update media.upload tRPC mutation to accept URL instead of base64
+- [x] Update frontend Media Library to use /api/upload multipart endpoint
+- [x] Removed dependency on BUILT_IN_FORGE_API_URL/BUILT_IN_FORGE_API_KEY for uploads
+- [x] All 82 tests pass, 0 TypeScript errors

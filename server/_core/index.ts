@@ -2,6 +2,9 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
+import fs from "fs";
+import multer from "multer";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
@@ -125,6 +128,73 @@ async function startServer() {
     } catch (err) {
       console.error("[Telnyx] Status callback error:", err);
       res.status(200).json({ received: true });
+    }
+  });
+
+  // ── Local File Upload Endpoint ──────────────────────────────────────────────
+  // Determine uploads directory: prefer a persistent path outside the app bundle
+  const uploadsDir = process.env.UPLOADS_DIR
+    ? path.resolve(process.env.UPLOADS_DIR)
+    : path.resolve(process.cwd(), "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log(`[Upload] Created uploads directory: ${uploadsDir}`);
+  }
+
+  // Serve uploaded files as static assets under /uploads/*
+  app.use("/uploads", express.static(uploadsDir, {
+    maxAge: "7d",
+    etag: true,
+  }));
+
+  // Multer storage: preserve original extension, add nanoid for uniqueness
+  const storage = multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase() || ".bin";
+      const name = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}${ext}`;
+      cb(null, name);
+    },
+  });
+  const upload = multer({
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+    fileFilter: (_req, file, cb) => {
+      const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
+      if (allowed.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error(`File type not allowed: ${file.mimetype}`));
+      }
+    },
+  });
+
+  // POST /api/upload — authenticated multipart upload
+  app.post("/api/upload", upload.single("file"), async (req, res) => {
+    try {
+      // Verify session using the same SDK used by tRPC context
+      const { sdk } = await import("./sdk");
+      let userId: number | null = null;
+      try {
+        const user = await sdk.authenticateRequest(req as any);
+        userId = user?.id ?? null;
+      } catch {
+        // not authenticated
+      }
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      if (!req.file) {
+        res.status(400).json({ error: "No file provided" });
+        return;
+      }
+      // Build the public URL for this file
+      const fileUrl = `/uploads/${req.file.filename}`;
+      res.json({ url: fileUrl, filename: req.file.filename, size: req.file.size });
+    } catch (err: any) {
+      console.error("[Upload] Error:", err);
+      res.status(500).json({ error: err.message ?? "Upload failed" });
     }
   });
 

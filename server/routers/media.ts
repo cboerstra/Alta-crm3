@@ -23,33 +23,31 @@ export const mediaRouter = router({
       return results;
     }),
 
-  // Upload a new media item
+  // Upload a new media item (accepts a URL returned by /api/upload)
   upload: adminProcedure
     .input(z.object({
-      fileBase64: z.string(),
+      fileUrl: z.string(),          // URL from /api/upload (e.g. /uploads/filename.jpg)
+      fileKey: z.string(),          // filename on disk
       fileName: z.string(),
       contentType: z.string(),
+      fileSize: z.number().default(0),
       fileType: z.enum(["logo", "image", "background", "other"]).default("image"),
       label: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) throw new Error("Database not available");
-      const buffer = Buffer.from(input.fileBase64, "base64");
-      const ext = input.fileName.split(".").pop() ?? "jpg";
-      const key = `media-library/${input.fileType}/${nanoid()}.${ext}`;
-      const { url } = await storagePut(key, buffer, input.contentType);
       const [result] = await db.insert(mediaLibrary).values({
         uploadedBy: ctx.user.id,
         fileName: input.fileName,
-        fileUrl: url,
-        fileKey: key,
+        fileUrl: input.fileUrl,
+        fileKey: input.fileKey,
         fileType: input.fileType,
         mimeType: input.contentType,
-        fileSize: buffer.length,
+        fileSize: input.fileSize,
         label: input.label || input.fileName.replace(/\.[^.]+$/, ""),
       }).$returningId();
-      return { id: result.id, url, key };
+      return { id: result.id, url: input.fileUrl, key: input.fileKey };
     }),
 
   // Update media item label/type

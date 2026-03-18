@@ -171,30 +171,49 @@ export default function SettingsPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files?.length) return;
     setUploading(true);
-    Array.from(files).forEach((file) => {
+    const uploads = Array.from(files);
+    let completed = 0;
+    for (const file of uploads) {
       if (file.size > 10 * 1024 * 1024) {
         toast.error(`${file.name} is too large (max 10MB)`);
-        return;
+        completed++;
+        if (completed === uploads.length) setUploading(false);
+        continue;
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = (reader.result as string).split(",")[1];
+      try {
+        // Step 1: Upload the file to the server via multipart POST
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/upload", { method: "POST", body: formData });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: res.statusText }));
+          throw new Error(err.error ?? "Upload failed");
+        }
+        const { url, filename, size } = await res.json();
+        // Step 2: Save the file metadata to the database
         const isLogo = file.name.toLowerCase().includes("logo");
         uploadMedia.mutate({
-          fileBase64: base64,
+          fileUrl: url,
+          fileKey: filename,
           fileName: file.name,
           contentType: file.type,
+          fileSize: size ?? file.size,
           fileType: isLogo ? "logo" : "image",
           label: file.name.replace(/\.[^.]+$/, ""),
         });
-      };
-      reader.readAsDataURL(file);
-    });
-    if (fileInputRef.current) fileInputRef.current.value = "";
+      } catch (err: any) {
+        toast.error(`Failed to upload ${file.name}: ${err.message}`);
+        setUploading(false);
+      }
+      completed++;
+      if (completed === uploads.length) {
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    }
   };
 
   const openEditDialog = (item: MediaItem) => {
