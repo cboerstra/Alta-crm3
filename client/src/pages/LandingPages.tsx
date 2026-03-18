@@ -173,6 +173,7 @@ export default function LandingPages() {
 
   const [pendingArtworkFile, setPendingArtworkFile] = useState<File | null>(null);
   const [pendingPdfFile, setPendingPdfFile] = useState<File | null>(null);
+  const [savingMedia, setSavingMedia] = useState(false);
 
   // Load existing media selections when editing
   const { data: existingMedia } = trpc.media.getForLandingPage.useQuery(
@@ -814,7 +815,34 @@ export default function LandingPages() {
                       {/* Selected Media Summary */}
                       {selectedMedia.length > 0 && (
                         <div className="p-3 rounded-lg bg-brand-green/5 border border-brand-green/15">
-                          <p className="text-xs font-semibold text-brand-green mb-2">{selectedMedia.length} item{selectedMedia.length > 1 ? "s" : ""} selected for foreground</p>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-brand-green">{selectedMedia.length} item{selectedMedia.length > 1 ? "s" : ""} selected for foreground</p>
+                            {editId && (
+                              <Button
+                                size="sm"
+                                className="h-7 px-3 text-xs bg-brand-green hover:bg-brand-green-dark text-white gap-1"
+                                disabled={savingMedia}
+                                onClick={async () => {
+                                  if (!editId) return;
+                                  setSavingMedia(true);
+                                  try {
+                                    await new Promise<void>((resolve, reject) => {
+                                      setMediaMutation.mutate(
+                                        { landingPageId: editId, items: selectedMedia },
+                                        { onSuccess: () => { toast.success("Media saved"); resolve(); }, onError: (e) => reject(e) }
+                                      );
+                                    });
+                                  } catch (e: any) {
+                                    toast.error("Failed to save media: " + e.message);
+                                  } finally {
+                                    setSavingMedia(false);
+                                  }
+                                }}
+                              >
+                                {savingMedia ? "Saving..." : "Save Changes"}
+                              </Button>
+                            )}
+                          </div>
                           <div className="space-y-1.5">
                             {selectedMedia.map((sel) => {
                               const item = mediaLibraryItems?.find(m => m.id === sel.mediaId);

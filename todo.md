@@ -499,3 +499,6 @@
 - [x] Fix background image upload not persisting (switch from storagePut tRPC to /api/upload multipart endpoint)
 - [x] Fix PDF upload not persisting (switch from storagePut tRPC to /api/upload-pdf multipart endpoint)
 - [x] Add "Set as Background" button on media library images in Landing Page editor
+- [x] Add "Update Media" save button to Media tab to persist foreground selections and background image
+- [x] Fix media tab changes not saving to DB (background image + foreground selections)
+- [x] Add explicit "Save Media" button to Media tab
