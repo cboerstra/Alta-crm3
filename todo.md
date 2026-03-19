@@ -509,3 +509,4 @@
 - [x] Add focal-point/position picker for background image in editor
 - [x] Fix logo not displaying correctly on landing page preview
 - [x] Fix production DB schema mismatch: artworkPosition column missing on Hostinger causing landing pages query to fail
+- [x] Revert uploads to local disk storage (Manus S3 credentials not available on Hostinger)
