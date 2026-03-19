@@ -1,0 +1,70 @@
+{
+  "query": "SELECT id, title, artworkUrl, artworkPosition FROM landing_pages LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dDnpezfLjGa5dS.c6434c886c49 --database 29hRXSpda4mmakt4QeiCJh --execute SELECT id, title, artworkUrl, artworkPosition FROM landing_pages LIMIT 10;",
+  "rows": [
+    {
+      "id": "60002",
+      "title": "Email Config Test",
+      "artworkUrl": "NULL",
+      "artworkPosition": "center"
+    },
+    {
+      "id": "210001",
+      "title": "Configurable Fields Test",
+      "artworkUrl": "NULL",
+      "artworkPosition": "center"
+    },
+    {
+      "id": "210002",
+      "title": "Email Config Test",
+      "artworkUrl": "NULL",
+      "artworkPosition": "center"
+    },
+    {
+      "id": "210003",
+      "title": "Update Fields Test",
+      "artworkUrl": "NULL",
+      "artworkPosition": "center"
+    },
+    {
+      "id": "210004",
+      "title": "Auto LP Webinar - Registration",
+      "artworkUrl": "NULL",
+      "artworkPosition": "center"
+    },
+    {
+      "id": "210005",
+      "title": "Opt-In Test LP",
+      "artworkUrl": "NULL",
+      "artworkPosition": "center"
+    },
+    {
+      "id": "210006",
+      "title": "Spring Webinar LP",
+      "artworkUrl": "NULL",
+      "artworkPosition": "center"
+    },
+    {
+      "id": "210007",
+      "title": "Slug Test Page",
+      "artworkUrl": "NULL",
+      "artworkPosition": "center"
+    },
+    {
+      "id": "210008",
+      "title": "First",
+      "artworkUrl": "NULL",
+      "artworkPosition": "center"
+    },
+    {
+      "id": "210009",
+      "title": "Session Select Webinar - Registration",
+      "artworkUrl": "NULL",
+      "artworkPosition": "center"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttitle\tartworkUrl\tartworkPosition\n60002\tEmail Config Test\tNULL\tcenter\n210001\tConfigurable Fields Test\tNULL\tcenter\n210002\tEmail Config Test\tNULL\tcenter\n210003\tUpdate Fields Test\tNULL\tcenter\n210004\tAuto LP Webinar - Registration\tNULL\tcenter\n210005\tOpt-In Test LP\tNULL\tcenter\n210006\tSpring Webinar LP\tNULL\tcenter\n210007\tSlug Test Page\tNULL\tcenter\n210008\tFirst\tNULL\tcenter\n210009\tSession Select Webinar - Registration\tNULL\tcenter\n",
+  "stderr": "",
+  "execution_time_ms": 118
+}

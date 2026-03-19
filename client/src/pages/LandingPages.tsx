@@ -188,6 +188,12 @@ export default function LandingPages() {
     onError: (e) => toast.error("Failed to save media: " + e.message),
   });
 
+  // Separate mutation for saving artwork/position without closing the dialog
+  const updateArtworkMutation = trpc.landingPages.update.useMutation({
+    onSuccess: () => { toast.success("Background image saved"); refetch(); },
+    onError: (e) => toast.error("Failed to save background: " + e.message),
+  });
+
   const [pendingArtworkFile, setPendingArtworkFile] = useState<File | null>(null);
   const [pendingPdfFile, setPendingPdfFile] = useState<File | null>(null);
   const [savingMedia, setSavingMedia] = useState(false);
@@ -286,7 +292,7 @@ export default function LandingPages() {
         const res = await fetch("/api/upload", { method: "POST", body: formData });
         if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error ?? "Upload failed"); }
         const { url } = await res.json();
-        updateMutation.mutate({ id: editId, artworkUrl: url });
+        updateArtworkMutation.mutate({ id: editId, artworkUrl: url });
       } catch (err: any) {
         toast.error("Failed to upload background image: " + err.message);
         setArtworkPreview(null);
@@ -750,7 +756,7 @@ export default function LandingPages() {
                           )}
                         </div>
                         {/* Remove button */}
-                        <Button variant="secondary" size="sm" className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white border-0" onClick={() => { setArtworkPreview(null); setArtworkPosition("center"); setPendingArtworkFile(null); if (editId) updateMutation.mutate({ id: editId, artworkUrl: null }); }}>
+                        <Button variant="secondary" size="sm" className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white border-0" onClick={() => { setArtworkPreview(null); setArtworkPosition("center"); setPendingArtworkFile(null); if (editId) updateArtworkMutation.mutate({ id: editId, artworkUrl: null }); }}>
                           <X className="h-3 w-3 mr-1" /> Remove
                         </Button>
                         {/* Change button */}
@@ -777,7 +783,7 @@ export default function LandingPages() {
                               key={pos.value}
                               onClick={() => {
                                 setArtworkPosition(pos.value);
-                                if (editId) updateMutation.mutate({ id: editId, artworkPosition: pos.value });
+                                if (editId) updateArtworkMutation.mutate({ id: editId, artworkPosition: pos.value });
                               }}
                               className={`text-[10px] py-1 px-1.5 rounded border transition-colors ${
                                 artworkPosition === pos.value
@@ -859,24 +865,36 @@ export default function LandingPages() {
                           <p className="text-[10px] text-muted-foreground mb-2">Click to add to foreground · hover for background option</p>
                           <ScrollArea className="w-full">
                             <div className="flex gap-3 pb-2">
-                              {images.map((item) => (
+                              {images.map((item) => {
+                                const isBackground = artworkPreview === item.fileUrl;
+                                return (
                                 <div key={item.id} className="relative flex-shrink-0 group">
                                   <button
-                                    onClick={() => toggleMediaSelection(item.id, "foreground_image")}
+                                    onClick={() => {
+                                      if (isBackground) return; // can't add background image to foreground
+                                      toggleMediaSelection(item.id, "foreground_image");
+                                    }}
                                     className={`relative w-28 h-20 rounded-lg border-2 overflow-hidden transition-all ${
-                                      isMediaSelected(item.id)
+                                      isBackground
+                                        ? "border-brand-gold ring-2 ring-brand-gold/30 shadow-md"
+                                        : isMediaSelected(item.id)
                                         ? "border-brand-green ring-2 ring-brand-green/30 shadow-md"
                                         : "border-muted hover:border-brand-green/40"
                                     }`}
                                   >
                                     <img src={item.fileUrl} alt={item.label || ""} className="w-full h-full object-cover" />
-                                    {isMediaSelected(item.id) && (
+                                    {isBackground && (
+                                      <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-brand-gold flex items-center justify-center" title="Set as background">
+                                        <Image className="h-3 w-3 text-white" />
+                                      </div>
+                                    )}
+                                    {!isBackground && isMediaSelected(item.id) && (
                                       <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-brand-green flex items-center justify-center">
                                         <Check className="h-3 w-3 text-white" />
                                       </div>
                                     )}
                                     <div className="absolute bottom-0 inset-x-0 bg-black/60 px-1 py-0.5">
-                                      <p className="text-[9px] text-white truncate text-center">{item.label}</p>
+                                      <p className="text-[9px] text-white truncate text-center">{isBackground ? "BG" : item.label}</p>
                                     </div>
                                   </button>
                                   {/* Set as Background button — shown on hover */}
@@ -885,9 +903,10 @@ export default function LandingPages() {
                                       e.stopPropagation();
                                       setArtworkPreview(item.fileUrl);
                                       setPendingArtworkFile(null);
+                                      // Remove from foreground selections if it was there
+                                      setSelectedMedia(prev => prev.filter(m => m.mediaId !== item.id));
                                       if (editId) {
-                                        updateMutation.mutate({ id: editId, artworkUrl: item.fileUrl });
-                                        toast.success("Background image set");
+                                        updateArtworkMutation.mutate({ id: editId, artworkUrl: item.fileUrl });
                                       }
                                     }}
                                     className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-brand-gold text-white shadow-md opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10"
@@ -896,7 +915,8 @@ export default function LandingPages() {
                                     <Image className="h-3 w-3" />
                                   </button>
                                 </div>
-                              ))}
+                              );
+                              })}
                             </div>
                           </ScrollArea>
                         </div>

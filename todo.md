@@ -510,3 +510,7 @@
 - [x] Fix logo not displaying correctly on landing page preview
 - [x] Fix production DB schema mismatch: artworkPosition column missing on Hostinger causing landing pages query to fail
 - [x] Revert uploads to local disk storage (Manus S3 credentials not available on Hostinger)
+- [x] Fix background image not showing on public landing page
+- [x] Fix: background image from media library should show in upload zone, not in foreground list
+- [x] Fix: summary box should show foreground count separately from background selection
+- [x] Fix: artworkUrl must be saved to DB when image is set as background from media library
