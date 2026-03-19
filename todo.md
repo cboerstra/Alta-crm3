@@ -508,3 +508,4 @@
 - [x] Fix background image not rendering as full-page background on public landing page (switched to S3 storage for permanent URLs)
 - [x] Add focal-point/position picker for background image in editor
 - [x] Fix logo not displaying correctly on landing page preview
+- [x] Fix production DB schema mismatch: artworkPosition column missing on Hostinger causing landing pages query to fail

@@ -1170,6 +1170,12 @@ export async function runAutoMigrations(): Promise<void> {
       column: "replayUrl",
       sql: "ALTER TABLE `webinar_sessions` ADD COLUMN `replayUrl` text DEFAULT NULL",
     },
+    // 0011: Add artworkPosition to landing_pages
+    {
+      table: "landing_pages",
+      column: "artworkPosition",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `artworkPosition` varchar(64) DEFAULT 'center'",
+    },
   ];
 
   for (const m of migrations) {
