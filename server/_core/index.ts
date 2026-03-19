@@ -11,6 +11,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { processPendingReminders } from "../emailService";
+import { registerWebsiteLeadRoute } from "../websiteLeads";
 import { getIntegration, createSmsMessage, logActivity, getLeads, migrateDefaultSmsTemplates, runAutoMigrations } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -61,6 +62,9 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+
+  // ── Website Lead Capture (from altamortgagegroup.net) ───────────────────────
+  registerWebsiteLeadRoute(app);
 
   // ── Telnyx SMS Webhooks ──────────────────────────────────────────────────────
   // Primary webhook: receives inbound SMS from Telnyx
