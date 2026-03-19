@@ -113,6 +113,7 @@ export default function LandingPages() {
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>({ ...defaultForm });
   const [artworkPreview, setArtworkPreview] = useState<string | null>(null);
+  const [artworkPosition, setArtworkPosition] = useState<string>("center");
   const [pdfName, setPdfName] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -239,6 +240,7 @@ export default function LandingPages() {
   function resetForm() {
     setForm({ ...defaultForm });
     setArtworkPreview(null);
+    setArtworkPosition("center");
     setPdfName(null);
     setPendingArtworkFile(null);
     setPendingPdfFile(null);
@@ -262,6 +264,7 @@ export default function LandingPages() {
       confirmationEmailBody: page.confirmationEmailBody || DEFAULT_EMAIL_BODY,
     });
     setArtworkPreview(page.artworkUrl || null);
+    setArtworkPosition(page.artworkPosition || "center");
     setPdfName(page.confirmationPdfUrl ? "Attached PDF" : null);
     setEditId(page.id);
     setTouched({});
@@ -709,12 +712,18 @@ export default function LandingPages() {
                   <Label className="mb-2 block font-semibold">Background Image</Label>
                   <p className="text-xs text-muted-foreground mb-3">This image fills the entire landing page background. Recommended: 1920x1080px or larger, JPG or PNG.</p>
                   {artworkPreview ? (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {/* Live preview with text overlay */}
                       <div
                         className="relative rounded-lg overflow-hidden border shadow-md"
-                        style={{ height: "200px", background: artworkPreview ? `url(${artworkPreview}) center/cover no-repeat` : "#1a1a1a" }}
+                        style={{ height: "200px" }}
                       >
+                        <img
+                          src={artworkPreview}
+                          alt="Background preview"
+                          className="absolute inset-0 w-full h-full object-cover"
+                          style={{ objectPosition: artworkPosition }}
+                        />
                         {/* Dark gradient overlay */}
                         <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.75) 100%)" }} />
                         {/* Text content */}
@@ -741,7 +750,7 @@ export default function LandingPages() {
                           )}
                         </div>
                         {/* Remove button */}
-                        <Button variant="secondary" size="sm" className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white border-0" onClick={() => { setArtworkPreview(null); setPendingArtworkFile(null); if (editId) updateMutation.mutate({ id: editId, artworkUrl: null }); }}>
+                        <Button variant="secondary" size="sm" className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white border-0" onClick={() => { setArtworkPreview(null); setArtworkPosition("center"); setPendingArtworkFile(null); if (editId) updateMutation.mutate({ id: editId, artworkUrl: null }); }}>
                           <X className="h-3 w-3 mr-1" /> Remove
                         </Button>
                         {/* Change button */}
@@ -749,7 +758,39 @@ export default function LandingPages() {
                           Change image
                         </button>
                       </div>
-                      <p className="text-[10px] text-muted-foreground">Preview shows how your headline and CTA button will appear over the background.</p>
+                      {/* Position picker */}
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1.5 block">Image focal point (position)</Label>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {[
+                            { label: "Top Left", value: "top left" },
+                            { label: "Top Center", value: "top center" },
+                            { label: "Top Right", value: "top right" },
+                            { label: "Middle Left", value: "center left" },
+                            { label: "Center", value: "center" },
+                            { label: "Middle Right", value: "center right" },
+                            { label: "Bottom Left", value: "bottom left" },
+                            { label: "Bottom Center", value: "bottom center" },
+                            { label: "Bottom Right", value: "bottom right" },
+                          ].map(pos => (
+                            <button
+                              key={pos.value}
+                              onClick={() => {
+                                setArtworkPosition(pos.value);
+                                if (editId) updateMutation.mutate({ id: editId, artworkPosition: pos.value });
+                              }}
+                              className={`text-[10px] py-1 px-1.5 rounded border transition-colors ${
+                                artworkPosition === pos.value
+                                  ? "bg-brand-green text-white border-brand-green font-semibold"
+                                  : "bg-muted text-muted-foreground border-border hover:border-brand-green/50"
+                              }`}
+                            >
+                              {pos.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">Preview shows how your headline and CTA button will appear over the background. Click a position to adjust the focal point.</p>
                     </div>
                   ) : (
                     <button onClick={() => artworkRef.current?.click()} className="w-full h-40 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-brand-green/50 hover:text-brand-green transition-colors cursor-pointer">

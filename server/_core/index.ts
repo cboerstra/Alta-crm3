@@ -147,17 +147,9 @@ async function startServer() {
     etag: true,
   }));
 
-  // Multer storage: preserve original extension, add nanoid for uniqueness
-  const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadsDir),
-    filename: (_req, file, cb) => {
-      const ext = path.extname(file.originalname).toLowerCase() || ".bin";
-      const name = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}${ext}`;
-      cb(null, name);
-    },
-  });
+  // Multer memory storage — files go to S3 via storagePut, no disk needed
   const upload = multer({
-    storage,
+    storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
     fileFilter: (_req, file, cb) => {
       const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
@@ -171,7 +163,7 @@ async function startServer() {
 
   // Multer for PDF uploads (separate instance with larger limit and PDF filter)
   const pdfUpload = multer({
-    storage,
+    storage: multer.memoryStorage(),
     limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB
     fileFilter: (_req, file, cb) => {
       if (file.mimetype === "application/pdf") {
@@ -193,8 +185,11 @@ async function startServer() {
       } catch { /* not authenticated */ }
       if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
       if (!req.file) { res.status(400).json({ error: "No file provided" }); return; }
-      const fileUrl = `/uploads/${req.file.filename}`;
-      res.json({ url: fileUrl, filename: req.file.filename, size: req.file.size });
+      // Upload to S3 for permanent CDN URL
+      const { storagePut } = await import("../storage");
+      const key = `uploads/pdfs/${Date.now()}-${Math.random().toString(36).slice(2, 9)}-${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+      const { url } = await storagePut(key, req.file.buffer!, req.file.mimetype);
+      res.json({ url, filename: req.file.originalname, size: req.file.size });
     } catch (err: any) {
       console.error("[Upload-PDF] Error:", err);
       res.status(500).json({ error: err.message ?? "Upload failed" });
@@ -204,26 +199,20 @@ async function startServer() {
   // POST /api/upload — authenticated multipart upload
   app.post("/api/upload", upload.single("file"), async (req, res) => {
     try {
-      // Verify session using the same SDK used by tRPC context
       const { sdk } = await import("./sdk");
       let userId: number | null = null;
       try {
         const user = await sdk.authenticateRequest(req as any);
         userId = user?.id ?? null;
-      } catch {
-        // not authenticated
-      }
-      if (!userId) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
-      }
-      if (!req.file) {
-        res.status(400).json({ error: "No file provided" });
-        return;
-      }
-      // Build the public URL for this file
-      const fileUrl = `/uploads/${req.file.filename}`;
-      res.json({ url: fileUrl, filename: req.file.filename, size: req.file.size });
+      } catch { /* not authenticated */ }
+      if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+      if (!req.file) { res.status(400).json({ error: "No file provided" }); return; }
+      // Upload to S3 for permanent CDN URL
+      const { storagePut } = await import("../storage");
+      const ext = path.extname(req.file.originalname).toLowerCase() || '.bin';
+      const key = `uploads/images/${Date.now()}-${Math.random().toString(36).slice(2, 9)}${ext}`;
+      const { url } = await storagePut(key, req.file.buffer!, req.file.mimetype);
+      res.json({ url, filename: req.file.originalname, size: req.file.size });
     } catch (err: any) {
       console.error("[Upload] Error:", err);
       res.status(500).json({ error: err.message ?? "Upload failed" });

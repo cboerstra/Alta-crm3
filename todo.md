@@ -504,3 +504,7 @@
 - [x] Add explicit "Save Media" button to Media tab
 - [x] Update default confirmation email template with all placeholders (professional copy)
 - [x] Add background image preview with headline/subheadline text overlay on Media tab
+- [ ] Update confirmation email body in DB for all existing landing pages to new professional template
+- [x] Fix background image not rendering as full-page background on public landing page (switched to S3 storage for permanent URLs)
+- [x] Add focal-point/position picker for background image in editor
+- [x] Fix logo not displaying correctly on landing page preview

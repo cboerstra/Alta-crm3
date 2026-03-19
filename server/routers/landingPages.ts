@@ -86,6 +86,7 @@ export const landingPagesRouter = router({
       confirmationEmailSubject: z.string().optional(),
       confirmationEmailBody: z.string().optional(),
       artworkUrl: z.string().nullable().optional(),
+      artworkPosition: z.string().optional(),
       confirmationPdfUrl: z.string().nullable().optional(),
     }))
     .mutation(async ({ input }) => {

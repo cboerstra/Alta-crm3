@@ -78,6 +78,13 @@
       "when": 1773864632160,
       "tag": "0010_right_paibok",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1773881373697,
+      "tag": "0011_third_molten_man",
+      "breakpoints": true
     }
   ]
 }

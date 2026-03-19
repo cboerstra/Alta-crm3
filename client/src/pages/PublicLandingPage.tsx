@@ -77,7 +77,7 @@ export default function PublicLandingPage() {
         {/* Full-bleed background */}
         {hasBackground && (
           <div className="absolute inset-0">
-            <img src={page.artworkUrl!} alt="" className="w-full h-full object-cover" />
+            <img src={page.artworkUrl!} alt="" className="w-full h-full object-cover" style={{ objectPosition: (page as any).artworkPosition || "center" }} />
             <div className="absolute inset-0 bg-black/60" />
           </div>
         )}
@@ -151,6 +151,7 @@ export default function PublicLandingPage() {
             src={page.artworkUrl!}
             alt=""
             className="w-full h-full object-cover"
+            style={{ objectPosition: (page as any).artworkPosition || "center" }}
           />
           {/* Dark overlay for readability */}
           <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" />

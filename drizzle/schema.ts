@@ -106,6 +106,8 @@ export const landingPages = mysqlTable("landing_pages", {
   accentColor: varchar("accentColor", { length: 16 }).default("#C9A84C"),
   // NEW: Artwork / hero image uploaded by host
   artworkUrl: text("artworkUrl"),
+  // NEW: Background image focal point position (CSS object-position value)
+  artworkPosition: varchar("artworkPosition", { length: 64 }).default("center"),
   // NEW: Configurable form fields (JSON array of enabled fields)
   // e.g. ["firstName","lastName","email","phone","sessionSelect","optIn"]
   enabledFields: json("enabledFields"),

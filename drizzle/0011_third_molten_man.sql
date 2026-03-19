@@ -1,0 +1,1 @@
+ALTER TABLE `landing_pages` ADD `artworkPosition` varchar(64) DEFAULT 'center';
