@@ -522,3 +522,4 @@
 - [x] Add trigger field to smsTemplates schema (New Lead, Registered, Attended, No Show, Consultation Booked, Under Contract, Closed)
 - [x] Add CRUD procedures to SMS templates router (create, update, delete, list)
 - [x] Build SMS Templates UI with Add/Edit/Delete buttons and trigger selector
+- [x] Write professional sample SMS templates for all 9 trigger types with appropriate variables

@@ -1,0 +1,64 @@
+{
+  "query": "SELECT id, `trigger`, LEFT(body, 60) as body_preview, isActive FROM sms_templates ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dDnpezfLjGa5dS.c6434c886c49 --database 29hRXSpda4mmakt4QeiCJh --execute SELECT id, `trigger`, LEFT(body, 60) as body_preview, isActive FROM sms_templates ORDER BY id;",
+  "rows": [
+    {
+      "id": "1",
+      "trigger": "new_lead",
+      "body_preview": "Hi {{first_name}}, this is Clarke & Associates Mortgage. Tha",
+      "isActive": "1"
+    },
+    {
+      "id": "2",
+      "trigger": "registered",
+      "body_preview": "Hi {{first_name}}, you're confirmed for {{webinar_title}} on",
+      "isActive": "1"
+    },
+    {
+      "id": "3",
+      "trigger": "reminder_24h",
+      "body_preview": "Hi {{first_name}}, just a reminder that {{webinar_title}} is",
+      "isActive": "1"
+    },
+    {
+      "id": "4",
+      "trigger": "reminder_1h",
+      "body_preview": "Hi {{first_name}}, {{webinar_title}} starts in 1 hour! Click",
+      "isActive": "1"
+    },
+    {
+      "id": "5",
+      "trigger": "attended",
+      "body_preview": "Hi {{first_name}}, thank you for attending {{webinar_title}}",
+      "isActive": "1"
+    },
+    {
+      "id": "6",
+      "trigger": "no_show",
+      "body_preview": "Hi {{first_name}}, we missed you at {{webinar_title}}! No wo",
+      "isActive": "1"
+    },
+    {
+      "id": "7",
+      "trigger": "consultation_booked",
+      "body_preview": "Hi {{first_name}}, your consultation with Clarke & Associate",
+      "isActive": "1"
+    },
+    {
+      "id": "8",
+      "trigger": "under_contract",
+      "body_preview": "Hi {{first_name}}, congratulations — you're under contract! ",
+      "isActive": "1"
+    },
+    {
+      "id": "9",
+      "trigger": "deal_closed",
+      "body_preview": "Hi {{first_name}}, congratulations on your new home! It was ",
+      "isActive": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttrigger\tbody_preview\tisActive\n1\tnew_lead\tHi {{first_name}}, this is Clarke & Associates Mortgage. Tha\t1\n2\tregistered\tHi {{first_name}}, you're confirmed for {{webinar_title}} on\t1\n3\treminder_24h\tHi {{first_name}}, just a reminder that {{webinar_title}} is\t1\n4\treminder_1h\tHi {{first_name}}, {{webinar_title}} starts in 1 hour! Click\t1\n5\tattended\tHi {{first_name}}, thank you for attending {{webinar_title}}\t1\n6\tno_show\tHi {{first_name}}, we missed you at {{webinar_title}}! No wo\t1\n7\tconsultation_booked\tHi {{first_name}}, your consultation with Clarke & Associate\t1\n8\tunder_contract\tHi {{first_name}}, congratulations — you're under contract! \t1\n9\tdeal_closed\tHi {{first_name}}, congratulations on your new home! It was \t0\n",
+  "stderr": "",
+  "execution_time_ms": 62
+}
