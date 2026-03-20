@@ -85,6 +85,13 @@
       "when": 1773881373697,
       "tag": "0011_third_molten_man",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1774043588027,
+      "tag": "0012_salty_morlun",
+      "breakpoints": true
     }
   ]
 }

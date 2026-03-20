@@ -1,0 +1,2 @@
+ALTER TABLE `sms_templates` DROP INDEX `sms_templates_trigger_unique`;--> statement-breakpoint
+ALTER TABLE `sms_templates` MODIFY COLUMN `trigger` enum('new_lead','registered','reminder_24h','reminder_1h','attended','no_show','consultation_booked','under_contract','deal_closed') NOT NULL;

@@ -774,6 +774,11 @@ const DEFAULT_SMS_TEMPLATES: Omit<InsertSmsTemplate, "createdBy">[] = [
     isActive: true,
   },
   {
+    trigger: "under_contract",
+    body: "Hi {{first_name}}, congratulations — you're under contract! The Clarke & Associates team is here to help you through the next steps. We'll be in touch soon. Reply STOP to opt out.",
+    isActive: true,
+  },
+  {
     trigger: "deal_closed",
     body: "Hi {{first_name}}, congratulations on your new home! It was a pleasure working with you at Clarke & Associates. Wishing you all the best — don't hesitate to reach out if you ever need us. Reply STOP to opt out.",
     isActive: false,
@@ -876,6 +881,35 @@ export async function resetSmsTemplate(trigger: SmsTemplate["trigger"]): Promise
   const def = DEFAULT_SMS_TEMPLATES.find((t) => t.trigger === trigger);
   if (!def) return;
   await db.update(smsTemplates).set({ body: def.body, isActive: def.isActive, updatedAt: new Date() }).where(eq(smsTemplates.trigger, trigger));
+}
+
+export async function createSmsTemplate(
+  trigger: SmsTemplate["trigger"],
+  body: string,
+  isActive: boolean,
+  createdBy?: number,
+): Promise<SmsTemplate> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [result] = await db.insert(smsTemplates).values({ trigger, body, isActive, createdBy }).$returningId();
+  const [row] = await db.select().from(smsTemplates).where(eq(smsTemplates.id, result.id)).limit(1);
+  return row;
+}
+
+export async function updateSmsTemplate(
+  id: number,
+  body: string,
+  isActive: boolean,
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(smsTemplates).set({ body, isActive, updatedAt: new Date() }).where(eq(smsTemplates.id, id));
+}
+
+export async function deleteSmsTemplate(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(smsTemplates).where(eq(smsTemplates.id, id));
 }
 
 // ─── Next Webinar for Lead ────────────────────────────────────────────────────

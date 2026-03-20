@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   Settings, Video, Calendar, CheckCircle, AlertCircle,
   Upload, Image, Trash2, Edit, ImageIcon, FileImage,
-  LayoutGrid, Tag, Loader2, X, MessageSquare, Phone, Eye, EyeOff, Send, Mail,
+  LayoutGrid, Tag, Loader2, X, MessageSquare, Phone, Eye, EyeOff, Send, Mail, Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -49,8 +49,13 @@ export default function SettingsPage() {
   const [showTestEmail, setShowTestEmail] = useState(false);
 
   // SMS Templates state
-  const [editingTemplate, setEditingTemplate] = useState<string | null>(null);
-  const [templateDrafts, setTemplateDrafts] = useState<Record<string, { body: string; isActive: boolean }>>({});
+  const [editingTemplate, setEditingTemplate] = useState<number | null>(null); // now uses id
+  const [templateDrafts, setTemplateDrafts] = useState<Record<number, { body: string; isActive: boolean }>>({});
+  const [showAddTemplate, setShowAddTemplate] = useState(false);
+  const [newTemplateTrigger, setNewTemplateTrigger] = useState<string>("new_lead");
+  const [newTemplateBody, setNewTemplateBody] = useState("");
+  const [newTemplateActive, setNewTemplateActive] = useState(true);
+  const [deletingTemplateId, setDeletingTemplateId] = useState<number | null>(null);
 
   const upsertTemplate = trpc.smsTemplates.upsert.useMutation({
     onSuccess: () => { toast.success("Template saved"); refetchTemplates(); setEditingTemplate(null); },
@@ -58,6 +63,25 @@ export default function SettingsPage() {
   });
   const resetTemplate = trpc.smsTemplates.reset.useMutation({
     onSuccess: () => { toast.success("Template reset to default"); refetchTemplates(); setEditingTemplate(null); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const createTemplate = trpc.smsTemplates.create.useMutation({
+    onSuccess: () => {
+      toast.success("Template created");
+      refetchTemplates();
+      setShowAddTemplate(false);
+      setNewTemplateBody("");
+      setNewTemplateTrigger("new_lead");
+      setNewTemplateActive(true);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const updateTemplate = trpc.smsTemplates.update.useMutation({
+    onSuccess: () => { toast.success("Template saved"); refetchTemplates(); setEditingTemplate(null); },
+    onError: (e: any) => toast.error(e.message),
+  });
+  const deleteTemplate = trpc.smsTemplates.delete.useMutation({
+    onSuccess: () => { toast.success("Template deleted"); refetchTemplates(); setDeletingTemplateId(null); },
     onError: (e: any) => toast.error(e.message),
   });
 
@@ -906,15 +930,87 @@ export default function SettingsPage() {
         {/* ─── General Tab ─── */}
         {/* ─── SMS Templates Tab ─── */}
         <TabsContent value="sms-templates">
+          {/* Add Template Dialog */}
+          <Dialog open={showAddTemplate} onOpenChange={setShowAddTemplate}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle style={{ fontFamily: 'Raleway, sans-serif' }}>Add SMS Template</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Trigger — when should this message be sent?</Label>
+                  <Select value={newTemplateTrigger} onValueChange={setNewTemplateTrigger}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select trigger" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {([
+                        { value: 'new_lead', label: 'New Lead' },
+                        { value: 'registered', label: 'Webinar Registration' },
+                        { value: 'reminder_24h', label: '24-Hour Reminder' },
+                        { value: 'reminder_1h', label: '1-Hour Reminder' },
+                        { value: 'attended', label: 'Post-Webinar (Attended)' },
+                        { value: 'no_show', label: 'Post-Webinar (No Show)' },
+                        { value: 'consultation_booked', label: 'Consultation Booked' },
+                        { value: 'under_contract', label: 'Under Contract' },
+                        { value: 'deal_closed', label: 'Deal Closed' },
+                      ] as const).map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">Message body</Label>
+                    <span className={`text-xs ${ newTemplateBody.length > 1600 ? 'text-destructive font-semibold' : newTemplateBody.length > 160 ? 'text-amber-600' : 'text-muted-foreground' }`}>
+                      {newTemplateBody.length} chars · {Math.ceil(newTemplateBody.length / 160) || 1} SMS segment{Math.ceil(newTemplateBody.length / 160) !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <textarea
+                    className="w-full min-h-[120px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder={`Hi {{first_name}}, ...`}
+                    value={newTemplateBody}
+                    onChange={(e) => setNewTemplateBody(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">Use variables: <span className="font-mono">{'{{first_name}}'}</span>, <span className="font-mono">{'{{webinar_link}}'}</span>, <span className="font-mono">{'{{webinar_title}}'}</span>, <span className="font-mono">{'{{session_date}}'}</span></p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={newTemplateActive} onCheckedChange={setNewTemplateActive} />
+                  <span className="text-sm">{newTemplateActive ? 'Active — will send automatically' : 'Inactive — saved but not sent'}</span>
+                </div>
+                <div className="flex gap-2 justify-end pt-2">
+                  <Button variant="ghost" size="sm" onClick={() => setShowAddTemplate(false)}>Cancel</Button>
+                  <Button
+                    size="sm"
+                    className="bg-brand-green hover:bg-brand-green-dark text-white gap-1"
+                    disabled={createTemplate.isPending || newTemplateBody.trim().length === 0 || newTemplateBody.length > 1600}
+                    onClick={() => createTemplate.mutate({ trigger: newTemplateTrigger as any, body: newTemplateBody.trim(), isActive: newTemplateActive })}
+                  >
+                    {createTemplate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                    Create Template
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Card className="border-0 shadow-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base" style={{ fontFamily: "Raleway, sans-serif" }}>SMS Templates</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Manage automated SMS messages sent at each lead stage. Use <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">{'{{webinar_link}}'}</span>, <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">{'{{first_name}}'}</span>, and other variables — they resolve automatically when sent.
+                    Manage automated SMS messages sent at each lead stage. Multiple templates per trigger are supported — all active templates for a trigger will be sent.
                   </p>
                 </div>
+                <Button
+                  size="sm"
+                  className="bg-brand-green hover:bg-brand-green-dark text-white gap-1 shrink-0"
+                  onClick={() => setShowAddTemplate(true)}
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add Template
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -952,15 +1048,16 @@ export default function SettingsPage() {
               ) : (
                 <div className="space-y-3">
                   {(smsTemplateList ?? []).map((tmpl) => {
-                    const isEditing = editingTemplate === tmpl.trigger;
-                    const draft = templateDrafts[tmpl.trigger];
+                    const isEditing = editingTemplate === tmpl.id;
+                    const draft = templateDrafts[tmpl.id];
                     const currentBody = isEditing ? (draft?.body ?? tmpl.body) : tmpl.body;
                     const currentActive = isEditing ? (draft?.isActive ?? tmpl.isActive) : tmpl.isActive;
                     const charCount = currentBody.length;
                     const smsCount = Math.ceil(charCount / 160);
+                    const isDeleting = deletingTemplateId === tmpl.id;
 
                     return (
-                      <div key={tmpl.trigger} className={`rounded-lg border p-4 space-y-3 transition-colors ${
+                      <div key={tmpl.id} className={`rounded-lg border p-4 space-y-3 transition-colors ${
                         isEditing ? 'border-brand-green/40 bg-brand-green/5' : 'border-border/40 bg-muted/10'
                       }`}>
                         {/* Header row */}
@@ -977,17 +1074,42 @@ export default function SettingsPage() {
                             <p className="text-xs text-muted-foreground mt-0.5">{tmpl.description}</p>
                           </div>
                           {!isEditing && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="shrink-0 gap-1"
-                              onClick={() => {
-                                setEditingTemplate(tmpl.trigger);
-                                setTemplateDrafts(prev => ({ ...prev, [tmpl.trigger]: { body: tmpl.body, isActive: tmpl.isActive } }));
-                              }}
-                            >
-                              <Edit className="h-3.5 w-3.5" /> Edit
-                            </Button>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => {
+                                  setEditingTemplate(tmpl.id);
+                                  setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: tmpl.body, isActive: tmpl.isActive } }));
+                                }}
+                              >
+                                <Edit className="h-3.5 w-3.5" /> Edit
+                              </Button>
+                              {isDeleting ? (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-destructive">Delete?</span>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    disabled={deleteTemplate.isPending}
+                                    onClick={() => deleteTemplate.mutate({ id: tmpl.id })}
+                                  >
+                                    {deleteTemplate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Yes'}
+                                  </Button>
+                                  <Button variant="ghost" size="sm" onClick={() => setDeletingTemplateId(null)}>No</Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => setDeletingTemplateId(tmpl.id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
                           )}
                         </div>
 
@@ -1002,7 +1124,7 @@ export default function SettingsPage() {
                                 </span>
                                 <Switch
                                   checked={currentActive}
-                                  onCheckedChange={(v) => setTemplateDrafts(prev => ({ ...prev, [tmpl.trigger]: { ...prev[tmpl.trigger], isActive: v } }))}
+                                  onCheckedChange={(v) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { ...prev[tmpl.id], isActive: v } }))}
                                 />
                                 <span className="text-xs text-muted-foreground">{currentActive ? 'Active' : 'Inactive'}</span>
                               </div>
@@ -1010,7 +1132,7 @@ export default function SettingsPage() {
                             <textarea
                               className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
                               value={currentBody}
-                              onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.trigger]: { ...prev[tmpl.trigger], body: e.target.value } }))}
+                              onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { ...prev[tmpl.id], body: e.target.value } }))}
                             />
                             <div className="flex gap-2 justify-end">
                               <Button
@@ -1033,10 +1155,10 @@ export default function SettingsPage() {
                               <Button
                                 size="sm"
                                 className="bg-brand-green hover:bg-brand-green-dark text-white gap-1"
-                                disabled={upsertTemplate.isPending || charCount === 0 || charCount > 1600}
-                                onClick={() => upsertTemplate.mutate({ trigger: tmpl.trigger as any, body: currentBody, isActive: currentActive })}
+                                disabled={updateTemplate.isPending || charCount === 0 || charCount > 1600}
+                                onClick={() => updateTemplate.mutate({ id: tmpl.id, body: currentBody, isActive: currentActive })}
                               >
-                                {upsertTemplate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                                {updateTemplate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                                 Save
                               </Button>
                             </div>

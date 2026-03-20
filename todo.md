@@ -519,3 +519,6 @@
 - [x] Add 10DLC opt-in disclosure text and links to the landing page signup form
 - [ ] Add links to Privacy Policy and Terms of Service from landing page
 - [x] Add green connected status dot to each integration card on Settings page
+- [x] Add trigger field to smsTemplates schema (New Lead, Registered, Attended, No Show, Consultation Booked, Under Contract, Closed)
+- [x] Add CRUD procedures to SMS templates router (create, update, delete, list)
+- [x] Build SMS Templates UI with Add/Edit/Delete buttons and trigger selector
