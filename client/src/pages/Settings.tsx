@@ -269,8 +269,18 @@ export default function SettingsPage() {
       <Tabs defaultValue="media" className="space-y-4">
         <TabsList className="bg-muted/30 flex-wrap h-auto gap-1">
           <TabsTrigger value="media" className="gap-1"><Image className="h-3.5 w-3.5" /> Media Library</TabsTrigger>
-          <TabsTrigger value="zoom" className="gap-1"><Video className="h-3.5 w-3.5" /> Zoom</TabsTrigger>
-          <TabsTrigger value="google" className="gap-1"><Calendar className="h-3.5 w-3.5" /> Google Calendar</TabsTrigger>
+          <TabsTrigger value="zoom" className="gap-1 relative">
+            <Video className="h-3.5 w-3.5" /> Zoom
+            {status?.zoom?.connected && (
+              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-green-500" />
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="google" className="gap-1 relative">
+            <Calendar className="h-3.5 w-3.5" /> Google Calendar
+            {status?.google?.connected && (
+              <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-green-500" />
+            )}
+          </TabsTrigger>
           <TabsTrigger value="sms" className="gap-1 relative">
             <MessageSquare className="h-3.5 w-3.5" /> SMS
             {telnyxConnected && (

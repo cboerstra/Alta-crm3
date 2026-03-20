@@ -19,6 +19,8 @@ import SettingsPage from "./pages/Settings";
 import UserManagement from "./pages/UserManagement";
 import PublicLandingPage from "./pages/PublicLandingPage";
 import PublicBooking from "./pages/PublicBooking";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 import Login from "./pages/Login";
 import Setup from "./pages/Setup";
 import SmsInbox from "./pages/SmsInbox";
@@ -92,6 +94,8 @@ function Router() {
       {/* Public routes */}
       <Route path="/lp/:slug" component={PublicLandingPage} />
       <Route path="/schedule/:slug" component={PublicBooking} />
+      <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/terms" component={TermsOfService} />
       {/* CRM routes (protected via DashboardLayout) */}
       <Route component={CRMRoutes} />
     </Switch>

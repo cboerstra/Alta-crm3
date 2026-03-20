@@ -330,18 +330,33 @@ export default function PublicLandingPage() {
                 </div>
               )}
 
-              {/* SMS Consent */}
-              <div className="flex items-start gap-2.5 pt-1">
-                <Checkbox
-                  id="sms-consent"
-                  checked={smsConsent}
-                  onCheckedChange={(v) => setSmsConsent(v === true)}
-                  className="mt-0.5"
-                />
-                <label htmlFor="sms-consent" className="text-xs text-gray-500 leading-relaxed cursor-pointer">
-                  I consent to receive SMS notifications and reminders. Message and data rates may apply.
-                </label>
-              </div>
+              {/* SMS Consent — 10DLC Compliant */}
+              {showField("phone") && (
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-start gap-2.5">
+                    <Checkbox
+                      id="sms-consent"
+                      checked={smsConsent}
+                      onCheckedChange={(v) => setSmsConsent(v === true)}
+                      className="mt-0.5 flex-shrink-0"
+                    />
+                    <label htmlFor="sms-consent" className="text-xs text-gray-500 leading-relaxed cursor-pointer">
+                      By checking this box, I consent to receive recurring automated and non-automated SMS text messages from Clarke &amp; Associates at the mobile number provided above. Messages may include event reminders, follow-up information, mortgage updates, and appointment confirmations. Consent is not a condition of any purchase.
+                    </label>
+                  </div>
+                  <p className="text-[10px] text-gray-400 leading-relaxed pl-7">
+                    <strong>Message frequency varies.</strong> Message &amp; data rates may apply.
+                    Reply <strong>STOP</strong> to cancel at any time.
+                    Reply <strong>HELP</strong> for help.
+                    Mobile carriers are not liable for delayed or undelivered messages.
+                    No mobile information will be shared with third parties for marketing purposes.
+                    View our{" "}
+                    <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600" style={{ color: accentColor }}>Privacy Policy</a>
+                    {" "}and{" "}
+                    <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600" style={{ color: accentColor }}>Terms of Service</a>.
+                  </p>
+                </div>
+              )}
 
               {/* Opt-In Consent */}
               {(showField("optIn") || page.showOptIn) && (
@@ -372,9 +387,14 @@ export default function PublicLandingPage() {
         </div>
 
         {/* ─── Footer ─── */}
-        <p className="text-center text-white/40 text-xs mt-8" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>
-          &copy; {new Date().getFullYear()} Clarke & Associates. All rights reserved.
-        </p>
+        <div className="text-center text-white/40 text-xs mt-8 space-y-1" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>
+          <p>&copy; {new Date().getFullYear()} Clarke &amp; Associates. All rights reserved.</p>
+          <p>
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/70 transition-colors">Privacy Policy</a>
+            {" · "}
+            <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/70 transition-colors">Terms of Service</a>
+          </p>
+        </div>
       </div>
     </div>
   );

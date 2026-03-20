@@ -514,3 +514,8 @@
 - [x] Fix: background image from media library should show in upload zone, not in foreground list
 - [x] Fix: summary box should show foreground count separately from background selection
 - [x] Fix: artworkUrl must be saved to DB when image is set as background from media library
+-- [x] Create Privacy Policy page with 10DLC-compliant content
+- [x] Create Terms of Service page with SMS messaging terms
+- [x] Add 10DLC opt-in disclosure text and links to the landing page signup form
+- [ ] Add links to Privacy Policy and Terms of Service from landing page
+- [x] Add green connected status dot to each integration card on Settings page
