@@ -523,3 +523,4 @@
 - [x] Add CRUD procedures to SMS templates router (create, update, delete, list)
 - [x] Build SMS Templates UI with Add/Edit/Delete buttons and trigger selector
 - [x] Write professional sample SMS templates for all 9 trigger types with appropriate variables
+- [x] Add Preview button to each SMS template card showing message with sample variable values

@@ -56,6 +56,19 @@ export default function SettingsPage() {
   const [newTemplateBody, setNewTemplateBody] = useState("");
   const [newTemplateActive, setNewTemplateActive] = useState(true);
   const [deletingTemplateId, setDeletingTemplateId] = useState<number | null>(null);
+  const [previewTemplateId, setPreviewTemplateId] = useState<number | null>(null);
+
+  const SAMPLE_VARS: Record<string, string> = {
+    '{{first_name}}': 'John',
+    '{{last_name}}': 'Smith',
+    '{{full_name}}': 'John Smith',
+    '{{webinar_title}}': 'Home Buying Seminar',
+    '{{webinar_link}}': 'https://zoom.us/j/123456789',
+    '{{session_date}}': 'Saturday, April 5 at 10:00 AM',
+  };
+
+  const renderPreview = (body: string) =>
+    Object.entries(SAMPLE_VARS).reduce((msg, [key, val]) => msg.replaceAll(key, val), body);
 
   const upsertTemplate = trpc.smsTemplates.upsert.useMutation({
     onSuccess: () => { toast.success("Template saved"); refetchTemplates(); setEditingTemplate(null); },
@@ -995,6 +1008,63 @@ export default function SettingsPage() {
             </DialogContent>
           </Dialog>
 
+          {/* Preview Template Dialog */}
+          {(() => {
+            const previewTmpl = smsTemplateList?.find((t: any) => t.id === previewTemplateId);
+            return (
+              <Dialog open={previewTemplateId !== null} onOpenChange={(open) => { if (!open) setPreviewTemplateId(null); }}>
+                <DialogContent className="max-w-sm">
+                  <DialogHeader>
+                    <DialogTitle style={{ fontFamily: 'Raleway, sans-serif' }} className="flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4 text-brand-green" />
+                      {previewTmpl?.label ?? 'Preview'}
+                    </DialogTitle>
+                  </DialogHeader>
+                  {previewTmpl && (
+                    <div className="space-y-4">
+                      {/* Phone frame */}
+                      <div className="mx-auto w-64 rounded-3xl border-4 border-gray-800 bg-gray-800 shadow-xl overflow-hidden">
+                        {/* Status bar */}
+                        <div className="bg-gray-800 px-4 py-1 flex justify-between items-center">
+                          <span className="text-white text-xs font-medium">9:41 AM</span>
+                          <span className="text-white text-xs">●●●</span>
+                        </div>
+                        {/* Screen */}
+                        <div className="bg-gray-100 min-h-[200px] px-3 py-4 flex flex-col gap-2">
+                          {/* Contact header */}
+                          <div className="text-center mb-2">
+                            <div className="w-10 h-10 rounded-full bg-brand-green flex items-center justify-center mx-auto mb-1">
+                              <span className="text-white text-sm font-bold">AM</span>
+                            </div>
+                            <p className="text-xs font-semibold text-gray-700">Alta Mortgage Group</p>
+                          </div>
+                          {/* Message bubble */}
+                          <div className="bg-white rounded-2xl rounded-tl-sm px-3 py-2 shadow-sm max-w-[90%] self-start">
+                            <p className="text-xs text-gray-800 leading-relaxed whitespace-pre-wrap">{renderPreview(previewTmpl.body)}</p>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Variable legend */}
+                      <div className="rounded-md border border-border/50 bg-muted/30 p-3 space-y-1">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sample values used</p>
+                        {Object.entries(SAMPLE_VARS).map(([key, val]) => (
+                          <div key={key} className="flex items-center gap-2 text-xs">
+                            <code className="font-mono text-brand-green bg-brand-green/10 px-1 rounded">{key}</code>
+                            <span className="text-muted-foreground">→</span>
+                            <span className="text-foreground">{val}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-end">
+                        <Button variant="outline" size="sm" onClick={() => setPreviewTemplateId(null)}>Close</Button>
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
+            );
+          })()}
+
           <Card className="border-0 shadow-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -1075,6 +1145,14 @@ export default function SettingsPage() {
                           </div>
                           {!isEditing && (
                             <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => setPreviewTemplateId(tmpl.id)}
+                              >
+                                <Eye className="h-3.5 w-3.5" /> Preview
+                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
