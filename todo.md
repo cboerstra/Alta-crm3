@@ -524,3 +524,7 @@
 - [x] Build SMS Templates UI with Add/Edit/Delete buttons and trigger selector
 - [x] Write professional sample SMS templates for all 9 trigger types with appropriate variables
 - [x] Add Preview button to each SMS template card showing message with sample variable values
+- [ ] Verify and fix SMS template bodies in production DB — ensure full professional content is stored
+- [ ] Remove auto-reset logic that overwrites custom SMS templates on server restart
+- [ ] Verify Add Template dialog shows all triggers including pre-webinar reminders
+- [ ] Ensure multiple templates per trigger work correctly

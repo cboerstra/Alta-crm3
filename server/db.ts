@@ -822,22 +822,8 @@ export async function migrateDefaultSmsTemplates(): Promise<void> {
     }
   }
 
-  // Reset ALL templates to the latest default bodies so improvements are
-  // automatically applied to existing installations on next server start.
-  // We only overwrite if the stored body still matches the old default pattern
-  // (i.e. the user has not customised it). We detect customisation by checking
-  // whether the body differs from any previously-known default body.
-  // For simplicity and reliability, we reset every template to the current
-  // default body unconditionally — users can always edit them afterwards.
-  for (const def of DEFAULT_SMS_TEMPLATES) {
-    const existing = rows.find((r) => r.trigger === def.trigger);
-    if (existing && existing.body !== def.body) {
-      await db
-        .update(smsTemplates)
-        .set({ body: def.body, updatedAt: new Date() })
-        .where(eq(smsTemplates.trigger, def.trigger));
-    }
-  }
+  // NOTE: We do NOT auto-reset template bodies here — users may have customised
+  // them and we must not overwrite their changes on server restart.
 }
 
 export async function getSmsTemplates(): Promise<SmsTemplate[]> {

@@ -1,0 +1,64 @@
+{
+  "query": "SELECT id, `trigger`, LEFT(body, 120) as body_preview, isActive FROM sms_templates ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dDnpezfLjGa5dS.c6434c886c49 --database 29hRXSpda4mmakt4QeiCJh --execute SELECT id, `trigger`, LEFT(body, 120) as body_preview, isActive FROM sms_templates ORDER BY id;",
+  "rows": [
+    {
+      "id": "1",
+      "trigger": "new_lead",
+      "body_preview": "Hi {{first_name}}, this is Clarke & Associates Mortgage. Thanks for reaching out — a member of our team will be in touch",
+      "isActive": "1"
+    },
+    {
+      "id": "2",
+      "trigger": "registered",
+      "body_preview": "Hi {{first_name}}, you're confirmed for {{webinar_title}} on {{session_date}}! Use this link to join: {{webinar_link}} —",
+      "isActive": "1"
+    },
+    {
+      "id": "3",
+      "trigger": "reminder_24h",
+      "body_preview": "Hi {{first_name}}, just a reminder that {{webinar_title}} is tomorrow on {{session_date}}. Your join link: {{webinar_lin",
+      "isActive": "1"
+    },
+    {
+      "id": "4",
+      "trigger": "reminder_1h",
+      "body_preview": "Hi {{first_name}}, {{webinar_title}} starts in 1 hour! Click here to join: {{webinar_link}} — We'll see you soon. Reply ",
+      "isActive": "1"
+    },
+    {
+      "id": "5",
+      "trigger": "attended",
+      "body_preview": "Hi {{first_name}}, thank you for attending {{webinar_title}}! We hope it was valuable. If you're ready to explore your m",
+      "isActive": "1"
+    },
+    {
+      "id": "6",
+      "trigger": "no_show",
+      "body_preview": "Hi {{first_name}}, we missed you at {{webinar_title}}! No worries — reply here if you have any questions or would like t",
+      "isActive": "1"
+    },
+    {
+      "id": "7",
+      "trigger": "consultation_booked",
+      "body_preview": "Hi {{first_name}}, your consultation with Clarke & Associates is confirmed. Please check your email for the details. We ",
+      "isActive": "1"
+    },
+    {
+      "id": "8",
+      "trigger": "under_contract",
+      "body_preview": "Hi {{first_name}}, congratulations — you're under contract! The Clarke & Associates team is here to help you through the",
+      "isActive": "1"
+    },
+    {
+      "id": "9",
+      "trigger": "deal_closed",
+      "body_preview": "Hi {{first_name}}, congratulations on your new home! It was a pleasure working with you at Clarke & Associates. Wishing ",
+      "isActive": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttrigger\tbody_preview\tisActive\n1\tnew_lead\tHi {{first_name}}, this is Clarke & Associates Mortgage. Thanks for reaching out — a member of our team will be in touch\t1\n2\tregistered\tHi {{first_name}}, you're confirmed for {{webinar_title}} on {{session_date}}! Use this link to join: {{webinar_link}} —\t1\n3\treminder_24h\tHi {{first_name}}, just a reminder that {{webinar_title}} is tomorrow on {{session_date}}. Your join link: {{webinar_lin\t1\n4\treminder_1h\tHi {{first_name}}, {{webinar_title}} starts in 1 hour! Click here to join: {{webinar_link}} — We'll see you soon. Reply \t1\n5\tattended\tHi {{first_name}}, thank you for attending {{webinar_title}}! We hope it was valuable. If you're ready to explore your m\t1\n6\tno_show\tHi {{first_name}}, we missed you at {{webinar_title}}! No worries — reply here if you have any questions or would like t\t1\n7\tconsultation_booked\tHi {{first_name}}, your consultation with Clarke & Associates is confirmed. Please check your email for the details. We \t1\n8\tunder_contract\tHi {{first_name}}, congratulations — you're under contract! The Clarke & Associates team is here to help you through the\t1\n9\tdeal_closed\tHi {{first_name}}, congratulations on your new home! It was a pleasure working with you at Clarke & Associates. Wishing \t1\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}

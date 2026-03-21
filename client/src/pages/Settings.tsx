@@ -53,7 +53,18 @@ export default function SettingsPage() {
   const [templateDrafts, setTemplateDrafts] = useState<Record<number, { body: string; isActive: boolean }>>({});
   const [showAddTemplate, setShowAddTemplate] = useState(false);
   const [newTemplateTrigger, setNewTemplateTrigger] = useState<string>("new_lead");
-  const [newTemplateBody, setNewTemplateBody] = useState("");
+  const SMS_TEMPLATE_DEFAULTS: Record<string, string> = {
+    new_lead: "Hi {{first_name}}, this is Clarke & Associates Mortgage. Thanks for reaching out — a member of our team will be in touch with you shortly. Reply STOP to opt out.",
+    registered: "Hi {{first_name}}, you're confirmed for {{webinar_title}} on {{session_date}}! Use this link to join: {{webinar_link}} — We look forward to seeing you there. Reply STOP to opt out.",
+    reminder_24h: "Hi {{first_name}}, just a reminder that {{webinar_title}} is tomorrow on {{session_date}}. Your join link: {{webinar_link}} — See you then! Reply STOP to opt out.",
+    reminder_1h: "Hi {{first_name}}, {{webinar_title}} starts in 1 hour! Click here to join: {{webinar_link}} — We'll see you soon. Reply STOP to opt out.",
+    attended: "Hi {{first_name}}, thank you for attending {{webinar_title}}! We hope it was valuable. If you're ready to explore your mortgage options, reply here or book a free consultation with our team. Reply STOP to opt out.",
+    no_show: "Hi {{first_name}}, we missed you at {{webinar_title}}! No worries — reply here if you have any questions or would like to register for an upcoming session. We're happy to help. Reply STOP to opt out.",
+    consultation_booked: "Hi {{first_name}}, your consultation with Clarke & Associates is confirmed. Please check your email for the details. We look forward to speaking with you! Reply STOP to opt out.",
+    under_contract: "Hi {{first_name}}, congratulations — you're under contract! The Clarke & Associates team is here to help you through the next steps. We'll be in touch soon. Reply STOP to opt out.",
+    deal_closed: "Hi {{first_name}}, congratulations on your new home! It was a pleasure working with you at Clarke & Associates. Wishing you all the best — don't hesitate to reach out if you ever need us. Reply STOP to opt out.",
+  };
+  const [newTemplateBody, setNewTemplateBody] = useState(SMS_TEMPLATE_DEFAULTS["new_lead"]);
   const [newTemplateActive, setNewTemplateActive] = useState(true);
   const [deletingTemplateId, setDeletingTemplateId] = useState<number | null>(null);
   const [previewTemplateId, setPreviewTemplateId] = useState<number | null>(null);
@@ -83,8 +94,8 @@ export default function SettingsPage() {
       toast.success("Template created");
       refetchTemplates();
       setShowAddTemplate(false);
-      setNewTemplateBody("");
       setNewTemplateTrigger("new_lead");
+      setNewTemplateBody(SMS_TEMPLATE_DEFAULTS["new_lead"]);
       setNewTemplateActive(true);
     },
     onError: (e: any) => toast.error(e.message),
@@ -952,7 +963,13 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Trigger — when should this message be sent?</Label>
-                  <Select value={newTemplateTrigger} onValueChange={setNewTemplateTrigger}>
+                  <Select value={newTemplateTrigger} onValueChange={(v) => {
+                    setNewTemplateTrigger(v);
+                    // Pre-populate body with default text if body is still empty
+                    if (!newTemplateBody.trim() && SMS_TEMPLATE_DEFAULTS[v]) {
+                      setNewTemplateBody(SMS_TEMPLATE_DEFAULTS[v]);
+                    }
+                  }}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select trigger" />
                     </SelectTrigger>
