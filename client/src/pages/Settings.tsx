@@ -48,9 +48,9 @@ export default function SettingsPage() {
   const [testEmail, setTestEmail] = useState("");
   const [showTestEmail, setShowTestEmail] = useState(false);
 
-  // SMS Templates state
-  const [editingTemplate, setEditingTemplate] = useState<number | null>(null); // now uses id
+  // SMS Templates state — always-editable; drafts keyed by template id
   const [templateDrafts, setTemplateDrafts] = useState<Record<number, { body: string; isActive: boolean }>>({});
+  const [savingTemplateId, setSavingTemplateId] = useState<number | null>(null);
   const [showAddTemplate, setShowAddTemplate] = useState(false);
   const [newTemplateTrigger, setNewTemplateTrigger] = useState<string>("new_lead");
   const SMS_TEMPLATE_DEFAULTS: Record<string, string> = {
@@ -82,11 +82,14 @@ export default function SettingsPage() {
     Object.entries(SAMPLE_VARS).reduce((msg, [key, val]) => msg.replaceAll(key, val), body);
 
   const upsertTemplate = trpc.smsTemplates.upsert.useMutation({
-    onSuccess: () => { toast.success("Template saved"); refetchTemplates(); setEditingTemplate(null); },
+    onSuccess: () => { toast.success("Template saved"); refetchTemplates(); },
     onError: (e: any) => toast.error(e.message),
   });
   const resetTemplate = trpc.smsTemplates.reset.useMutation({
-    onSuccess: () => { toast.success("Template reset to default"); refetchTemplates(); setEditingTemplate(null); },
+    onSuccess: (_data: any, vars: { trigger: string }) => {
+      toast.success("Template reset to default");
+      refetchTemplates();
+    },
     onError: (e: any) => toast.error(e.message),
   });
   const createTemplate = trpc.smsTemplates.create.useMutation({
@@ -101,8 +104,14 @@ export default function SettingsPage() {
     onError: (e: any) => toast.error(e.message),
   });
   const updateTemplate = trpc.smsTemplates.update.useMutation({
-    onSuccess: () => { toast.success("Template saved"); refetchTemplates(); setEditingTemplate(null); },
-    onError: (e: any) => toast.error(e.message),
+    onSuccess: (_data: any, vars: { id: number }) => {
+      toast.success("Template saved");
+      setSavingTemplateId(null);
+      refetchTemplates();
+      // Clear draft so card re-syncs from server data
+      setTemplateDrafts(prev => { const next = { ...prev }; delete next[vars.id]; return next; });
+    },
+    onError: (e: any) => { toast.error(e.message); setSavingTemplateId(null); },
   });
   const deleteTemplate = trpc.smsTemplates.delete.useMutation({
     onSuccess: () => { toast.success("Template deleted"); refetchTemplates(); setDeletingTemplateId(null); },
@@ -1133,134 +1142,138 @@ export default function SettingsPage() {
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading templates...
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {(smsTemplateList ?? []).map((tmpl) => {
-                    const isEditing = editingTemplate === tmpl.id;
                     const draft = templateDrafts[tmpl.id];
-                    const currentBody = isEditing ? (draft?.body ?? tmpl.body) : tmpl.body;
-                    const currentActive = isEditing ? (draft?.isActive ?? tmpl.isActive) : tmpl.isActive;
+                    // Always use draft if present, otherwise fall back to server data
+                    const currentBody = draft?.body ?? tmpl.body;
+                    const currentActive = draft?.isActive ?? tmpl.isActive;
                     const charCount = currentBody.length;
-                    const smsCount = Math.ceil(charCount / 160);
+                    const smsCount = Math.ceil(charCount / 160) || 1;
                     const isDeleting = deletingTemplateId === tmpl.id;
+                    const isSaving = savingTemplateId === tmpl.id;
+                    const isDirty = draft !== undefined && (draft.body !== tmpl.body || draft.isActive !== tmpl.isActive);
+
+                    const initDraft = () => {
+                      if (!templateDrafts[tmpl.id]) {
+                        setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: tmpl.body, isActive: tmpl.isActive } }));
+                      }
+                    };
 
                     return (
                       <div key={tmpl.id} className={`rounded-lg border p-4 space-y-3 transition-colors ${
-                        isEditing ? 'border-brand-green/40 bg-brand-green/5' : 'border-border/40 bg-muted/10'
+                        isDirty ? 'border-brand-green/50 bg-brand-green/5' : 'border-border/40 bg-muted/10'
                       }`}>
                         {/* Header row */}
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-semibold text-sm" style={{ fontFamily: 'Raleway, sans-serif' }}>{tmpl.label}</span>
-                              <Badge variant={tmpl.isActive ? 'default' : 'secondary'} className={`text-xs ${
-                                tmpl.isActive ? 'bg-green-100 text-green-800 border-green-200' : ''
+                              <Badge variant={currentActive ? 'default' : 'secondary'} className={`text-xs ${
+                                currentActive ? 'bg-green-100 text-green-800 border-green-200' : ''
                               }`}>
-                                {tmpl.isActive ? 'Active' : 'Inactive'}
+                                {currentActive ? 'Active' : 'Inactive'}
                               </Badge>
+                              {isDirty && (
+                                <span className="text-xs text-amber-600 font-medium">Unsaved changes</span>
+                              )}
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5">{tmpl.description}</p>
                           </div>
-                          {!isEditing && (
-                            <div className="flex items-center gap-1 shrink-0">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1"
-                                onClick={() => setPreviewTemplateId(tmpl.id)}
-                              >
-                                <Eye className="h-3.5 w-3.5" /> Preview
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1"
-                                onClick={() => {
-                                  setEditingTemplate(tmpl.id);
-                                  setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: tmpl.body, isActive: tmpl.isActive } }));
-                                }}
-                              >
-                                <Edit className="h-3.5 w-3.5" /> Edit
-                              </Button>
-                              {isDeleting ? (
-                                <div className="flex items-center gap-1">
-                                  <span className="text-xs text-destructive">Delete?</span>
-                                  <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    disabled={deleteTemplate.isPending}
-                                    onClick={() => deleteTemplate.mutate({ id: tmpl.id })}
-                                  >
-                                    {deleteTemplate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Yes'}
-                                  </Button>
-                                  <Button variant="ghost" size="sm" onClick={() => setDeletingTemplateId(null)}>No</Button>
-                                </div>
-                              ) : (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1"
+                              onClick={() => setPreviewTemplateId(tmpl.id)}
+                            >
+                              <Eye className="h-3.5 w-3.5" /> Preview
+                            </Button>
+                            {isDeleting ? (
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs text-destructive">Delete?</span>
                                 <Button
-                                  variant="ghost"
+                                  variant="destructive"
                                   size="sm"
-                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  onClick={() => setDeletingTemplateId(tmpl.id)}
+                                  disabled={deleteTemplate.isPending}
+                                  onClick={() => deleteTemplate.mutate({ id: tmpl.id })}
                                 >
-                                  <Trash2 className="h-3.5 w-3.5" />
+                                  {deleteTemplate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Yes'}
                                 </Button>
-                              )}
-                            </div>
-                          )}
+                                <Button variant="ghost" size="sm" onClick={() => setDeletingTemplateId(null)}>No</Button>
+                              </div>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => setDeletingTemplateId(tmpl.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
 
-                        {/* Body — textarea when editing, read-only preview otherwise */}
-                        {isEditing ? (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <Label className="text-xs">Message body</Label>
-                              <div className="flex items-center gap-2">
-                                <span className={`text-xs ${ charCount > 1600 ? 'text-destructive font-semibold' : charCount > 160 ? 'text-amber-600' : 'text-muted-foreground' }`}>
-                                  {charCount} chars · {smsCount} SMS segment{smsCount !== 1 ? 's' : ''}
-                                </span>
+                        {/* Always-editable body */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs text-muted-foreground">Message body</Label>
+                            <div className="flex items-center gap-3">
+                              <span className={`text-xs ${ charCount > 1600 ? 'text-destructive font-semibold' : charCount > 160 ? 'text-amber-600' : 'text-muted-foreground' }`}>
+                                {charCount} chars · {smsCount} segment{smsCount !== 1 ? 's' : ''}
+                              </span>
+                              <div className="flex items-center gap-1.5">
                                 <Switch
                                   checked={currentActive}
-                                  onCheckedChange={(v) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { ...prev[tmpl.id], isActive: v } }))}
+                                  onCheckedChange={(v) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: v } }))}
                                 />
                                 <span className="text-xs text-muted-foreground">{currentActive ? 'Active' : 'Inactive'}</span>
                               </div>
                             </div>
-                            <textarea
-                              className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
-                              value={currentBody}
-                              onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { ...prev[tmpl.id], body: e.target.value } }))}
-                            />
-                            <div className="flex gap-2 justify-end">
+                          </div>
+                          <textarea
+                            className="w-full min-h-[90px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+                            value={currentBody}
+                            onFocus={initDraft}
+                            onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: e.target.value, isActive: currentActive } }))}
+                          />
+                          <div className="flex gap-2 justify-between items-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs text-muted-foreground"
+                              disabled={resetTemplate.isPending}
+                              onClick={() => resetTemplate.mutate({ trigger: tmpl.trigger as any })}
+                            >
+                              {resetTemplate.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                              Reset to default
+                            </Button>
+                            <div className="flex gap-2">
+                              {isDirty && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setTemplateDrafts(prev => { const next = { ...prev }; delete next[tmpl.id]; return next; })}
+                                >
+                                  Discard
+                                </Button>
+                              )}
                               <Button
-                                variant="ghost"
                                 size="sm"
-                                onClick={() => { setEditingTemplate(null); }}
+                                className={`gap-1 ${ isDirty ? 'bg-brand-green hover:bg-brand-green-dark text-white' : 'bg-muted text-muted-foreground cursor-default' }`}
+                                disabled={isSaving || charCount === 0 || charCount > 1600 || !isDirty}
+                                onClick={() => {
+                                  setSavingTemplateId(tmpl.id);
+                                  updateTemplate.mutate({ id: tmpl.id, body: currentBody, isActive: currentActive });
+                                }}
                               >
-                                Cancel
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1"
-                                disabled={resetTemplate.isPending}
-                                onClick={() => resetTemplate.mutate({ trigger: tmpl.trigger as any })}
-                              >
-                                {resetTemplate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                                Reset to default
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="bg-brand-green hover:bg-brand-green-dark text-white gap-1"
-                                disabled={updateTemplate.isPending || charCount === 0 || charCount > 1600}
-                                onClick={() => updateTemplate.mutate({ id: tmpl.id, body: currentBody, isActive: currentActive })}
-                              >
-                                {updateTemplate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                                Save
+                                {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                                Save changes
                               </Button>
                             </div>
                           </div>
-                        ) : (
-                          <p className="text-xs text-muted-foreground font-mono bg-muted/30 rounded px-3 py-2 whitespace-pre-wrap">{tmpl.body}</p>
-                        )}
+                        </div>
                       </div>
                     );
                   })}
