@@ -1157,6 +1157,98 @@ export async function sendLeadSms(
   }
 }
 
+/**
+ * Send an email to a lead using the active SMS template body as the email body.
+ * Falls back gracefully if no email is configured or lead has no email.
+ */
+export async function sendLeadEmail(
+  leadId: number,
+  trigger: SmsTemplate["trigger"],
+  sentByUserId?: number,
+): Promise<void> {
+  try {
+    const { sendEmail } = await import("./emailService");
+    const [template, lead] = await Promise.all([
+      getSmsTemplate(trigger),
+      getLeadById(leadId),
+    ]);
+    if (!template || !template.isActive) return;
+    if (!lead?.email) return;
+
+    // Resolve placeholders (same logic as sendLeadSms)
+    let body = template.body;
+    body = body.replace(/\{\{first_name\}\}/g, lead.firstName ?? "there");
+    body = body.replace(/\{\{last_name\}\}/g, lead.lastName ?? "");
+    body = body.replace(/\{\{full_name\}\}/g, [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "there");
+
+    if (lead.webinarId) {
+      const webinar = await getWebinarById(lead.webinarId);
+      if (webinar) {
+        body = body.replace(/\{\{webinar_title\}\}/g, webinar.title ?? "");
+        body = body.replace(/\{\{webinar_link\}\}/g, webinar.zoomJoinUrl ?? webinar.replayUrl ?? "");
+      }
+    }
+    if (lead.webinarSessionId) {
+      const session = await getWebinarSessionById(lead.webinarSessionId);
+      if (session) {
+        body = body.replace(/\{\{session_date\}\}/g, new Date(session.sessionDate).toLocaleString("en-US", {
+          month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+        }));
+        if (session.zoomJoinUrl) body = body.replace(/\{\{webinar_link\}\}/g, session.zoomJoinUrl);
+      }
+    }
+    body = body.replace(/\{\{[^}]+\}\}/g, "");
+
+    // Build a subject line from the trigger
+    const subjectMap: Record<string, string> = {
+      new_lead: "Welcome to Clarke & Associates Mortgage!",
+      registered: "You're Registered — Here's Your Webinar Info",
+      reminder_24h: "Reminder: Your Webinar is Tomorrow",
+      reminder_1h: "Starting Soon: Your Webinar Begins in 1 Hour",
+      attended: "Thank You for Attending!",
+      no_show: "We Missed You — Here's the Replay",
+      consultation_booked: "Your Consultation is Confirmed",
+      under_contract: "Congratulations — You're Under Contract!",
+      deal_closed: "Congratulations on Your New Home!",
+    };
+    const subject = subjectMap[trigger] ?? "Message from Clarke & Associates Mortgage";
+
+    // Convert plain text to basic HTML
+    const html = `<p>${body.replace(/\n/g, "<br>")}</p>`;
+
+    await sendEmail({ to: lead.email, subject, body: html });
+
+    const db = await getDb();
+    if (db) {
+      await logActivity({
+        leadId,
+        userId: sentByUserId,
+        type: "email_sent",
+        title: `Auto email sent (${trigger})`,
+        content: body,
+      });
+    }
+  } catch (err) {
+    console.error(`[sendLeadEmail] Unexpected error for lead ${leadId} trigger ${trigger}:`, err);
+  }
+}
+
+/**
+ * Fire both SMS and email for a lead trigger simultaneously.
+ * SMS is only sent if lead has phone + smsConsent.
+ * Email is only sent if lead has email + Gmail is configured.
+ */
+export async function sendLeadNotifications(
+  leadId: number,
+  trigger: SmsTemplate["trigger"],
+  sentByUserId?: number,
+): Promise<void> {
+  await Promise.all([
+    sendLeadSms(leadId, trigger, sentByUserId),
+    sendLeadEmail(leadId, trigger, sentByUserId),
+  ]);
+}
+
 // ─── SMS Inbox helpers ────────────────────────────────────────────────────────
 
 /** Returns one row per lead that has at least one SMS message, with the latest message body/time and unread count */

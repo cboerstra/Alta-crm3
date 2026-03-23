@@ -5,6 +5,7 @@ import {
   logActivity, getActivityByLeadId, updateLeadScore,
   getLandingPageBySlug, getWebinarById, getWebinarSessionById,
   createEmailReminder, deleteLead, deleteLeads, notifyAdminsBySms,
+  sendLeadNotifications,
 } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { notifyOwner } from "../_core/notification";
@@ -50,6 +51,8 @@ export const leadsRouter = router({
         title: "Lead created",
         content: `Lead created from ${input.source ?? "direct entry"}`,
       });
+      // Fire SMS + email for new lead (fire-and-forget)
+      sendLeadNotifications(id, "new_lead", ctx.user.id).catch(() => {});
       return { id };
     }),
 
@@ -85,6 +88,16 @@ export const leadsRouter = router({
         title: `Stage changed to ${input.stage.replace(/_/g, " ")}`,
         content: `Previous stage: ${prev?.stage ?? "unknown"}`,
       });
+      // Map stage names to SMS template triggers
+      const stageToTrigger: Partial<Record<string, "consultation_booked" | "under_contract" | "deal_closed">> = {
+        consultation_booked: "consultation_booked",
+        under_contract: "under_contract",
+        closed: "deal_closed",
+      };
+      const triggerKey = stageToTrigger[input.stage];
+      if (triggerKey) {
+        sendLeadNotifications(input.id, triggerKey, ctx.user.id).catch(() => {});
+      }
       return { success: true };
     }),
 
@@ -314,6 +327,10 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
       } catch (e) {
         // Non-critical, don't fail the capture
       }
+
+      // Fire SMS + email for the lead (new_lead or registered trigger)
+      const landingTrigger = page.webinarId ? "registered" : "new_lead";
+      sendLeadNotifications(id, landingTrigger).catch(() => {});
 
       // Notify admins via SMS (fire-and-forget — never blocks the response)
       const adminSmsBody = [

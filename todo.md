@@ -528,3 +528,4 @@
 - [ ] Remove auto-reset logic that overwrites custom SMS templates on server restart
 - [ ] Verify Add Template dialog shows all triggers including pre-webinar reminders
 - [ ] Ensure multiple templates per trigger work correctly
+- [x] Fire both SMS and email simultaneously for all trigger events (new_lead, registered, attended, no_show, consultation_booked, under_contract, deal_closed)
