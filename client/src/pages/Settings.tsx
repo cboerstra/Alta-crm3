@@ -54,15 +54,15 @@ export default function SettingsPage() {
   const [showAddTemplate, setShowAddTemplate] = useState(false);
   const [newTemplateTrigger, setNewTemplateTrigger] = useState<string>("new_lead");
   const SMS_TEMPLATE_DEFAULTS: Record<string, string> = {
-    new_lead: "Hi {{first_name}}, this is Clarke & Associates Mortgage. Thanks for reaching out — a member of our team will be in touch with you shortly. Reply STOP to opt out.",
-    registered: "Hi {{first_name}}, you're confirmed for {{webinar_title}} on {{session_date}}! Use this link to join: {{webinar_link}} — We look forward to seeing you there. Reply STOP to opt out.",
-    reminder_24h: "Hi {{first_name}}, just a reminder that {{webinar_title}} is tomorrow on {{session_date}}. Your join link: {{webinar_link}} — See you then! Reply STOP to opt out.",
-    reminder_1h: "Hi {{first_name}}, {{webinar_title}} starts in 1 hour! Click here to join: {{webinar_link}} — We'll see you soon. Reply STOP to opt out.",
-    attended: "Hi {{first_name}}, thank you for attending {{webinar_title}}! We hope it was valuable. If you're ready to explore your mortgage options, reply here or book a free consultation with our team. Reply STOP to opt out.",
-    no_show: "Hi {{first_name}}, we missed you at {{webinar_title}}! No worries — reply here if you have any questions or would like to register for an upcoming session. We're happy to help. Reply STOP to opt out.",
-    consultation_booked: "Hi {{first_name}}, your consultation with Clarke & Associates is confirmed. Please check your email for the details. We look forward to speaking with you! Reply STOP to opt out.",
-    under_contract: "Hi {{first_name}}, congratulations — you're under contract! The Clarke & Associates team is here to help you through the next steps. We'll be in touch soon. Reply STOP to opt out.",
-    deal_closed: "Hi {{first_name}}, congratulations on your new home! It was a pleasure working with you at Clarke & Associates. Wishing you all the best — don't hesitate to reach out if you ever need us. Reply STOP to opt out.",
+    new_lead: "Hi {{first_name}}, thanks for your interest in Clarke & Associates! We help families navigate the home-buying process with confidence. A member of our team will reach out to you shortly. Reply STOP to opt out.",
+    registered: "Hi {{first_name}}, you're registered for {{webinar_title}} on {{session_date}}! We're excited to have you join us. Your link to attend: {{webinar_link}}. Add it to your calendar so you don't miss it! Reply STOP to opt out.",
+    reminder_24h: "Hi {{first_name}}, your webinar {{webinar_title}} is TOMORROW on {{session_date}}! We have some great information prepared for you. Your join link: {{webinar_link}}. See you there! Reply STOP to opt out.",
+    reminder_1h: "Hi {{first_name}}, {{webinar_title}} starts in 1 HOUR! Don't miss out — join us here: {{webinar_link}}. We're looking forward to seeing you! Reply STOP to opt out.",
+    attended: "Hi {{first_name}}, thank you for attending {{webinar_title}} today! We hope you found it valuable. Ready to take the next step toward homeownership? Reply to this message or call us to schedule a free consultation. Reply STOP to opt out.",
+    no_show: "Hi {{first_name}}, we missed you at {{webinar_title}}! Life gets busy — we understand. We'd love to connect and share what you missed. Reply here to get the replay or to schedule a quick call with our team. Reply STOP to opt out.",
+    consultation_booked: "Hi {{first_name}}, your consultation with Clarke & Associates Mortgage is confirmed! Please check your email for the meeting details and any documents to review beforehand. We look forward to speaking with you soon. Reply STOP to opt out.",
+    under_contract: "Hi {{first_name}}, exciting news — you're officially under contract! Congratulations! The Clarke & Associates team is here to guide you through every step of the closing process. We'll be in touch with next steps shortly. Reply STOP to opt out.",
+    deal_closed: "Hi {{first_name}}, CONGRATULATIONS on closing your home! It has been a true pleasure working with you at Clarke & Associates Mortgage. Wishing you many happy years in your new home. Please don't hesitate to refer friends and family our way! Reply STOP to opt out.",
   };
   const [newTemplateBody, setNewTemplateBody] = useState(SMS_TEMPLATE_DEFAULTS["new_lead"]);
   const [newTemplateActive, setNewTemplateActive] = useState(true);
@@ -350,7 +350,7 @@ export default function SettingsPage() {
               <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-green-500" />
             )}
           </TabsTrigger>
-          <TabsTrigger value="sms-templates" className="gap-1"><MessageSquare className="h-3.5 w-3.5" /> SMS Templates</TabsTrigger>
+          <TabsTrigger value="sms-templates" className="gap-1"><MessageSquare className="h-3.5 w-3.5" /> SMS &amp; Email Templates</TabsTrigger>
           <TabsTrigger value="general" className="gap-1"><Settings className="h-3.5 w-3.5" /> General</TabsTrigger>
         </TabsList>
 
@@ -967,7 +967,7 @@ export default function SettingsPage() {
           <Dialog open={showAddTemplate} onOpenChange={setShowAddTemplate}>
             <DialogContent className="max-w-lg">
               <DialogHeader>
-                <DialogTitle style={{ fontFamily: 'Raleway, sans-serif' }}>Add SMS Template</DialogTitle>
+                <DialogTitle style={{ fontFamily: 'Raleway, sans-serif' }}>Add SMS / Email Template</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-1.5">
@@ -1095,9 +1095,9 @@ export default function SettingsPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-base" style={{ fontFamily: "Raleway, sans-serif" }}>SMS Templates</CardTitle>
+                  <CardTitle className="text-base" style={{ fontFamily: "Raleway, sans-serif" }}>SMS &amp; Email Templates</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Manage automated SMS messages sent at each lead stage. Multiple templates per trigger are supported — all active templates for a trigger will be sent.
+                    Manage automated SMS and email messages sent at each lead stage. Multiple templates per trigger are supported — all active templates for a trigger will be sent.
                   </p>
                 </div>
                 <Button
@@ -1105,7 +1105,7 @@ export default function SettingsPage() {
                   className="bg-brand-green hover:bg-brand-green-dark text-white gap-1 shrink-0"
                   onClick={() => setShowAddTemplate(true)}
                 >
-                  <Plus className="h-3.5 w-3.5" /> Add Template
+                  <Plus className="h-3.5 w-3.5" /> Add SMS / Email Template
                 </Button>
               </div>
             </CardHeader>
@@ -1189,6 +1189,19 @@ export default function SettingsPage() {
                             >
                               <Eye className="h-3.5 w-3.5" /> Preview
                             </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1"
+                              onClick={() => {
+                                // Focus the textarea for this card
+                                initDraft();
+                                const el = document.getElementById(`tmpl-body-${tmpl.id}`);
+                                if (el) { el.focus(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+                              }}
+                            >
+                              <Edit className="h-3.5 w-3.5" /> Edit
+                            </Button>
                             {isDeleting ? (
                               <div className="flex items-center gap-1">
                                 <span className="text-xs text-destructive">Delete?</span>
@@ -1233,6 +1246,7 @@ export default function SettingsPage() {
                             </div>
                           </div>
                           <textarea
+                            id={`tmpl-body-${tmpl.id}`}
                             className="w-full min-h-[90px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
                             value={currentBody}
                             onFocus={initDraft}

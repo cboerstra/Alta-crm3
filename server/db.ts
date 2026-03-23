@@ -739,49 +739,58 @@ export async function deleteInvite(id: number): Promise<void> {
 
 const DEFAULT_SMS_TEMPLATES: Omit<InsertSmsTemplate, "createdBy">[] = [
   {
+    // Sent immediately when a new lead submits a landing page form or is added manually.
     trigger: "new_lead",
-    body: "Hi {{first_name}}, this is Clarke & Associates Mortgage. Thanks for reaching out — a member of our team will be in touch with you shortly. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, thanks for your interest in Clarke & Associates! We help families navigate the home-buying process with confidence. A member of our team will reach out to you shortly. Reply STOP to opt out.",
     isActive: true,
   },
   {
+    // Sent as soon as a lead registers for a webinar session.
     trigger: "registered",
-    body: "Hi {{first_name}}, you're confirmed for {{webinar_title}} on {{session_date}}! Use this link to join: {{webinar_link}} — We look forward to seeing you there. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, you're registered for {{webinar_title}} on {{session_date}}! We're excited to have you join us. Your link to attend: {{webinar_link}}. Add it to your calendar so you don't miss it! Reply STOP to opt out.",
     isActive: true,
   },
   {
+    // Sent 24 hours before the webinar starts.
     trigger: "reminder_24h",
-    body: "Hi {{first_name}}, just a reminder that {{webinar_title}} is tomorrow on {{session_date}}. Your join link: {{webinar_link}} — See you then! Reply STOP to opt out.",
+    body: "Hi {{first_name}}, your webinar {{webinar_title}} is TOMORROW on {{session_date}}! We have some great information prepared for you. Your join link: {{webinar_link}}. See you there! Reply STOP to opt out.",
     isActive: true,
   },
   {
+    // Sent 1 hour before the webinar starts.
     trigger: "reminder_1h",
-    body: "Hi {{first_name}}, {{webinar_title}} starts in 1 hour! Click here to join: {{webinar_link}} — We'll see you soon. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, {{webinar_title}} starts in 1 HOUR! Don't miss out — join us here: {{webinar_link}}. We're looking forward to seeing you! Reply STOP to opt out.",
     isActive: true,
   },
   {
+    // Sent after the webinar to leads who attended.
     trigger: "attended",
-    body: "Hi {{first_name}}, thank you for attending {{webinar_title}}! We hope it was valuable. If you're ready to explore your mortgage options, reply here or book a free consultation with our team. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, thank you for attending {{webinar_title}} today! We hope you found it valuable. Ready to take the next step toward homeownership? Reply to this message or call us to schedule a free consultation. Reply STOP to opt out.",
     isActive: true,
   },
   {
+    // Sent after the webinar to leads who registered but did not attend.
     trigger: "no_show",
-    body: "Hi {{first_name}}, we missed you at {{webinar_title}}! No worries — reply here if you have any questions or would like to register for an upcoming session. We're happy to help. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, we missed you at {{webinar_title}}! Life gets busy — we understand. We'd love to connect and share what you missed. Reply here to get the replay or to schedule a quick call with our team. Reply STOP to opt out.",
     isActive: true,
   },
   {
+    // Sent when a lead books a consultation appointment.
     trigger: "consultation_booked",
-    body: "Hi {{first_name}}, your consultation with Clarke & Associates is confirmed. Please check your email for the details. We look forward to speaking with you! Reply STOP to opt out.",
+    body: "Hi {{first_name}}, your consultation with Clarke & Associates Mortgage is confirmed! Please check your email for the meeting details and any documents to review beforehand. We look forward to speaking with you soon. Reply STOP to opt out.",
     isActive: true,
   },
   {
+    // Sent when a deal is marked as under contract.
     trigger: "under_contract",
-    body: "Hi {{first_name}}, congratulations — you're under contract! The Clarke & Associates team is here to help you through the next steps. We'll be in touch soon. Reply STOP to opt out.",
+    body: "Hi {{first_name}}, exciting news — you're officially under contract! Congratulations! The Clarke & Associates team is here to guide you through every step of the closing process. We'll be in touch with next steps shortly. Reply STOP to opt out.",
     isActive: true,
   },
   {
+    // Sent when a deal is closed/won.
     trigger: "deal_closed",
-    body: "Hi {{first_name}}, congratulations on your new home! It was a pleasure working with you at Clarke & Associates. Wishing you all the best — don't hesitate to reach out if you ever need us. Reply STOP to opt out.",
-    isActive: false,
+    body: "Hi {{first_name}}, CONGRATULATIONS on closing your home! 🏠 It has been a true pleasure working with you at Clarke & Associates Mortgage. Wishing you many happy years in your new home. Please don't hesitate to refer friends and family our way! Reply STOP to opt out.",
+    isActive: true,
   },
 ];
 
@@ -832,7 +841,13 @@ export async function getSmsTemplates(): Promise<SmsTemplate[]> {
   const rows = await db.select().from(smsTemplates).orderBy(smsTemplates.trigger);
   // If no templates exist yet, seed defaults and return them
   if (rows.length === 0) {
-    await db.insert(smsTemplates).values(DEFAULT_SMS_TEMPLATES);
+    // Use raw SQL to avoid Drizzle DEFAULT keyword issue on some MySQL versions
+    for (const t of DEFAULT_SMS_TEMPLATES) {
+      await (db as any).execute(
+        "INSERT INTO `sms_templates` (`trigger`, `body`, `isActive`) VALUES (?, ?, ?)",
+        [t.trigger, t.body, t.isActive ? 1 : 0],
+      );
+    }
     return db.select().from(smsTemplates).orderBy(smsTemplates.trigger);
   }
   return rows;
@@ -857,7 +872,18 @@ export async function upsertSmsTemplate(
   if (existing) {
     await db.update(smsTemplates).set({ body, isActive, updatedAt: new Date() }).where(eq(smsTemplates.trigger, trigger));
   } else {
-    await db.insert(smsTemplates).values({ trigger, body, isActive, createdBy });
+    // Use raw SQL to avoid Drizzle DEFAULT keyword issue on some MySQL versions
+    if (createdBy !== undefined) {
+      await (db as any).execute(
+        "INSERT INTO `sms_templates` (`trigger`, `body`, `isActive`, `createdBy`) VALUES (?, ?, ?, ?)",
+        [trigger, body, isActive ? 1 : 0, createdBy],
+      );
+    } else {
+      await (db as any).execute(
+        "INSERT INTO `sms_templates` (`trigger`, `body`, `isActive`) VALUES (?, ?, ?)",
+        [trigger, body, isActive ? 1 : 0],
+      );
+    }
   }
 }
 
@@ -877,9 +903,24 @@ export async function createSmsTemplate(
 ): Promise<SmsTemplate> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const [result] = await db.insert(smsTemplates).values({ trigger, body, isActive, createdBy }).$returningId();
-  const [row] = await db.select().from(smsTemplates).where(eq(smsTemplates.id, result.id)).limit(1);
-  return row;
+  // Use raw SQL to avoid Drizzle emitting DEFAULT keyword for auto-columns,
+  // which fails on some MySQL versions (e.g., Hostinger shared hosting).
+  if (createdBy !== undefined) {
+    await (db as any).execute(
+      "INSERT INTO `sms_templates` (`trigger`, `body`, `isActive`, `createdBy`) VALUES (?, ?, ?, ?)",
+      [trigger, body, isActive ? 1 : 0, createdBy],
+    );
+  } else {
+    await (db as any).execute(
+      "INSERT INTO `sms_templates` (`trigger`, `body`, `isActive`) VALUES (?, ?, ?)",
+      [trigger, body, isActive ? 1 : 0],
+    );
+  }
+  const [rows] = await (db as any).execute(
+    "SELECT * FROM `sms_templates` WHERE `id` = LAST_INSERT_ID() LIMIT 1",
+  );
+  const row = Array.isArray(rows) ? rows[0] : rows;
+  return row as SmsTemplate;
 }
 
 export async function updateSmsTemplate(
