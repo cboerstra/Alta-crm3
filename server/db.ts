@@ -20,6 +20,7 @@ import {
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _pool: mysql2.Pool | null = null;
 let _dbInitError: string | null = null;
 
 /**
@@ -29,6 +30,13 @@ let _dbInitError: string | null = null;
  * Throws with a descriptive message when DATABASE_URL is missing or the
  * connection cannot be established.
  */
+/** Returns the raw mysql2 pool for executing raw SQL that bypasses Drizzle's query builder. */
+export async function getPool(): Promise<mysql2.Pool> {
+  await getDb(); // ensure pool is initialized
+  if (!_pool) throw new Error("DB pool unavailable");
+  return _pool;
+}
+
 export async function getDb() {
   if (_db) return _db;
   if (_dbInitError) throw new Error(_dbInitError);
@@ -60,6 +68,7 @@ export async function getDb() {
     await pool.query("SELECT 1");
     console.log("[Database] Connected successfully");
 
+    _pool = pool;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     _db = drizzle(pool as any);
     return _db;
@@ -841,9 +850,10 @@ export async function getSmsTemplates(): Promise<SmsTemplate[]> {
   const rows = await db.select().from(smsTemplates).orderBy(smsTemplates.trigger);
   // If no templates exist yet, seed defaults and return them
   if (rows.length === 0) {
-    // Use raw SQL to avoid Drizzle DEFAULT keyword issue on some MySQL versions
+    // Use raw pool to avoid Drizzle DEFAULT keyword issue on some MySQL versions
+    const pool = await getPool();
     for (const t of DEFAULT_SMS_TEMPLATES) {
-      await (db as any).execute(
+      await pool.execute(
         "INSERT INTO `sms_templates` (`trigger`, `body`, `isActive`) VALUES (?, ?, ?)",
         [t.trigger, t.body, t.isActive ? 1 : 0],
       );
@@ -872,14 +882,15 @@ export async function upsertSmsTemplate(
   if (existing) {
     await db.update(smsTemplates).set({ body, isActive, updatedAt: new Date() }).where(eq(smsTemplates.trigger, trigger));
   } else {
-    // Use raw SQL to avoid Drizzle DEFAULT keyword issue on some MySQL versions
+    // Use raw pool to avoid Drizzle DEFAULT keyword issue on some MySQL versions
+    const pool = await getPool();
     if (createdBy !== undefined) {
-      await (db as any).execute(
+      await pool.execute(
         "INSERT INTO `sms_templates` (`trigger`, `body`, `isActive`, `createdBy`) VALUES (?, ?, ?, ?)",
         [trigger, body, isActive ? 1 : 0, createdBy],
       );
     } else {
-      await (db as any).execute(
+      await pool.execute(
         "INSERT INTO `sms_templates` (`trigger`, `body`, `isActive`) VALUES (?, ?, ?)",
         [trigger, body, isActive ? 1 : 0],
       );
@@ -903,23 +914,24 @@ export async function createSmsTemplate(
 ): Promise<SmsTemplate> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  // Use raw SQL to avoid Drizzle emitting DEFAULT keyword for auto-columns,
+  // Use raw pool to avoid Drizzle emitting DEFAULT keyword for auto-columns,
   // which fails on some MySQL versions (e.g., Hostinger shared hosting).
+  const pool = await getPool();
   if (createdBy !== undefined) {
-    await (db as any).execute(
+    await pool.execute(
       "INSERT INTO `sms_templates` (`trigger`, `body`, `isActive`, `createdBy`) VALUES (?, ?, ?, ?)",
       [trigger, body, isActive ? 1 : 0, createdBy],
     );
   } else {
-    await (db as any).execute(
+    await pool.execute(
       "INSERT INTO `sms_templates` (`trigger`, `body`, `isActive`) VALUES (?, ?, ?)",
       [trigger, body, isActive ? 1 : 0],
     );
   }
-  const [rows] = await (db as any).execute(
+  const [rows] = await pool.execute(
     "SELECT * FROM `sms_templates` WHERE `id` = LAST_INSERT_ID() LIMIT 1",
   );
-  const row = Array.isArray(rows) ? rows[0] : rows;
+  const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
   return row as SmsTemplate;
 }
 

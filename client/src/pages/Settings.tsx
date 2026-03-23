@@ -28,6 +28,19 @@ type MediaItem = {
   createdAt: Date;
 };
 
+// Module-level constant so it's available in mutation callbacks (before component renders)
+const SMS_TEMPLATE_DEFAULTS: Record<string, string> = {
+  new_lead: "Hi {{first_name}}, thanks for your interest in Clarke & Associates! We help families navigate the home-buying process with confidence. A member of our team will reach out to you shortly. Reply STOP to opt out.",
+  registered: "Hi {{first_name}}, you're registered for {{webinar_title}} on {{session_date}}! We're excited to have you join us. Your link to attend: {{webinar_link}}. Add it to your calendar so you don't miss it! Reply STOP to opt out.",
+  reminder_24h: "Hi {{first_name}}, your webinar {{webinar_title}} is TOMORROW on {{session_date}}! We have some great information prepared for you. Your join link: {{webinar_link}}. See you there! Reply STOP to opt out.",
+  reminder_1h: "Hi {{first_name}}, {{webinar_title}} starts in 1 HOUR! Don't miss out — join us here: {{webinar_link}}. We're looking forward to seeing you! Reply STOP to opt out.",
+  attended: "Hi {{first_name}}, thank you for attending {{webinar_title}} today! We hope you found it valuable. Ready to take the next step toward homeownership? Reply to this message or call us to schedule a free consultation. Reply STOP to opt out.",
+  no_show: "Hi {{first_name}}, we missed you at {{webinar_title}}! Life gets busy — we understand. We'd love to connect and share what you missed. Reply here to get the replay or to schedule a quick call with our team. Reply STOP to opt out.",
+  consultation_booked: "Hi {{first_name}}, your consultation with Clarke & Associates Mortgage is confirmed! Please check your email for the meeting details and any documents to review beforehand. We look forward to speaking with you soon. Reply STOP to opt out.",
+  under_contract: "Hi {{first_name}}, exciting news — you're officially under contract! Congratulations! The Clarke & Associates team is here to guide you through every step of the closing process. We'll be in touch with next steps shortly. Reply STOP to opt out.",
+  deal_closed: "Hi {{first_name}}, CONGRATULATIONS on closing your home! It has been a true pleasure working with you at Clarke & Associates Mortgage. Wishing you many happy years in your new home. Please don't hesitate to refer friends and family our way! Reply STOP to opt out.",
+};
+
 export default function SettingsPage() {
   const { data: status, refetch: refetchStatus } = trpc.integrations.getStatus.useQuery();
   const { data: mediaItems, isLoading: mediaLoading, refetch: refetchMedia } = trpc.media.list.useQuery();
@@ -53,17 +66,7 @@ export default function SettingsPage() {
   const [savingTemplateId, setSavingTemplateId] = useState<number | null>(null);
   const [showAddTemplate, setShowAddTemplate] = useState(false);
   const [newTemplateTrigger, setNewTemplateTrigger] = useState<string>("new_lead");
-  const SMS_TEMPLATE_DEFAULTS: Record<string, string> = {
-    new_lead: "Hi {{first_name}}, thanks for your interest in Clarke & Associates! We help families navigate the home-buying process with confidence. A member of our team will reach out to you shortly. Reply STOP to opt out.",
-    registered: "Hi {{first_name}}, you're registered for {{webinar_title}} on {{session_date}}! We're excited to have you join us. Your link to attend: {{webinar_link}}. Add it to your calendar so you don't miss it! Reply STOP to opt out.",
-    reminder_24h: "Hi {{first_name}}, your webinar {{webinar_title}} is TOMORROW on {{session_date}}! We have some great information prepared for you. Your join link: {{webinar_link}}. See you there! Reply STOP to opt out.",
-    reminder_1h: "Hi {{first_name}}, {{webinar_title}} starts in 1 HOUR! Don't miss out — join us here: {{webinar_link}}. We're looking forward to seeing you! Reply STOP to opt out.",
-    attended: "Hi {{first_name}}, thank you for attending {{webinar_title}} today! We hope you found it valuable. Ready to take the next step toward homeownership? Reply to this message or call us to schedule a free consultation. Reply STOP to opt out.",
-    no_show: "Hi {{first_name}}, we missed you at {{webinar_title}}! Life gets busy — we understand. We'd love to connect and share what you missed. Reply here to get the replay or to schedule a quick call with our team. Reply STOP to opt out.",
-    consultation_booked: "Hi {{first_name}}, your consultation with Clarke & Associates Mortgage is confirmed! Please check your email for the meeting details and any documents to review beforehand. We look forward to speaking with you soon. Reply STOP to opt out.",
-    under_contract: "Hi {{first_name}}, exciting news — you're officially under contract! Congratulations! The Clarke & Associates team is here to guide you through every step of the closing process. We'll be in touch with next steps shortly. Reply STOP to opt out.",
-    deal_closed: "Hi {{first_name}}, CONGRATULATIONS on closing your home! It has been a true pleasure working with you at Clarke & Associates Mortgage. Wishing you many happy years in your new home. Please don't hesitate to refer friends and family our way! Reply STOP to opt out.",
-  };
+  // SMS_TEMPLATE_DEFAULTS is defined at module level above
   const [newTemplateBody, setNewTemplateBody] = useState(SMS_TEMPLATE_DEFAULTS["new_lead"]);
   const [newTemplateActive, setNewTemplateActive] = useState(true);
   const [deletingTemplateId, setDeletingTemplateId] = useState<number | null>(null);
@@ -964,7 +967,15 @@ export default function SettingsPage() {
         {/* ─── SMS Templates Tab ─── */}
         <TabsContent value="sms-templates">
           {/* Add Template Dialog */}
-          <Dialog open={showAddTemplate} onOpenChange={setShowAddTemplate}>
+          <Dialog open={showAddTemplate} onOpenChange={(open) => {
+            setShowAddTemplate(open);
+            if (open) {
+              // Reset to new_lead default each time dialog opens
+              setNewTemplateTrigger('new_lead');
+              setNewTemplateBody(SMS_TEMPLATE_DEFAULTS['new_lead'] ?? '');
+              setNewTemplateActive(true);
+            }
+          }}>
             <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle style={{ fontFamily: 'Raleway, sans-serif' }}>Add SMS / Email Template</DialogTitle>
@@ -974,8 +985,8 @@ export default function SettingsPage() {
                   <Label className="text-xs">Trigger — when should this message be sent?</Label>
                   <Select value={newTemplateTrigger} onValueChange={(v) => {
                     setNewTemplateTrigger(v);
-                    // Pre-populate body with default text if body is still empty
-                    if (!newTemplateBody.trim() && SMS_TEMPLATE_DEFAULTS[v]) {
+                    // Always pre-populate body with the default for the selected trigger
+                    if (SMS_TEMPLATE_DEFAULTS[v]) {
                       setNewTemplateBody(SMS_TEMPLATE_DEFAULTS[v]);
                     }
                   }}>
