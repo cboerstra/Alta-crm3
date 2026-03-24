@@ -213,24 +213,7 @@ export default function PublicLandingPage() {
           </div>
         )}
 
-        {/* ─── Foreground Images ─── */}
-        {foregroundImages.length > 0 && (
-          <div className="flex items-center justify-center gap-4 md:gap-6 mb-6 flex-wrap">
-            {foregroundImages.map((item) => (
-              <div
-                key={item.mediaId}
-                className="rounded-xl overflow-hidden shadow-2xl border-2 border-white/20"
-                style={{ maxWidth: foregroundImages.length === 1 ? "400px" : "200px" }}
-              >
-                <img
-                  src={item.media!.fileUrl}
-                  alt={item.media!.label || ""}
-                  className="w-full h-auto object-cover"
-                />
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Foreground images are intentionally not shown on the public page — only logos appear as foreground */}
 
         {/* ─── Available Sessions Preview ─── */}
         {sessions.length > 0 && !showField("sessionSelect") && (
