@@ -1,15 +1,11 @@
 /**
  * Email Service for Clarke & Associates CRM
- * 
+ *
  * Handles sending confirmation emails, reminders, and follow-ups.
- * Uses the notification system for owner alerts and stores email records
- * in the emailReminders table for tracking and scheduling.
- * 
- * In production, integrate with an email provider like SendGrid, Mailgun,
- * or Amazon SES by implementing the sendEmail function below.
+ * Reminder emails use the active SMS/Email template body so all content
+ * is managed from the Settings → SMS & Email Templates tab.
  */
-
-import { getDb } from "./db";
+import { getDb, getLeadById, getWebinarById, getWebinarSessionById, getSmsTemplate } from "./db";
 import { emailReminders, leads, integrations } from "../drizzle/schema";
 import { eq, and, lte } from "drizzle-orm";
 import { notifyOwner } from "./_core/notification";
@@ -23,8 +19,18 @@ export type EmailPayload = {
 };
 
 /**
- * Retrieve the active Gmail integration for any admin user.
- * Returns credentials or null if not configured/enabled.
+ * Map email_reminders.type → sms_templates.trigger
+ */
+const REMINDER_TYPE_TO_TRIGGER: Record<string, string> = {
+  registration_confirmation: "registered",
+  reminder_24h: "reminder_24h",
+  reminder_1h: "reminder_1h",
+  reminder_10min: "reminder_1h", // closest match — use 1h template for 10-min too
+  no_show_followup: "no_show",
+};
+
+/**
+ * Retrieve the active Gmail integration.
  */
 async function getGmailCredentials(): Promise<{ gmailAddress: string; appPassword: string } | null> {
   const db = await getDb();
@@ -53,7 +59,6 @@ export async function sendEmail(payload: EmailPayload): Promise<boolean> {
       });
       console.log(`[Email] Sent via Gmail to ${payload.to}: ${payload.subject}`);
     } else {
-      // No Gmail configured — log and notify owner so nothing is silently lost
       console.log(`[Email] Gmail not configured. Would send to ${payload.to}: ${payload.subject}`);
       await notifyOwner({
         title: `Email Queued (Gmail not connected): ${payload.subject}`,
@@ -68,8 +73,61 @@ export async function sendEmail(payload: EmailPayload): Promise<boolean> {
 }
 
 /**
+ * Resolve {{placeholders}} in a template body using lead + webinar data.
+ */
+async function resolveTemplateBody(
+  body: string,
+  leadId: number,
+  webinarId?: number | null,
+): Promise<string> {
+  let result = body;
+
+  // Lead variables
+  const lead = await getLeadById(leadId).catch(() => null);
+  if (lead) {
+    result = result.replace(/\{\{first_name\}\}/g, lead.firstName ?? "there");
+    result = result.replace(/\{\{last_name\}\}/g, lead.lastName ?? "");
+    result = result.replace(/\{\{full_name\}\}/g,
+      [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "there");
+  }
+
+  // Webinar variables
+  const wid = webinarId ?? (lead as any)?.webinarId;
+  if (wid) {
+    const webinar = await getWebinarById(wid).catch(() => null);
+    if (webinar) {
+      result = result.replace(/\{\{webinar_title\}\}/g, webinar.title ?? "");
+      const joinUrl = (webinar as any).zoomJoinUrl ?? (webinar as any).replayUrl ?? "";
+      result = result.replace(/\{\{webinar_link\}\}/g, joinUrl);
+    }
+  }
+
+  // Session variables
+  const sessionId = (lead as any)?.webinarSessionId;
+  if (sessionId) {
+    const session = await getWebinarSessionById(sessionId).catch(() => null);
+    if (session) {
+      result = result.replace(/\{\{session_date\}\}/g,
+        new Date((session as any).sessionDate).toLocaleString("en-US", {
+          weekday: "long", month: "long", day: "numeric", year: "numeric",
+          hour: "numeric", minute: "2-digit",
+        }));
+      if ((session as any).zoomJoinUrl) {
+        result = result.replace(/\{\{webinar_link\}\}/g, (session as any).zoomJoinUrl);
+      }
+    }
+  }
+
+  // Strip any remaining unresolved placeholders
+  result = result.replace(/\{\{[^}]+\}\}/g, "");
+  return result;
+}
+
+/**
  * Process pending email reminders that are due to be sent.
- * Call this on a schedule (e.g., every minute via cron).
+ * For each reminder, looks up the active SMS/Email template for the
+ * matching trigger type and uses that body (with variable substitution)
+ * instead of the hardcoded stored body.
  */
 export async function processPendingReminders(): Promise<number> {
   const db = await getDb();
@@ -77,13 +135,15 @@ export async function processPendingReminders(): Promise<number> {
 
   try {
     const now = new Date();
-    // Join with leads to get the recipient email address
     const pending = await db
       .select({
         id: emailReminders.id,
+        type: emailReminders.type,
         subject: emailReminders.subject,
         body: emailReminders.body,
         attachmentUrl: emailReminders.attachmentUrl,
+        leadId: emailReminders.leadId,
+        webinarId: emailReminders.webinarId,
         leadEmail: leads.email,
       })
       .from(emailReminders)
@@ -97,10 +157,35 @@ export async function processPendingReminders(): Promise<number> {
         await db.update(emailReminders).set({ status: "failed" }).where(eq(emailReminders.id, reminder.id));
         continue;
       }
+
+      // ── Resolve body from SMS/Email template if one is active ──
+      let emailBody = reminder.body ?? "";
+      const emailSubject = reminder.subject ?? "Notification from Clarke & Associates";
+
+      const triggerKey = REMINDER_TYPE_TO_TRIGGER[reminder.type ?? ""];
+      if (triggerKey) {
+        try {
+          const template = await getSmsTemplate(triggerKey as any);
+          if (template && template.isActive && template.body) {
+            // Use template body with full variable substitution
+            const resolved = await resolveTemplateBody(
+              template.body,
+              reminder.leadId,
+              reminder.webinarId,
+            );
+            // Wrap in clean HTML
+            emailBody = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333;max-width:600px;">${resolved.replace(/\n/g, "<br>")}</div>`;
+          }
+        } catch (e) {
+          console.error(`[Email] Failed to load template for trigger ${triggerKey}:`, e);
+          // Fall back to stored body
+        }
+      }
+
       const success = await sendEmail({
         to: reminder.leadEmail,
-        subject: reminder.subject ?? "Notification from Clarke & Associates",
-        body: reminder.body ?? "",
+        subject: emailSubject,
+        body: emailBody,
         attachmentUrl: reminder.attachmentUrl ?? undefined,
       });
 
