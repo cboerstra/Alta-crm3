@@ -1,0 +1,210 @@
+{
+  "query": "SELECT id, leadId, type, status, subject, LEFT(body, 200) as body_preview, scheduledAt, sentAt FROM email_reminders ORDER BY createdAt DESC LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dDnpezfLjGa5dS.c6434c886c49 --database 29hRXSpda4mmakt4QeiCJh --execute SELECT id, leadId, type, status, subject, LEFT(body, 200) as body_preview, scheduledAt, sentAt FROM email_reminders ORDER BY createdAt DESC LIMIT 20;",
+  "rows": [
+    {
+      "id": "330091",
+      "leadId": "330429",
+      "type": "reminder_1h",
+      "status": "pending",
+      "subject": "Starting soon: Session Select Webinar",
+      "body_preview": "Join link: TBD",
+      "scheduledAt": "2026-04-01 21:42:57",
+      "sentAt": "NULL"
+    },
+    {
+      "id": "330092",
+      "leadId": "330429",
+      "type": "reminder_10min",
+      "status": "pending",
+      "subject": "Starting in 10 minutes: Session Select Webinar",
+      "body_preview": "Join link: TBD",
+      "scheduledAt": "2026-04-01 22:32:57",
+      "sentAt": "NULL"
+    },
+    {
+      "id": "330089",
+      "leadId": "330429",
+      "type": "registration_confirmation",
+      "status": "sent",
+      "subject": "You're registered for Session Select Webinar!",
+      "body_preview": "Thank you for registering! We look forward to seeing you at Session Select Webinar.",
+      "scheduledAt": "2026-03-18 22:42:57",
+      "sentAt": "2026-03-18 22:44:34"
+    },
+    {
+      "id": "330090",
+      "leadId": "330429",
+      "type": "reminder_24h",
+      "status": "pending",
+      "subject": "Reminder: Session Select Webinar is tomorrow",
+      "body_preview": "Join link: TBD",
+      "scheduledAt": "2026-03-31 22:42:57",
+      "sentAt": "NULL"
+    },
+    {
+      "id": "330087",
+      "leadId": "330410",
+      "type": "reminder_1h",
+      "status": "pending",
+      "subject": "Starting soon: Session Select Webinar",
+      "body_preview": "Join link: TBD",
+      "scheduledAt": "2026-04-01 20:56:14",
+      "sentAt": "NULL"
+    },
+    {
+      "id": "330088",
+      "leadId": "330410",
+      "type": "reminder_10min",
+      "status": "pending",
+      "subject": "Starting in 10 minutes: Session Select Webinar",
+      "body_preview": "Join link: TBD",
+      "scheduledAt": "2026-04-01 21:46:14",
+      "sentAt": "NULL"
+    },
+    {
+      "id": "330085",
+      "leadId": "330410",
+      "type": "registration_confirmation",
+      "status": "sent",
+      "subject": "You're registered for Session Select Webinar!",
+      "body_preview": "Thank you for registering! We look forward to seeing you at Session Select Webinar.",
+      "scheduledAt": "2026-03-18 21:56:14",
+      "sentAt": "2026-03-18 21:56:34"
+    },
+    {
+      "id": "330086",
+      "leadId": "330410",
+      "type": "reminder_24h",
+      "status": "pending",
+      "subject": "Reminder: Session Select Webinar is tomorrow",
+      "body_preview": "Join link: TBD",
+      "scheduledAt": "2026-03-31 21:56:14",
+      "sentAt": "NULL"
+    },
+    {
+      "id": "330081",
+      "leadId": "330391",
+      "type": "registration_confirmation",
+      "status": "sent",
+      "subject": "You're registered for Session Select Webinar!",
+      "body_preview": "Thank you for registering! We look forward to seeing you at Session Select Webinar.",
+      "scheduledAt": "2026-03-18 21:38:48",
+      "sentAt": "2026-03-18 21:39:43"
+    },
+    {
+      "id": "330083",
+      "leadId": "330391",
+      "type": "reminder_1h",
+      "status": "pending",
+      "subject": "Starting soon: Session Select Webinar",
+      "body_preview": "Join link: TBD",
+      "scheduledAt": "2026-04-01 20:38:48",
+      "sentAt": "NULL"
+    },
+    {
+      "id": "330084",
+      "leadId": "330391",
+      "type": "reminder_10min",
+      "status": "pending",
+      "subject": "Starting in 10 minutes: Session Select Webinar",
+      "body_preview": "Join link: TBD",
+      "scheduledAt": "2026-04-01 21:28:48",
+      "sentAt": "NULL"
+    },
+    {
+      "id": "330082",
+      "leadId": "330391",
+      "type": "reminder_24h",
+      "status": "pending",
+      "subject": "Reminder: Session Select Webinar is tomorrow",
+      "body_preview": "Join link: TBD",
+      "scheduledAt": "2026-03-31 21:38:48",
+      "sentAt": "NULL"
+    },
+    {
+      "id": "330077",
+      "leadId": "330372",
+      "type": "registration_confirmation",
+      "status": "sent",
+      "subject": "You're registered for Session Select Webinar!",
+      "body_preview": "Thank you for registering! We look forward to seeing you at Session Select Webinar.",
+      "scheduledAt": "2026-03-18 21:17:41",
+      "sentAt": "2026-03-18 21:18:25"
+    },
+    {
+      "id": "330079",
+      "leadId": "330372",
+      "type": "reminder_1h",
+      "status": "pending",
+      "subject": "Starting soon: Session Select Webinar",
+      "body_preview": "Join link: TBD",
+      "scheduledAt": "2026-04-01 20:17:41",
+      "sentAt": "NULL"
+    },
+    {
+      "id": "330080",
+      "leadId": "330372",
+      "type": "reminder_10min",
+      "status": "pending",
+      "subject": "Starting in 10 minutes: Session Select Webinar",
+      "body_preview": "Join link: TBD",
+      "scheduledAt": "2026-04-01 21:07:41",
+      "sentAt": "NULL"
+    },
+    {
+      "id": "330078",
+      "leadId": "330372",
+      "type": "reminder_24h",
+      "status": "pending",
+      "subject": "Reminder: Session Select Webinar is tomorrow",
+      "body_preview": "Join link: TBD",
+      "scheduledAt": "2026-03-31 21:17:41",
+      "sentAt": "NULL"
+    },
+    {
+      "id": "330073",
+      "leadId": "330353",
+      "type": "registration_confirmation",
+      "status": "sent",
+      "subject": "You're registered for Session Select Webinar!",
+      "body_preview": "Thank you for registering! We look forward to seeing you at Session Select Webinar.",
+      "scheduledAt": "2026-03-18 20:58:07",
+      "sentAt": "2026-03-18 20:58:42"
+    },
+    {
+      "id": "330075",
+      "leadId": "330353",
+      "type": "reminder_1h",
+      "status": "pending",
+      "subject": "Starting soon: Session Select Webinar",
+      "body_preview": "Join link: TBD",
+      "scheduledAt": "2026-04-01 19:58:06",
+      "sentAt": "NULL"
+    },
+    {
+      "id": "330076",
+      "leadId": "330353",
+      "type": "reminder_10min",
+      "status": "pending",
+      "subject": "Starting in 10 minutes: Session Select Webinar",
+      "body_preview": "Join link: TBD",
+      "scheduledAt": "2026-04-01 20:48:06",
+      "sentAt": "NULL"
+    },
+    {
+      "id": "330074",
+      "leadId": "330353",
+      "type": "reminder_24h",
+      "status": "pending",
+      "subject": "Reminder: Session Select Webinar is tomorrow",
+      "body_preview": "Join link: TBD",
+      "scheduledAt": "2026-03-31 20:58:06",
+      "sentAt": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tleadId\ttype\tstatus\tsubject\tbody_preview\tscheduledAt\tsentAt\n330091\t330429\treminder_1h\tpending\tStarting soon: Session Select Webinar\tJoin link: TBD\t2026-04-01 21:42:57\tNULL\n330092\t330429\treminder_10min\tpending\tStarting in 10 minutes: Session Select Webinar\tJoin link: TBD\t2026-04-01 22:32:57\tNULL\n330089\t330429\tregistration_confirmation\tsent\tYou're registered for Session Select Webinar!\tThank you for registering! We look forward to seeing you at Session Select Webinar.\t2026-03-18 22:42:57\t2026-03-18 22:44:34\n330090\t330429\treminder_24h\tpending\tReminder: Session Select Webinar is tomorrow\tJoin link: TBD\t2026-03-31 22:42:57\tNULL\n330087\t330410\treminder_1h\tpending\tStarting soon: Session Select Webinar\tJoin link: TBD\t2026-04-01 20:56:14\tNULL\n330088\t330410\treminder_10min\tpending\tStarting in 10 minutes: Session Select Webinar\tJoin link: TBD\t2026-04-01 21:46:14\tNULL\n330085\t330410\tregistration_confirmation\tsent\tYou're registered for Session Select Webinar!\tThank you for registering! We look forward to seeing you at Session Select Webinar.\t2026-03-18 21:56:14\t2026-03-18 21:56:34\n330086\t330410\treminder_24h\tpending\tReminder: Session Select Webinar is tomorrow\tJoin link: TBD\t2026-03-31 21:56:14\tNULL\n330081\t330391\tregistration_confirmation\tsent\tYou're registered for Session Select Webinar!\tThank you for registering! We look forward to seeing you at Session Select Webinar.\t2026-03-18 21:38:48\t2026-03-18 21:39:43\n330083\t330391\treminder_1h\tpending\tStarting soon: Session Select Webinar\tJoin link: TBD\t2026-04-01 20:38:48\tNULL\n330084\t330391\treminder_10min\tpending\tStarting in 10 minutes: Session Select Webinar\tJoin link: TBD\t2026-04-01 21:28:48\tNULL\n330082\t330391\treminder_24h\tpending\tReminder: Session Select Webinar is tomorrow\tJoin link: TBD\t2026-03-31 21:38:48\tNULL\n330077\t330372\tregistration_confirmation\tsent\tYou're registered for Session Select Webinar!\tThank you for registering! We look forward to seeing you at Session Select Webinar.\t2026-03-18 21:17:41\t2026-03-18 21:18:25\n330079\t330372\treminder_1h\tpending\tStarting soon: Session Select Webinar\tJoin link: TBD\t2026-04-01 20:17:41\tNULL\n330080\t330372\treminder_10min\tpending\tStarting in 10 minutes: Session Select Webinar\tJoin link: TBD\t2026-04-01 21:07:41\tNULL\n330078\t330372\treminder_24h\tpending\tReminder: Session Select Webinar is tomorrow\tJoin link: TBD\t2026-03-31 21:17:41\tNULL\n330073\t330353\tregistration_confirmation\tsent\tYou're registered for Session Select Webinar!\tThank you for registering! We look forward to seeing you at Session Select Webinar.\t2026-03-18 20:58:07\t2026-03-18 20:58:42\n330075\t330353\treminder_1h\tpending\tStarting soon: Session Select Webinar\tJoin link: TBD\t2026-04-01 19:58:06\tNULL\n330076\t330353\treminder_10min\tpending\tStarting in 10 minutes: Session Select Webinar\tJoin link: TBD\t2026-04-01 20:48:06\tNULL\n330074\t330353\treminder_24h\tpending\tReminder: Session Select Webinar is tomorrow\tJoin link: TBD\t2026-03-31 20:58:06\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 52
+}

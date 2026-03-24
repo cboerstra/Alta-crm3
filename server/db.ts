@@ -1347,6 +1347,72 @@ export async function runAutoMigrations(): Promise<void> {
       column: "bgOverlayOpacity",
       sql: "ALTER TABLE `landing_pages` ADD COLUMN `bgOverlayOpacity` DECIMAL(3,2) DEFAULT 0.50",
     },
+    // 0013: Add enabledFields to landing_pages
+    {
+      table: "landing_pages",
+      column: "enabledFields",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `enabledFields` json DEFAULT NULL",
+    },
+    // 0014: Add optInLabel to landing_pages
+    {
+      table: "landing_pages",
+      column: "optInLabel",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `optInLabel` text DEFAULT NULL",
+    },
+    // 0015: Add showOptIn to landing_pages
+    {
+      table: "landing_pages",
+      column: "showOptIn",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `showOptIn` tinyint(1) DEFAULT 1",
+    },
+    // 0016: Add confirmationEmailSubject to landing_pages
+    {
+      table: "landing_pages",
+      column: "confirmationEmailSubject",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `confirmationEmailSubject` varchar(512) DEFAULT NULL",
+    },
+    // 0017: Add confirmationEmailBody to landing_pages
+    {
+      table: "landing_pages",
+      column: "confirmationEmailBody",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `confirmationEmailBody` text DEFAULT NULL",
+    },
+    // 0018: Add confirmationPdfUrl to landing_pages
+    {
+      table: "landing_pages",
+      column: "confirmationPdfUrl",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `confirmationPdfUrl` text DEFAULT NULL",
+    },
+    // 0019: Add bodyText to landing_pages
+    {
+      table: "landing_pages",
+      column: "bodyText",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `bodyText` text DEFAULT NULL",
+    },
+    // 0020: Add artworkUrl to landing_pages
+    {
+      table: "landing_pages",
+      column: "artworkUrl",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `artworkUrl` text DEFAULT NULL",
+    },
+    // 0021: Add customCss to landing_pages
+    {
+      table: "landing_pages",
+      column: "customCss",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `customCss` text DEFAULT NULL",
+    },
+    // 0022: Add accentColor to landing_pages
+    {
+      table: "landing_pages",
+      column: "accentColor",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `accentColor` varchar(16) DEFAULT '#C9A84C'",
+    },
+    // 0023: Add backgroundImageUrl to landing_pages
+    {
+      table: "landing_pages",
+      column: "backgroundImageUrl",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `backgroundImageUrl` text DEFAULT NULL",
+    },
   ];
 
   for (const m of migrations) {

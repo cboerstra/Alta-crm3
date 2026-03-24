@@ -1,0 +1,76 @@
+{
+  "query": "SELECT id, title, slug, confirmationEmailSubject, LEFT(confirmationEmailBody, 300) as email_body_preview FROM landing_pages WHERE title LIKE '%Session%' OR slug LIKE '%session%' ORDER BY createdAt DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dDnpezfLjGa5dS.c6434c886c49 --database 29hRXSpda4mmakt4QeiCJh --execute SELECT id, title, slug, confirmationEmailSubject, LEFT(confirmationEmailBody, 300) as email_body_preview FROM landing_pages WHERE title LIKE '%Session%' OR slug LIKE '%session%' ORDER BY createdAt DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "300247",
+      "title": "Session Select Webinar - Registration",
+      "slug": "session-select-1773873777308",
+      "confirmationEmailSubject": "You're Registered — {{webinarTitle}}",
+      "email_body_preview": "Dear {{firstName}} {{lastName}},"
+    },
+    {
+      "id": "300236",
+      "title": "Session Select Webinar - Registration",
+      "slug": "session-select-1773870974190",
+      "confirmationEmailSubject": "You're Registered — {{webinarTitle}}",
+      "email_body_preview": "Dear {{firstName}} {{lastName}},"
+    },
+    {
+      "id": "300225",
+      "title": "Session Select Webinar - Registration",
+      "slug": "session-select-1773869927878",
+      "confirmationEmailSubject": "You're Registered — {{webinarTitle}}",
+      "email_body_preview": "Dear {{firstName}} {{lastName}},"
+    },
+    {
+      "id": "300216",
+      "title": "Session Select Webinar - Registration",
+      "slug": "session-select-1773868661206",
+      "confirmationEmailSubject": "You're Registered — {{webinarTitle}}",
+      "email_body_preview": "Dear {{firstName}} {{lastName}},"
+    },
+    {
+      "id": "300205",
+      "title": "Session Select Webinar - Registration",
+      "slug": "session-select-1773867486401",
+      "confirmationEmailSubject": "You're Registered — {{webinarTitle}}",
+      "email_body_preview": "Dear {{firstName}} {{lastName}},"
+    }
+  ],
+  "messages": [
+    "Thank you for registering for {{webinarTitle}}! We are thrilled to have you join us and look forward to sharing valuable insights with you.",
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    "YOUR EVENT DETAILS",
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    "  Event:      {{webinarTitle}}",
+    "  Date/Time:",
+    "Thank you for registering for {{webinarTitle}}! We are thrilled to have you join us and look forward to sharing valuable insights with you.",
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    "YOUR EVENT DETAILS",
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    "  Event:      {{webinarTitle}}",
+    "  Date/Time:",
+    "Thank you for registering for {{webinarTitle}}! We are thrilled to have you join us and look forward to sharing valuable insights with you.",
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    "YOUR EVENT DETAILS",
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    "  Event:      {{webinarTitle}}",
+    "  Date/Time:",
+    "Thank you for registering for {{webinarTitle}}! We are thrilled to have you join us and look forward to sharing valuable insights with you.",
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    "YOUR EVENT DETAILS",
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    "  Event:      {{webinarTitle}}",
+    "  Date/Time:",
+    "Thank you for registering for {{webinarTitle}}! We are thrilled to have you join us and look forward to sharing valuable insights with you.",
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    "YOUR EVENT DETAILS",
+    "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    "  Event:      {{webinarTitle}}",
+    "  Date/Time:"
+  ],
+  "stdout": "id\ttitle\tslug\tconfirmationEmailSubject\temail_body_preview\n300247\tSession Select Webinar - Registration\tsession-select-1773873777308\tYou're Registered — {{webinarTitle}}\tDear {{firstName}} {{lastName}},\n\nThank you for registering for {{webinarTitle}}! We are thrilled to have you join us and look forward to sharing valuable insights with you.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nYOUR EVENT DETAILS\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n  Event:      {{webinarTitle}}\n  Date/Time:\n300236\tSession Select Webinar - Registration\tsession-select-1773870974190\tYou're Registered — {{webinarTitle}}\tDear {{firstName}} {{lastName}},\n\nThank you for registering for {{webinarTitle}}! We are thrilled to have you join us and look forward to sharing valuable insights with you.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nYOUR EVENT DETAILS\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n  Event:      {{webinarTitle}}\n  Date/Time:\n300225\tSession Select Webinar - Registration\tsession-select-1773869927878\tYou're Registered — {{webinarTitle}}\tDear {{firstName}} {{lastName}},\n\nThank you for registering for {{webinarTitle}}! We are thrilled to have you join us and look forward to sharing valuable insights with you.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nYOUR EVENT DETAILS\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n  Event:      {{webinarTitle}}\n  Date/Time:\n300216\tSession Select Webinar - Registration\tsession-select-1773868661206\tYou're Registered — {{webinarTitle}}\tDear {{firstName}} {{lastName}},\n\nThank you for registering for {{webinarTitle}}! We are thrilled to have you join us and look forward to sharing valuable insights with you.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nYOUR EVENT DETAILS\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n  Event:      {{webinarTitle}}\n  Date/Time:\n300205\tSession Select Webinar - Registration\tsession-select-1773867486401\tYou're Registered — {{webinarTitle}}\tDear {{firstName}} {{lastName}},\n\nThank you for registering for {{webinarTitle}}! We are thrilled to have you join us and look forward to sharing valuable insights with you.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nYOUR EVENT DETAILS\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n  Event:      {{webinarTitle}}\n  Date/Time:\n",
+  "stderr": "",
+  "execution_time_ms": 66
+}

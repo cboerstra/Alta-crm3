@@ -1,0 +1,8 @@
+{
+  "query": "SELECT id, lead_id, type, status, subject, LEFT(body, 200) as body_preview, scheduled_at, sent_at, created_at FROM email_reminders ORDER BY created_at DESC LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dDnpezfLjGa5dS.c6434c886c49 --database 29hRXSpda4mmakt4QeiCJh --execute SELECT id, lead_id, type, status, subject, LEFT(body, 200) as body_preview, scheduled_at, sent_at, created_at FROM email_reminders ORDER BY created_at DESC LIMIT 20;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'lead_id' in 'field list'"
+  ]
+}
