@@ -170,34 +170,7 @@ export default function PublicLandingPage() {
           ═══════════════════════════════════════════════════════════ */}
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-8 md:py-12">
 
-        {/* Logos are now inside the form card */}
-        {/* ─── Headline & Subheadline ─── */}
-        <div className="text-center mb-6 md:mb-8 max-w-2xl">
-          <h1
-            className="text-3xl md:text-5xl font-bold leading-tight drop-shadow-lg"
-            style={{ fontFamily: "Raleway, sans-serif", textShadow: "0 2px 20px rgba(0,0,0,0.5)", color: (page as any).textColor || '#FFFFFF' }}
-          >
-            {page.headline || page.title}
-          </h1>
-          {page.subheadline && (
-            <p
-              className="mt-3 md:mt-4 text-lg md:text-xl drop-shadow-md"
-              style={{ textShadow: "0 1px 10px rgba(0,0,0,0.4)", color: (page as any).textColor ? `${(page as any).textColor}dd` : 'rgba(255,255,255,0.9)' }}
-            >
-              {page.subheadline}
-            </p>
-          )}
-        </div>
-
-        {/* ─── Body Text ─── */}
-        {page.bodyText && (
-          <div
-            className="text-sm md:text-base leading-relaxed mb-6 text-center max-w-lg drop-shadow-md"
-            style={{ color: (page as any).textColor ? `${(page as any).textColor}cc` : 'rgba(255,255,255,0.85)' }}
-          >
-            {page.bodyText}
-          </div>
-        )}
+         {/* Headline, subheadline, and body text are shown inside the form card */}
 
         {/* Foreground images are intentionally not shown on the public page — only logos appear as foreground */}
 
