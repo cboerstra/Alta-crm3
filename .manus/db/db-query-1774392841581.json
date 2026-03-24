@@ -1,0 +1,9 @@
+{
+  "query": "SELECT id, title, confirmationPdfUrl FROM landing_pages WHERE confirmationPdfUrl IS NOT NULL LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3dDnpezfLjGa5dS.c6434c886c49 --database 29hRXSpda4mmakt4QeiCJh --execute SELECT id, title, confirmationPdfUrl FROM landing_pages WHERE confirmationPdfUrl IS NOT NULL LIMIT 5;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 780
+}

@@ -57,14 +57,26 @@ export async function sendEmail(
     text: opts.text ?? opts.html.replace(/<[^>]+>/g, ""),
   };
 
-  // Attach PDF if a URL is provided
+  // Attach PDF by fetching bytes from the URL (works with presigned/CDN URLs)
   if (opts.attachmentUrl) {
-    mailOptions.attachments = [
-      {
-        filename: "attachment.pdf",
-        path: opts.attachmentUrl,
-      },
-    ];
+    try {
+      const response = await fetch(opts.attachmentUrl);
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        mailOptions.attachments = [
+          {
+            filename: "attachment.pdf",
+            content: buffer,
+            contentType: "application/pdf",
+          },
+        ];
+      } else {
+        console.error(`[Email] Failed to fetch PDF attachment (${response.status}): ${opts.attachmentUrl}`);
+      }
+    } catch (fetchErr) {
+      console.error("[Email] Error fetching PDF attachment:", fetchErr);
+    }
   }
 
   await transporter.sendMail(mailOptions);
