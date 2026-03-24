@@ -1341,6 +1341,12 @@ export async function runAutoMigrations(): Promise<void> {
       column: "artworkPosition",
       sql: "ALTER TABLE `landing_pages` ADD COLUMN `artworkPosition` varchar(64) DEFAULT 'center'",
     },
+    // 0012: Add bgOverlayOpacity to landing_pages
+    {
+      table: "landing_pages",
+      column: "bgOverlayOpacity",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `bgOverlayOpacity` DECIMAL(3,2) DEFAULT 0.50",
+    },
   ];
 
   for (const m of migrations) {
