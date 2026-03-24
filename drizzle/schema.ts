@@ -359,6 +359,8 @@ export const smsTemplates = mysqlTable("sms_templates", {
     "deal_closed",
   ]).notNull(),
   body: text("body").notNull(),
+  // Optional email subject line — used when this template is sent as an email (e.g. registered trigger)
+  emailSubject: varchar("emailSubject", { length: 512 }),
   isActive: boolean("isActive").default(true).notNull(),
   createdBy: int("createdBy"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

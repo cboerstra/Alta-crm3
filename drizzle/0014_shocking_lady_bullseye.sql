@@ -1,0 +1,1 @@
+ALTER TABLE `sms_templates` ADD `emailSubject` varchar(512);

@@ -5,7 +5,7 @@ import {
   logActivity, getActivityByLeadId, updateLeadScore,
   getLandingPageBySlug, getWebinarById, getWebinarSessionById,
   createEmailReminder, deleteLead, deleteLeads, notifyAdminsBySms,
-  sendLeadNotifications,
+  sendLeadNotifications, getSmsTemplate,
 } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { notifyOwner } from "../_core/notification";
@@ -265,17 +265,21 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
             }
           }
           // Helper to resolve all placeholders in a template string
+          // Supports both {{camelCase}} (legacy landing page style) and {{snake_case}} (SMS template style)
           const resolve = (tpl: string) => tpl
-            .replace(/\{\{firstName\}\}/g, input.firstName)
-            .replace(/\{\{lastName\}\}/g, input.lastName)
-            .replace(/\{\{fullName\}\}/g, `${input.firstName} ${input.lastName}`)
-            .replace(/\{\{webinarTitle\}\}/g, webinar.title)
-            .replace(/\{\{joinUrl\}\}/g, joinUrl ?? "")
-            .replace(/\{\{date\}\}/g, sessionDateStr);
+            .replace(/\{\{firstName\}\}|\{\{first_name\}\}/g, input.firstName)
+            .replace(/\{\{lastName\}\}|\{\{last_name\}\}/g, input.lastName)
+            .replace(/\{\{fullName\}\}|\{\{full_name\}\}/g, `${input.firstName} ${input.lastName}`)
+            .replace(/\{\{webinarTitle\}\}|\{\{webinar_title\}\}/g, webinar.title)
+            .replace(/\{\{joinUrl\}\}|\{\{webinar_link\}\}/g, joinUrl ?? "")
+            .replace(/\{\{date\}\}|\{\{session_date\}\}/g, sessionDateStr);
+
+          // Load the registered SMS template to use as the confirmation email body
+          const registeredTemplate = await getSmsTemplate("registered");
 
           const webinarTime = webinar.scheduledAt.getTime();
           const reminders = [
-            { type: "registration_confirmation" as const, offset: 0, subject: resolve(page.confirmationEmailSubject || `You're registered for ${webinar.title}!`) },
+            { type: "registration_confirmation" as const, offset: 0, subject: resolve(registeredTemplate?.emailSubject || `You're registered for ${webinar.title}!`) },
             { type: "reminder_24h" as const, offset: -24 * 60 * 60 * 1000, subject: `Reminder: ${webinar.title} is tomorrow` },
             { type: "reminder_1h" as const, offset: -60 * 60 * 1000, subject: `Starting soon: ${webinar.title}` },
             { type: "reminder_10min" as const, offset: -10 * 60 * 1000, subject: `Starting in 10 minutes: ${webinar.title}` },
@@ -292,7 +296,7 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
                 scheduledAt,
                 subject: r.subject,
                 body: r.type === "registration_confirmation"
-                  ? resolve(page.confirmationEmailBody || `Thank you for registering for ${webinar.title}!`)
+                  ? resolve(registeredTemplate?.body || `Thank you for registering for ${webinar.title}!`)
                   : `Join link: ${joinUrl ?? "TBD"}`,
                 attachmentUrl: r.type === "registration_confirmation" ? (page.confirmationPdfUrl ?? undefined) : undefined,
               });

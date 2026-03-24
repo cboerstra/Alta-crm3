@@ -77,10 +77,11 @@ export const smsTemplatesRouter = router({
         trigger: triggerEnum,
         body: z.string().min(1, "Template body cannot be empty").max(1600, "SMS body cannot exceed 1600 characters"),
         isActive: z.boolean().default(true),
+        emailSubject: z.string().max(512).optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const template = await createSmsTemplate(input.trigger, input.body, input.isActive, ctx.user.id);
+      const template = await createSmsTemplate(input.trigger, input.body, input.isActive, ctx.user.id, input.emailSubject);
       return { success: true, id: template.id };
     }),
 
@@ -90,10 +91,11 @@ export const smsTemplatesRouter = router({
         id: z.number(),
         body: z.string().min(1, "Template body cannot be empty").max(1600, "SMS body cannot exceed 1600 characters"),
         isActive: z.boolean(),
+        emailSubject: z.string().max(512).nullable().optional(),
       }),
     )
     .mutation(async ({ input }) => {
-      await updateSmsTemplate(input.id, input.body, input.isActive);
+      await updateSmsTemplate(input.id, input.body, input.isActive, input.emailSubject);
       return { success: true };
     }),
 

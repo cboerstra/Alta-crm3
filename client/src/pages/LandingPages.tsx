@@ -490,7 +490,6 @@ export default function LandingPages() {
                     </span>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="email">Email</TabsTrigger>
               </TabsList>
 
               {/* ─── Content Tab ─── */}
@@ -1050,39 +1049,7 @@ export default function LandingPages() {
                 </div>
               </TabsContent>
 
-              {/* ─── Email Tab ─── */}
-              <TabsContent value="email" className="space-y-4 mt-4">
-                <p className="text-sm text-muted-foreground">Configure the confirmation email sent to registrants. Placeholders are automatically replaced with the lead's real information when the email is sent.</p>
-                <div>
-                  <Label>Email Subject</Label>
-                  <Input value={form.confirmationEmailSubject} onChange={(e) => setForm({ ...form, confirmationEmailSubject: e.target.value })} placeholder="You're registered for our webinar!" />
-                </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <Label>Email Body</Label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs h-6 px-2 text-muted-foreground hover:text-foreground"
-                      onClick={() => setForm({ ...form, confirmationEmailSubject: DEFAULT_EMAIL_SUBJECT, confirmationEmailBody: DEFAULT_EMAIL_BODY })}
-                    >
-                      Reset to default
-                    </Button>
-                  </div>
-                  <Textarea value={form.confirmationEmailBody} onChange={(e) => setForm({ ...form, confirmationEmailBody: e.target.value })} rows={12} className="font-mono text-sm" />
-                </div>
-                <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
-                  <p className="text-xs font-semibold text-foreground mb-2">Available placeholders</p>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                    <span><code className="bg-muted px-1 rounded">{"{{firstName}}"}</code> — First name</span>
-                    <span><code className="bg-muted px-1 rounded">{"{{lastName}}"}</code> — Last name</span>
-                    <span><code className="bg-muted px-1 rounded">{"{{webinarTitle}}"}</code> — Webinar name</span>
-                    <span><code className="bg-muted px-1 rounded">{"{{joinUrl}}"}</code> — Zoom join link</span>
-                    <span><code className="bg-muted px-1 rounded">{"{{date}}"}</code> — Webinar date &amp; time</span>
-                  </div>
-                </div>
-              </TabsContent>
+
             </Tabs>
 
             <div className="flex justify-end gap-2 pt-4 border-t mt-4">

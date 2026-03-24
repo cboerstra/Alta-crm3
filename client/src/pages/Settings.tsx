@@ -62,7 +62,7 @@ export default function SettingsPage() {
   const [showTestEmail, setShowTestEmail] = useState(false);
 
   // SMS Templates state — always-editable; drafts keyed by template id
-  const [templateDrafts, setTemplateDrafts] = useState<Record<number, { body: string; isActive: boolean }>>({});
+  const [templateDrafts, setTemplateDrafts] = useState<Record<number, { body: string; isActive: boolean; emailSubject?: string | null }>>({}); 
   const [savingTemplateId, setSavingTemplateId] = useState<number | null>(null);
   const [showAddTemplate, setShowAddTemplate] = useState(false);
   const [newTemplateTrigger, setNewTemplateTrigger] = useState<string>("new_lead");
@@ -1159,15 +1159,20 @@ export default function SettingsPage() {
                     // Always use draft if present, otherwise fall back to server data
                     const currentBody = draft?.body ?? tmpl.body;
                     const currentActive = draft?.isActive ?? tmpl.isActive;
+                    const currentEmailSubject = draft !== undefined ? (draft.emailSubject ?? null) : ((tmpl as any).emailSubject ?? null);
                     const charCount = currentBody.length;
                     const smsCount = Math.ceil(charCount / 160) || 1;
                     const isDeleting = deletingTemplateId === tmpl.id;
                     const isSaving = savingTemplateId === tmpl.id;
-                    const isDirty = draft !== undefined && (draft.body !== tmpl.body || draft.isActive !== tmpl.isActive);
+                    const isDirty = draft !== undefined && (
+                      draft.body !== tmpl.body ||
+                      draft.isActive !== tmpl.isActive ||
+                      (draft.emailSubject ?? null) !== ((tmpl as any).emailSubject ?? null)
+                    );
 
                     const initDraft = () => {
                       if (!templateDrafts[tmpl.id]) {
-                        setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: tmpl.body, isActive: tmpl.isActive } }));
+                        setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: tmpl.body, isActive: tmpl.isActive, emailSubject: (tmpl as any).emailSubject ?? null } }));
                       }
                     };
 
@@ -1239,10 +1244,25 @@ export default function SettingsPage() {
                           </div>
                         </div>
 
+                        {/* Email Subject — only for registered trigger */}
+                        {tmpl.trigger === 'registered' && (
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="h-3 w-3" /> Email Subject Line</Label>
+                            <Input
+                              className="text-sm"
+                              placeholder={`You're registered for {{webinar_title}}!`}
+                              value={currentEmailSubject ?? ''}
+                              onFocus={initDraft}
+                              onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: currentActive, emailSubject: e.target.value || null } }))}
+                            />
+                            <p className="text-xs text-muted-foreground">Used as the email subject for registration confirmation emails. Leave blank to use the default.</p>
+                          </div>
+                        )}
+
                         {/* Always-editable body */}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <Label className="text-xs text-muted-foreground">Message body</Label>
+                            <Label className="text-xs text-muted-foreground">{tmpl.trigger === 'registered' ? 'SMS & Email Body' : 'Message body'}</Label>
                             <div className="flex items-center gap-3">
                               <span className={`text-xs ${ charCount > 1600 ? 'text-destructive font-semibold' : charCount > 160 ? 'text-amber-600' : 'text-muted-foreground' }`}>
                                 {charCount} chars · {smsCount} segment{smsCount !== 1 ? 's' : ''}
@@ -1261,7 +1281,7 @@ export default function SettingsPage() {
                             className="w-full min-h-[90px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
                             value={currentBody}
                             onFocus={initDraft}
-                            onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: e.target.value, isActive: currentActive } }))}
+                            onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: e.target.value, isActive: currentActive, emailSubject: currentEmailSubject } }))}
                           />
                           <div className="flex gap-2 justify-between items-center">
                             <Button
@@ -1290,7 +1310,7 @@ export default function SettingsPage() {
                                 disabled={isSaving || charCount === 0 || charCount > 1600 || !isDirty}
                                 onClick={() => {
                                   setSavingTemplateId(tmpl.id);
-                                  updateTemplate.mutate({ id: tmpl.id, body: currentBody, isActive: currentActive });
+                                  updateTemplate.mutate({ id: tmpl.id, body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject });
                                 }}
                               >
                                 {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}

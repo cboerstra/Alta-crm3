@@ -911,6 +911,7 @@ export async function createSmsTemplate(
   body: string,
   isActive: boolean,
   createdBy?: number,
+  emailSubject?: string,
 ): Promise<SmsTemplate> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
@@ -919,13 +920,13 @@ export async function createSmsTemplate(
   const pool = await getPool();
   if (createdBy !== undefined) {
     await pool.execute(
-      "INSERT INTO `sms_templates` (`trigger`, `body`, `isActive`, `createdBy`) VALUES (?, ?, ?, ?)",
-      [trigger, body, isActive ? 1 : 0, createdBy],
+      "INSERT INTO `sms_templates` (`trigger`, `body`, `isActive`, `createdBy`, `emailSubject`) VALUES (?, ?, ?, ?, ?)",
+      [trigger, body, isActive ? 1 : 0, createdBy, emailSubject ?? null],
     );
   } else {
     await pool.execute(
-      "INSERT INTO `sms_templates` (`trigger`, `body`, `isActive`) VALUES (?, ?, ?)",
-      [trigger, body, isActive ? 1 : 0],
+      "INSERT INTO `sms_templates` (`trigger`, `body`, `isActive`, `emailSubject`) VALUES (?, ?, ?, ?)",
+      [trigger, body, isActive ? 1 : 0, emailSubject ?? null],
     );
   }
   const [rows] = await pool.execute(
@@ -939,10 +940,11 @@ export async function updateSmsTemplate(
   id: number,
   body: string,
   isActive: boolean,
+  emailSubject?: string | null,
 ): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  await db.update(smsTemplates).set({ body, isActive, updatedAt: new Date() }).where(eq(smsTemplates.id, id));
+  await db.update(smsTemplates).set({ body, isActive, emailSubject: emailSubject ?? null, updatedAt: new Date() }).where(eq(smsTemplates.id, id));
 }
 
 export async function deleteSmsTemplate(id: number): Promise<void> {
@@ -1412,6 +1414,12 @@ export async function runAutoMigrations(): Promise<void> {
       table: "landing_pages",
       column: "backgroundImageUrl",
       sql: "ALTER TABLE `landing_pages` ADD COLUMN `backgroundImageUrl` text DEFAULT NULL",
+    },
+    // 0024: Add emailSubject to sms_templates (for registration confirmation email subject)
+    {
+      table: "sms_templates",
+      column: "emailSubject",
+      sql: "ALTER TABLE `sms_templates` ADD COLUMN `emailSubject` varchar(512) DEFAULT NULL",
     },
   ];
 
