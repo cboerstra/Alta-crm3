@@ -1318,24 +1318,24 @@ export default function SettingsPage() {
                           </div>
                         )}
 
-                        {/* SMS body for reminder triggers */}
-                        {['reminder_24h', 'reminder_1h', 'reminder_10min'].includes(tmpl.trigger) && (
+                        {/* SMS body for all triggers */}
+                        {true && (
                           <div className="space-y-2 border border-dashed border-border/60 rounded-md p-3 bg-background/50">
-                            <Label className="text-xs font-semibold flex items-center gap-1.5"><span>📱</span> SMS Reminder Text</Label>
+                            <Label className="text-xs font-semibold flex items-center gap-1.5"><span>📱</span> SMS Text Message</Label>
                             <textarea
                               className="w-full min-h-[70px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
-                              placeholder={`Hi {{first_name}}, your webinar starts soon! Join here: {{webinar_link}}`}
+                              placeholder={`Hi {{first_name}}, ...`}
                               value={currentSmsBody ?? ''}
                               onFocus={initDraft}
                               onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: e.target.value || null } }))}
                             />
-                            <p className="text-xs text-muted-foreground">Sent as an SMS text. Use <code className="bg-muted px-1 rounded">{'{{'+'first_name'+'}}'}</code>, <code className="bg-muted px-1 rounded">{'{{'+'webinar_link'+'}}'}</code>, <code className="bg-muted px-1 rounded">{'{{'+'session_date'+'}}'}</code>. Leave blank to skip SMS for this reminder.</p>
+                            <p className="text-xs text-muted-foreground">Sent as an SMS text. Use <code className="bg-muted px-1 rounded">{'{{'+'first_name'+'}}'}</code>, <code className="bg-muted px-1 rounded">{'{{'+'webinar_link'+'}}'}</code>, <code className="bg-muted px-1 rounded">{'{{'+'session_date'+'}}'}</code>, <code className="bg-muted px-1 rounded">{'{{'+'webinar_title'+'}}'}</code>. Leave blank to skip SMS for this trigger.</p>
                           </div>
                         )}
                         {/* Always-editable email body */}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <Label className="text-xs text-muted-foreground">{tmpl.trigger === 'registered' ? 'Email Body' : 'Email body'}</Label>
+                            <Label className="text-xs font-semibold flex items-center gap-1.5"><span>✉️</span> Email Body</Label>
                             <div className="flex items-center gap-3">
                               <span className={`text-xs ${ charCount > 1600 ? 'text-destructive font-semibold' : charCount > 160 ? 'text-amber-600' : 'text-muted-foreground' }`}>
                                 {charCount} chars · {smsCount} segment{smsCount !== 1 ? 's' : ''}
