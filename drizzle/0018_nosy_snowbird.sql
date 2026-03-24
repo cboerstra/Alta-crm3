@@ -1,0 +1,1 @@
+ALTER TABLE `landing_pages` ADD `textColor` varchar(16) DEFAULT '#FFFFFF';

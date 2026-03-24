@@ -104,6 +104,7 @@ export const landingPages = mysqlTable("landing_pages", {
   customCss: text("customCss"),
   backgroundImageUrl: text("backgroundImageUrl"),
   accentColor: varchar("accentColor", { length: 16 }).default("#C9A84C"),
+  textColor: varchar("textColor", { length: 16 }).default("#FFFFFF"),
   // NEW: Artwork / hero image uploaded by host
   artworkUrl: text("artworkUrl"),
   // NEW: Background image focal point position (CSS object-position value)

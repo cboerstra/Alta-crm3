@@ -170,33 +170,19 @@ export default function PublicLandingPage() {
           ═══════════════════════════════════════════════════════════ */}
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-8 md:py-12">
 
-        {/* ─── Corporate Logos (Foreground) ─── */}
-        {foregroundLogos.length > 0 && (
-          <div className="flex items-center justify-center gap-5 md:gap-8 mb-6 md:mb-8">
-            {foregroundLogos.map((item) => (
-              <img
-                key={item.mediaId}
-                src={item.media!.fileUrl}
-                alt={item.media!.label || ""}
-                className="h-12 md:h-20 object-contain drop-shadow-2xl"
-                style={{ filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.4))" }}
-              />
-            ))}
-          </div>
-        )}
-
+        {/* Logos are now inside the form card */}
         {/* ─── Headline & Subheadline ─── */}
         <div className="text-center mb-6 md:mb-8 max-w-2xl">
           <h1
-            className="text-3xl md:text-5xl font-bold text-white leading-tight drop-shadow-lg"
-            style={{ fontFamily: "Raleway, sans-serif", textShadow: "0 2px 20px rgba(0,0,0,0.5)" }}
+            className="text-3xl md:text-5xl font-bold leading-tight drop-shadow-lg"
+            style={{ fontFamily: "Raleway, sans-serif", textShadow: "0 2px 20px rgba(0,0,0,0.5)", color: (page as any).textColor || '#FFFFFF' }}
           >
             {page.headline || page.title}
           </h1>
           {page.subheadline && (
             <p
-              className="text-white/90 mt-3 md:mt-4 text-lg md:text-xl drop-shadow-md"
-              style={{ textShadow: "0 1px 10px rgba(0,0,0,0.4)" }}
+              className="mt-3 md:mt-4 text-lg md:text-xl drop-shadow-md"
+              style={{ textShadow: "0 1px 10px rgba(0,0,0,0.4)", color: (page as any).textColor ? `${(page as any).textColor}dd` : 'rgba(255,255,255,0.9)' }}
             >
               {page.subheadline}
             </p>
@@ -206,8 +192,8 @@ export default function PublicLandingPage() {
         {/* ─── Body Text ─── */}
         {page.bodyText && (
           <div
-            className="text-white/85 text-sm md:text-base leading-relaxed mb-6 text-center max-w-lg"
-            style={{ textShadow: "0 1px 8px rgba(0,0,0,0.3)" }}
+            className="text-sm md:text-base leading-relaxed mb-6 text-center max-w-lg drop-shadow-md"
+            style={{ color: (page as any).textColor ? `${(page as any).textColor}cc` : 'rgba(255,255,255,0.85)' }}
           >
             {page.bodyText}
           </div>
@@ -234,6 +220,30 @@ export default function PublicLandingPage() {
             ═══════════════════════════════════════════════════════════ */}
         <div className="w-full max-w-md">
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-6 md:p-8 border border-white/20">
+            {/* ─── Logo inside form ─── */}
+            {foregroundLogos.length > 0 && (
+              <div className="flex items-center justify-center gap-4 mb-4">
+                {foregroundLogos.map((item) => (
+                  <img
+                    key={item.mediaId}
+                    src={item.media!.fileUrl}
+                    alt={item.media!.label || ""}
+                    className="h-10 md:h-14 object-contain"
+                  />
+                ))}
+              </div>
+            )}
+            {/* ─── Webinar name inside form ─── */}
+            {(page.headline || page.title) && (
+              <div className="text-center mb-4">
+                <h2 className="text-lg font-bold text-gray-900 leading-tight" style={{ fontFamily: "Raleway, sans-serif" }}>
+                  {page.headline || page.title}
+                </h2>
+                {page.subheadline && (
+                  <p className="text-sm text-gray-500 mt-1">{page.subheadline}</p>
+                )}
+              </div>
+            )}
             <div className="space-y-4">
               {/* Name Fields */}
               {(showField("firstName") || showField("lastName")) && (

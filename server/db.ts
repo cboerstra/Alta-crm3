@@ -1482,6 +1482,12 @@ export async function runAutoMigrations(): Promise<void> {
       column: "smsBody",
       sql: "ALTER TABLE `sms_templates` ADD COLUMN `smsBody` text DEFAULT NULL",
     },
+    // 0027: Add textColor to landing_pages (admin-selectable text color)
+    {
+      table: "landing_pages",
+      column: "textColor",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `textColor` varchar(16) DEFAULT '#FFFFFF'",
+    },
   ];
 
   // Create sms_reminders table if it doesn't exist (Hostinger migration)

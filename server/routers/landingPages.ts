@@ -49,6 +49,7 @@ export const landingPagesRouter = router({
       webinarId: z.number().optional(),
       isActive: z.boolean().default(true),
       accentColor: z.string().optional(),
+      textColor: z.string().optional(),
       // NEW fields
       enabledFields: z.array(z.string()).optional(),
       optInLabel: z.string().optional(),
@@ -80,6 +81,7 @@ export const landingPagesRouter = router({
       webinarId: z.number().nullable().optional(),
       isActive: z.boolean().optional(),
       accentColor: z.string().optional(),
+      textColor: z.string().optional(),
       enabledFields: z.array(z.string()).optional(),
       optInLabel: z.string().optional(),
       showOptIn: z.boolean().optional(),

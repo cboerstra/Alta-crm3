@@ -38,6 +38,7 @@ type FormState = {
   webinarId: number | undefined;
   isActive: boolean;
   accentColor: string;
+  textColor: string;
   enabledFields: string[];
   optInLabel: string;
   showOptIn: boolean;
@@ -87,7 +88,7 @@ P.S. Add this event to your calendar now so you don't miss it. Your join link is
 const defaultForm: FormState = {
   title: "", slug: "", headline: "", subheadline: "", bodyText: "",
   ctaText: "Register Now", campaignTag: "", sourceTag: "",
-  webinarId: undefined, isActive: true, accentColor: "#C9A84C",
+  webinarId: undefined, isActive: true, accentColor: "#C9A84C", textColor: "#FFFFFF",
   enabledFields: ["firstName", "lastName", "email", "phone"],
   optInLabel: "I agree to receive communications about this event and future opportunities",
   showOptIn: true,
@@ -264,6 +265,7 @@ export default function LandingPages() {
       campaignTag: page.campaignTag || "", sourceTag: page.sourceTag || "",
       webinarId: page.webinarId || undefined, isActive: page.isActive,
       accentColor: page.accentColor || "#C9A84C",
+      textColor: page.textColor || "#FFFFFF",
       enabledFields: (page.enabledFields as string[]) || ["firstName", "lastName", "email", "phone"],
       optInLabel: page.optInLabel || "I agree to receive communications about this event and future opportunities",
       showOptIn: page.showOptIn ?? true,
@@ -399,7 +401,7 @@ export default function LandingPages() {
         bodyText: form.bodyText || undefined, ctaText: form.ctaText || undefined,
         campaignTag: form.campaignTag || undefined, sourceTag: form.sourceTag || undefined,
         webinarId: form.webinarId ?? null, isActive: form.isActive,
-        accentColor: form.accentColor || undefined, enabledFields: form.enabledFields,
+        accentColor: form.accentColor || undefined, textColor: form.textColor || undefined, enabledFields: form.enabledFields,
         optInLabel: form.optInLabel || undefined, showOptIn: form.showOptIn,
         confirmationEmailSubject: form.confirmationEmailSubject || undefined,
         confirmationEmailBody: form.confirmationEmailBody || undefined,
@@ -411,7 +413,7 @@ export default function LandingPages() {
         bodyText: form.bodyText || undefined, ctaText: form.ctaText || undefined,
         campaignTag: form.campaignTag || undefined, sourceTag: form.sourceTag || undefined,
         webinarId: form.webinarId, isActive: form.isActive,
-        accentColor: form.accentColor || undefined, enabledFields: form.enabledFields,
+        accentColor: form.accentColor || undefined, textColor: form.textColor || undefined, enabledFields: form.enabledFields,
         optInLabel: form.optInLabel || undefined, showOptIn: form.showOptIn,
         confirmationEmailSubject: form.confirmationEmailSubject || undefined,
         confirmationEmailBody: form.confirmationEmailBody || undefined,
@@ -669,6 +671,15 @@ export default function LandingPages() {
                   <div className="flex items-center gap-2">
                     <input type="color" value={form.accentColor} onChange={(e) => setForm({ ...form, accentColor: e.target.value })} className="h-8 w-12 rounded cursor-pointer" />
                     <Input value={form.accentColor} onChange={(e) => setForm({ ...form, accentColor: e.target.value })} className="w-28" />
+                  </div>
+                </div>
+                <div>
+                  <Label>Text Color</Label>
+                  <p className="text-xs text-muted-foreground mb-1">Color for headline and body text on the landing page.</p>
+                  <div className="flex items-center gap-2">
+                    <input type="color" value={form.textColor || '#FFFFFF'} onChange={(e) => setForm({ ...form, textColor: e.target.value })} className="h-8 w-12 rounded cursor-pointer" />
+                    <Input value={form.textColor || '#FFFFFF'} onChange={(e) => setForm({ ...form, textColor: e.target.value })} className="w-28" />
+                    <button type="button" className="text-xs text-muted-foreground underline" onClick={() => setForm({ ...form, textColor: '#FFFFFF' })}>Reset</button>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
