@@ -62,7 +62,33 @@ export default function SettingsPage() {
   const [showTestEmail, setShowTestEmail] = useState(false);
 
   // SMS Templates state — always-editable; drafts keyed by template id
-  const [templateDrafts, setTemplateDrafts] = useState<Record<number, { body: string; isActive: boolean; emailSubject?: string | null }>>({}); 
+  const [templateDrafts, setTemplateDrafts] = useState<Record<number, { body: string; isActive: boolean; emailSubject?: string | null; sendOffsetMinutes?: number | null }>>({}); 
+
+  // Preset send-time options for reminder templates (value = minutes relative to webinar start)
+  const SEND_TIME_OPTIONS = [
+    { label: "5 minutes before", value: -5 },
+    { label: "10 minutes before", value: -10 },
+    { label: "15 minutes before", value: -15 },
+    { label: "30 minutes before", value: -30 },
+    { label: "45 minutes before", value: -45 },
+    { label: "1 hour before", value: -60 },
+    { label: "2 hours before", value: -120 },
+    { label: "3 hours before", value: -180 },
+    { label: "4 hours before", value: -240 },
+    { label: "6 hours before", value: -360 },
+    { label: "12 hours before", value: -720 },
+    { label: "24 hours before", value: -1440 },
+    { label: "36 hours before", value: -2160 },
+    { label: "48 hours before", value: -2880 },
+    { label: "72 hours before", value: -4320 },
+  ];
+
+  const REMINDER_TRIGGERS = ["reminder_24h", "reminder_1h", "reminder_10min"];
+  const REMINDER_DEFAULTS: Record<string, number> = {
+    reminder_24h: -1440,
+    reminder_1h: -60,
+    reminder_10min: -10,
+  };
   const [savingTemplateId, setSavingTemplateId] = useState<number | null>(null);
   const [showAddTemplate, setShowAddTemplate] = useState(false);
   const [newTemplateTrigger, setNewTemplateTrigger] = useState<string>("new_lead");
@@ -1160,6 +1186,7 @@ export default function SettingsPage() {
                     const currentBody = draft?.body ?? tmpl.body;
                     const currentActive = draft?.isActive ?? tmpl.isActive;
                     const currentEmailSubject = draft !== undefined ? (draft.emailSubject ?? null) : ((tmpl as any).emailSubject ?? null);
+                    const currentSendOffset = draft !== undefined ? (draft.sendOffsetMinutes ?? null) : ((tmpl as any).sendOffsetMinutes ?? null);
                     const charCount = currentBody.length;
                     const smsCount = Math.ceil(charCount / 160) || 1;
                     const isDeleting = deletingTemplateId === tmpl.id;
@@ -1167,12 +1194,13 @@ export default function SettingsPage() {
                     const isDirty = draft !== undefined && (
                       draft.body !== tmpl.body ||
                       draft.isActive !== tmpl.isActive ||
-                      (draft.emailSubject ?? null) !== ((tmpl as any).emailSubject ?? null)
+                      (draft.emailSubject ?? null) !== ((tmpl as any).emailSubject ?? null) ||
+                      (draft.sendOffsetMinutes ?? null) !== ((tmpl as any).sendOffsetMinutes ?? null)
                     );
 
                     const initDraft = () => {
                       if (!templateDrafts[tmpl.id]) {
-                        setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: tmpl.body, isActive: tmpl.isActive, emailSubject: (tmpl as any).emailSubject ?? null } }));
+                        setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: tmpl.body, isActive: tmpl.isActive, emailSubject: (tmpl as any).emailSubject ?? null, sendOffsetMinutes: (tmpl as any).sendOffsetMinutes ?? null } }));
                       }
                     };
 
@@ -1244,6 +1272,35 @@ export default function SettingsPage() {
                           </div>
                         </div>
 
+                        {/* Send-Time Selector — only for reminder triggers */}
+                        {REMINDER_TRIGGERS.includes(tmpl.trigger) && (
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                              Send Time
+                            </Label>
+                            <Select
+                              value={String(currentSendOffset ?? REMINDER_DEFAULTS[tmpl.trigger] ?? -60)}
+                              onValueChange={(val) => {
+                                initDraft();
+                                setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: Number(val) } }));
+                              }}
+                            >
+                              <SelectTrigger className="text-sm">
+                                <SelectValue placeholder="Select send time..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {SEND_TIME_OPTIONS.map(opt => (
+                                  <SelectItem key={opt.value} value={String(opt.value)}>{opt.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                              This message will be sent {SEND_TIME_OPTIONS.find(o => o.value === (currentSendOffset ?? REMINDER_DEFAULTS[tmpl.trigger]))?.label ?? 'at the configured time'} to all registered leads.
+                            </p>
+                          </div>
+                        )}
+
                         {/* Email Subject — only for registered trigger */}
                         {tmpl.trigger === 'registered' && (
                           <div className="space-y-1.5">
@@ -1281,7 +1338,7 @@ export default function SettingsPage() {
                             className="w-full min-h-[90px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
                             value={currentBody}
                             onFocus={initDraft}
-                            onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: e.target.value, isActive: currentActive, emailSubject: currentEmailSubject } }))}
+                            onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: e.target.value, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset } }))}
                           />
                           <div className="flex gap-2 justify-between items-center">
                             <Button
@@ -1310,7 +1367,7 @@ export default function SettingsPage() {
                                 disabled={isSaving || charCount === 0 || charCount > 1600 || !isDirty}
                                 onClick={() => {
                                   setSavingTemplateId(tmpl.id);
-                                  updateTemplate.mutate({ id: tmpl.id, body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject });
+                                  updateTemplate.mutate({ id: tmpl.id, body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset });
                                 }}
                               >
                                 {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}

@@ -352,6 +352,7 @@ export const smsTemplates = mysqlTable("sms_templates", {
     "registered",
     "reminder_24h",
     "reminder_1h",
+    "reminder_10min",
     "attended",
     "no_show",
     "consultation_booked",
@@ -361,6 +362,9 @@ export const smsTemplates = mysqlTable("sms_templates", {
   body: text("body").notNull(),
   // Optional email subject line — used when this template is sent as an email (e.g. registered trigger)
   emailSubject: varchar("emailSubject", { length: 512 }),
+  // How many minutes before the webinar to send this reminder (negative = before, null = use default)
+  // e.g. -1440 = 24h before, -60 = 1h before, -10 = 10min before
+  sendOffsetMinutes: int("sendOffsetMinutes"),
   isActive: boolean("isActive").default(true).notNull(),
   createdBy: int("createdBy"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

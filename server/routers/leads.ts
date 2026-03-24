@@ -274,15 +274,32 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
             .replace(/\{\{joinUrl\}\}|\{\{webinar_link\}\}/g, joinUrl ?? "")
             .replace(/\{\{date\}\}|\{\{session_date\}\}/g, sessionDateStr);
 
-          // Load the registered SMS template to use as the confirmation email body
-          const registeredTemplate = await getSmsTemplate("registered");
+          // Load all relevant SMS templates to use their bodies and admin-configured send offsets
+          const [registeredTemplate, reminder24hTemplate, reminder1hTemplate, reminder10minTemplate] = await Promise.all([
+            getSmsTemplate("registered"),
+            getSmsTemplate("reminder_24h"),
+            getSmsTemplate("reminder_1h"),
+            getSmsTemplate("reminder_10min"),
+          ]);
+
+          // Default offsets (in ms) — used if admin has not configured a custom offset
+          const DEFAULT_OFFSETS: Record<string, number> = {
+            reminder_24h: -24 * 60 * 60 * 1000,
+            reminder_1h: -60 * 60 * 1000,
+            reminder_10min: -10 * 60 * 1000,
+          };
+
+          const getOffset = (tmpl: { sendOffsetMinutes?: number | null } | null, key: string) => {
+            if (tmpl?.sendOffsetMinutes != null) return tmpl.sendOffsetMinutes * 60 * 1000;
+            return DEFAULT_OFFSETS[key] ?? 0;
+          };
 
           const webinarTime = webinar.scheduledAt.getTime();
           const reminders = [
             { type: "registration_confirmation" as const, offset: 0, subject: resolve(registeredTemplate?.emailSubject || `You're registered for ${webinar.title}!`) },
-            { type: "reminder_24h" as const, offset: -24 * 60 * 60 * 1000, subject: `Reminder: ${webinar.title} is tomorrow` },
-            { type: "reminder_1h" as const, offset: -60 * 60 * 1000, subject: `Starting soon: ${webinar.title}` },
-            { type: "reminder_10min" as const, offset: -10 * 60 * 1000, subject: `Starting in 10 minutes: ${webinar.title}` },
+            { type: "reminder_24h" as const, offset: getOffset(reminder24hTemplate, "reminder_24h"), subject: `Reminder: ${webinar.title}` },
+            { type: "reminder_1h" as const, offset: getOffset(reminder1hTemplate, "reminder_1h"), subject: `Starting soon: ${webinar.title}` },
+            { type: "reminder_10min" as const, offset: getOffset(reminder10minTemplate, "reminder_10min"), subject: `Starting soon: ${webinar.title}` },
           ];
           for (const r of reminders) {
             const scheduledAt = r.type === "registration_confirmation"

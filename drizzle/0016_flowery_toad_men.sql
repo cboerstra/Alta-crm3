@@ -1,0 +1,1 @@
+ALTER TABLE `sms_templates` MODIFY COLUMN `trigger` enum('new_lead','registered','reminder_24h','reminder_1h','reminder_10min','attended','no_show','consultation_booked','under_contract','deal_closed') NOT NULL;

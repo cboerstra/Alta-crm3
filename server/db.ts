@@ -941,10 +941,11 @@ export async function updateSmsTemplate(
   body: string,
   isActive: boolean,
   emailSubject?: string | null,
+  sendOffsetMinutes?: number | null,
 ): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  await db.update(smsTemplates).set({ body, isActive, emailSubject: emailSubject ?? null, updatedAt: new Date() }).where(eq(smsTemplates.id, id));
+  await db.update(smsTemplates).set({ body, isActive, emailSubject: emailSubject ?? null, sendOffsetMinutes: sendOffsetMinutes ?? null, updatedAt: new Date() }).where(eq(smsTemplates.id, id));
 }
 
 export async function deleteSmsTemplate(id: number): Promise<void> {
@@ -1420,6 +1421,12 @@ export async function runAutoMigrations(): Promise<void> {
       table: "sms_templates",
       column: "emailSubject",
       sql: "ALTER TABLE `sms_templates` ADD COLUMN `emailSubject` varchar(512) DEFAULT NULL",
+    },
+    // 0025: Add sendOffsetMinutes to sms_templates (admin-configurable reminder send time)
+    {
+      table: "sms_templates",
+      column: "sendOffsetMinutes",
+      sql: "ALTER TABLE `sms_templates` ADD COLUMN `sendOffsetMinutes` int DEFAULT NULL",
     },
   ];
 

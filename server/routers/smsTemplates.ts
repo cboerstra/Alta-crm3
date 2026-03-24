@@ -9,6 +9,7 @@ export const TRIGGER_VALUES = [
   "registered",
   "reminder_24h",
   "reminder_1h",
+  "reminder_10min",
   "attended",
   "no_show",
   "consultation_booked",
@@ -21,6 +22,7 @@ export const TRIGGER_LABELS: Record<SmsTemplate["trigger"], string> = {
   registered: "Webinar Registration",
   reminder_24h: "24-Hour Reminder",
   reminder_1h: "1-Hour Reminder",
+  reminder_10min: "10-Minute Reminder",
   attended: "Post-Webinar (Attended)",
   no_show: "Post-Webinar (No Show)",
   consultation_booked: "Consultation Booked",
@@ -31,8 +33,9 @@ export const TRIGGER_LABELS: Record<SmsTemplate["trigger"], string> = {
 export const TRIGGER_DESCRIPTIONS: Record<SmsTemplate["trigger"], string> = {
   new_lead: "Sent immediately when a new lead is created manually or via a landing page.",
   registered: "Sent when a lead registers for a webinar session.",
-  reminder_24h: "Sent 24 hours before a webinar session starts.",
-  reminder_1h: "Sent 1 hour before a webinar session starts.",
+  reminder_24h: "Sent before a webinar session starts (default: 24 hours). Use the send-time selector to customize.",
+  reminder_1h: "Sent before a webinar session starts (default: 1 hour). Use the send-time selector to customize.",
+  reminder_10min: "Sent before a webinar session starts (default: 10 minutes). Use the send-time selector to customize.",
   attended: "Sent after a webinar to leads who attended.",
   no_show: "Sent after a webinar to leads who registered but did not attend.",
   consultation_booked: "Sent when a lead books a consultation.",
@@ -45,6 +48,7 @@ const TRIGGER_ORDER: SmsTemplate["trigger"][] = [
   "registered",
   "reminder_24h",
   "reminder_1h",
+  "reminder_10min",
   "attended",
   "no_show",
   "consultation_booked",
@@ -92,10 +96,11 @@ export const smsTemplatesRouter = router({
         body: z.string().min(1, "Template body cannot be empty").max(1600, "SMS body cannot exceed 1600 characters"),
         isActive: z.boolean(),
         emailSubject: z.string().max(512).nullable().optional(),
+        sendOffsetMinutes: z.number().nullable().optional(),
       }),
     )
     .mutation(async ({ input }) => {
-      await updateSmsTemplate(input.id, input.body, input.isActive, input.emailSubject);
+      await updateSmsTemplate(input.id, input.body, input.isActive, input.emailSubject, input.sendOffsetMinutes);
       return { success: true };
     }),
 
