@@ -11,6 +11,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { processPendingReminders } from "../emailService";
+import { processPendingSmsReminders } from "../smsReminderService";
 import { registerWebsiteLeadRoute } from "../websiteLeads";
 import { getIntegration, createSmsMessage, logActivity, getLeads, migrateDefaultSmsTemplates, runAutoMigrations } from "../db";
 
@@ -271,6 +272,14 @@ async function startServer() {
       if (sent > 0) console.log(`[Email Scheduler] Sent ${sent} reminder(s)`);
     } catch (err) {
       console.error("[Email Scheduler] Error:", err);
+    }
+  }, 60_000);
+  // SMS reminder scheduler: process pending SMS reminders every 60 seconds
+  setInterval(async () => {
+    try {
+      await processPendingSmsReminders();
+    } catch (err) {
+      console.error("[SMS Reminder Scheduler] Error:", err);
     }
   }, 60_000);
 }

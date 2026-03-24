@@ -75,7 +75,7 @@ export async function sendEmail(payload: EmailPayload): Promise<boolean> {
 /**
  * Resolve {{placeholders}} in a template body using lead + webinar data.
  */
-async function resolveTemplateBody(
+export async function resolveTemplateBody(
   body: string,
   leadId: number,
   webinarId?: number | null,

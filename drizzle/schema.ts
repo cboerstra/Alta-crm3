@@ -221,6 +221,23 @@ export const smsMessages = mysqlTable("sms_messages", {
 export type SmsMessage = typeof smsMessages.$inferSelect;
 
 // ─── Email Reminders ──────────────────────────────────────────────────────────
+// ─── SMS Reminders (scheduled outbound SMS) ──────────────────────────────────
+export const smsReminders = mysqlTable("sms_reminders", {
+  id: int("id").autoincrement().primaryKey(),
+  leadId: int("leadId").notNull(),
+  webinarId: int("webinarId").notNull(),
+  type: mysqlEnum("type", [
+    "reminder_24h",
+    "reminder_1h",
+    "reminder_10min",
+  ]).notNull(),
+  scheduledAt: timestamp("scheduledAt").notNull(),
+  sentAt: timestamp("sentAt"),
+  status: mysqlEnum("status", ["pending", "sent", "failed", "cancelled"]).default("pending").notNull(),
+  body: text("body"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export const emailReminders = mysqlTable("email_reminders", {
   id: int("id").autoincrement().primaryKey(),
   leadId: int("leadId").notNull(),
@@ -365,6 +382,8 @@ export const smsTemplates = mysqlTable("sms_templates", {
   // How many minutes before the webinar to send this reminder (negative = before, null = use default)
   // e.g. -1440 = 24h before, -60 = 1h before, -10 = 10min before
   sendOffsetMinutes: int("sendOffsetMinutes"),
+  // Optional SMS body for reminder triggers — separate from the email body
+  smsBody: text("smsBody"),
   isActive: boolean("isActive").default(true).notNull(),
   createdBy: int("createdBy"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

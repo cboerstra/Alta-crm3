@@ -4,7 +4,7 @@ import {
   createLead, getLeads, getLeadById, updateLead, updateLeadStage,
   logActivity, getActivityByLeadId, updateLeadScore,
   getLandingPageBySlug, getWebinarById, getWebinarSessionById,
-  createEmailReminder, deleteLead, deleteLeads, notifyAdminsBySms,
+  createEmailReminder, createSmsReminder, deleteLead, deleteLeads, notifyAdminsBySms,
   sendLeadNotifications, getSmsTemplate,
 } from "../db";
 import { invokeLLM } from "../_core/llm";
@@ -301,11 +301,19 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
             { type: "reminder_1h" as const, offset: getOffset(reminder1hTemplate, "reminder_1h"), subject: `Starting soon: ${webinar.title}` },
             { type: "reminder_10min" as const, offset: getOffset(reminder10minTemplate, "reminder_10min"), subject: `Starting soon: ${webinar.title}` },
           ];
+          // SMS reminder templates (separate smsBody field)
+          const smsReminderTemplates: Record<string, { smsBody?: string | null, sendOffsetMinutes?: number | null } | null> = {
+            reminder_24h: reminder24hTemplate,
+            reminder_1h: reminder1hTemplate,
+            reminder_10min: reminder10minTemplate,
+          };
+
           for (const r of reminders) {
             const scheduledAt = r.type === "registration_confirmation"
               ? new Date()
               : new Date(webinarTime + r.offset);
             if (scheduledAt > new Date() || r.type === "registration_confirmation") {
+              // Schedule email reminder
               await createEmailReminder({
                 leadId: id,
                 webinarId: page.webinarId,
@@ -317,6 +325,21 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
                   : `Join link: ${joinUrl ?? "TBD"}`,
                 attachmentUrl: r.type === "registration_confirmation" ? (page.confirmationPdfUrl ?? undefined) : undefined,
               });
+
+              // Schedule SMS reminder (only for reminder types, not registration_confirmation)
+              if (r.type !== "registration_confirmation") {
+                const smsTmpl = smsReminderTemplates[r.type];
+                const smsBody = smsTmpl?.smsBody ? resolve(smsTmpl.smsBody) : null;
+                if (smsBody) {
+                  await createSmsReminder({
+                    leadId: id,
+                    webinarId: page.webinarId!,
+                    type: r.type as "reminder_24h" | "reminder_1h" | "reminder_10min",
+                    scheduledAt,
+                    body: smsBody,
+                  });
+                }
+              }
             }
           }
         }

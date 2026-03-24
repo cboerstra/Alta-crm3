@@ -16,6 +16,7 @@ import {
   webinarSessions, InsertWebinarSession,
   pendingInvites, InsertPendingInvite,
   smsTemplates, InsertSmsTemplate, SmsTemplate,
+  smsReminders,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -433,6 +434,52 @@ export async function createEmailReminder(data: {
   const db = await getDb();
   if (!db) return;
   await db.insert(emailReminders).values(data as any);
+}
+
+// ─── SMS Reminders ───────────────────────────────────────────────────────────
+export async function createSmsReminder(data: {
+  leadId: number;
+  webinarId: number;
+  type: typeof smsReminders.$inferInsert["type"];
+  scheduledAt: Date;
+  body: string;
+}) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(smsReminders).values(data as any);
+}
+export async function getPendingSmsReminders(before: Date) {
+  const db = await getDb();
+  if (!db) return [];
+  const { leads } = await import("../drizzle/schema");
+  return db.select({
+    id: smsReminders.id,
+    type: smsReminders.type,
+    body: smsReminders.body,
+    leadId: smsReminders.leadId,
+    webinarId: smsReminders.webinarId,
+    leadPhone: leads.phone,
+    smsConsent: leads.smsConsent,
+  })
+    .from(smsReminders)
+    .innerJoin(leads, eq(smsReminders.leadId, leads.id))
+    .where(and(eq(smsReminders.status, "pending"), lte(smsReminders.scheduledAt, before)))
+    .limit(50);
+}
+export async function markSmsReminderSent(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(smsReminders).set({ status: "sent", sentAt: new Date() }).where(eq(smsReminders.id, id));
+}
+export async function markSmsReminderFailed(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(smsReminders).set({ status: "failed" }).where(eq(smsReminders.id, id));
+}
+export async function cancelSmsRemindersByLead(leadId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(smsReminders).set({ status: "cancelled" }).where(and(eq(smsReminders.leadId, leadId), eq(smsReminders.status, "pending")));
 }
 
 export async function getPendingReminders(before: Date) {
@@ -942,10 +989,11 @@ export async function updateSmsTemplate(
   isActive: boolean,
   emailSubject?: string | null,
   sendOffsetMinutes?: number | null,
+  smsBody?: string | null,
 ): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  await db.update(smsTemplates).set({ body, isActive, emailSubject: emailSubject ?? null, sendOffsetMinutes: sendOffsetMinutes ?? null, updatedAt: new Date() }).where(eq(smsTemplates.id, id));
+  await db.update(smsTemplates).set({ body, isActive, emailSubject: emailSubject ?? null, sendOffsetMinutes: sendOffsetMinutes ?? null, smsBody: smsBody ?? null, updatedAt: new Date() }).where(eq(smsTemplates.id, id));
 }
 
 export async function deleteSmsTemplate(id: number): Promise<void> {
@@ -1428,7 +1476,33 @@ export async function runAutoMigrations(): Promise<void> {
       column: "sendOffsetMinutes",
       sql: "ALTER TABLE `sms_templates` ADD COLUMN `sendOffsetMinutes` int DEFAULT NULL",
     },
+    // 0026: Add smsBody to sms_templates (separate SMS body for reminder triggers)
+    {
+      table: "sms_templates",
+      column: "smsBody",
+      sql: "ALTER TABLE `sms_templates` ADD COLUMN `smsBody` text DEFAULT NULL",
+    },
   ];
+
+  // Create sms_reminders table if it doesn't exist (Hostinger migration)
+  try {
+    await (db as any).execute(`
+      CREATE TABLE IF NOT EXISTS sms_reminders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        leadId INT NOT NULL,
+        webinarId INT NOT NULL,
+        type ENUM('reminder_24h','reminder_1h','reminder_10min') NOT NULL,
+        scheduledAt TIMESTAMP NOT NULL,
+        sentAt TIMESTAMP NULL,
+        status ENUM('pending','sent','failed','cancelled') NOT NULL DEFAULT 'pending',
+        body TEXT,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!msg.includes("already exists")) console.error("[Auto-Migration] sms_reminders table:", msg);
+  }
 
   for (const m of migrations) {
     try {

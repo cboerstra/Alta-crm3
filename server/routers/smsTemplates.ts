@@ -97,10 +97,11 @@ export const smsTemplatesRouter = router({
         isActive: z.boolean(),
         emailSubject: z.string().max(512).nullable().optional(),
         sendOffsetMinutes: z.number().nullable().optional(),
+        smsBody: z.string().nullable().optional(),
       }),
     )
     .mutation(async ({ input }) => {
-      await updateSmsTemplate(input.id, input.body, input.isActive, input.emailSubject, input.sendOffsetMinutes);
+      await updateSmsTemplate(input.id, input.body, input.isActive, input.emailSubject, input.sendOffsetMinutes, input.smsBody);
       return { success: true };
     }),
 

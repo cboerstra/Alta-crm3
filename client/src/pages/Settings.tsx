@@ -62,7 +62,7 @@ export default function SettingsPage() {
   const [showTestEmail, setShowTestEmail] = useState(false);
 
   // SMS Templates state — always-editable; drafts keyed by template id
-  const [templateDrafts, setTemplateDrafts] = useState<Record<number, { body: string; isActive: boolean; emailSubject?: string | null; sendOffsetMinutes?: number | null }>>({}); 
+  const [templateDrafts, setTemplateDrafts] = useState<Record<number, { body: string; isActive: boolean; emailSubject?: string | null; sendOffsetMinutes?: number | null; smsBody?: string | null }>>({}); 
 
   // Preset send-time options for reminder templates (value = minutes relative to webinar start)
   const SEND_TIME_OPTIONS = [
@@ -1187,6 +1187,7 @@ export default function SettingsPage() {
                     const currentActive = draft?.isActive ?? tmpl.isActive;
                     const currentEmailSubject = draft !== undefined ? (draft.emailSubject ?? null) : ((tmpl as any).emailSubject ?? null);
                     const currentSendOffset = draft !== undefined ? (draft.sendOffsetMinutes ?? null) : ((tmpl as any).sendOffsetMinutes ?? null);
+                    const currentSmsBody = draft !== undefined ? (draft.smsBody ?? null) : ((tmpl as any).smsBody ?? null);
                     const charCount = currentBody.length;
                     const smsCount = Math.ceil(charCount / 160) || 1;
                     const isDeleting = deletingTemplateId === tmpl.id;
@@ -1195,12 +1196,13 @@ export default function SettingsPage() {
                       draft.body !== tmpl.body ||
                       draft.isActive !== tmpl.isActive ||
                       (draft.emailSubject ?? null) !== ((tmpl as any).emailSubject ?? null) ||
-                      (draft.sendOffsetMinutes ?? null) !== ((tmpl as any).sendOffsetMinutes ?? null)
+                      (draft.sendOffsetMinutes ?? null) !== ((tmpl as any).sendOffsetMinutes ?? null) ||
+                      (draft.smsBody ?? null) !== ((tmpl as any).smsBody ?? null)
                     );
 
                     const initDraft = () => {
                       if (!templateDrafts[tmpl.id]) {
-                        setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: tmpl.body, isActive: tmpl.isActive, emailSubject: (tmpl as any).emailSubject ?? null, sendOffsetMinutes: (tmpl as any).sendOffsetMinutes ?? null } }));
+                        setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: tmpl.body, isActive: tmpl.isActive, emailSubject: (tmpl as any).emailSubject ?? null, sendOffsetMinutes: (tmpl as any).sendOffsetMinutes ?? null, smsBody: (tmpl as any).smsBody ?? null } }));
                       }
                     };
 
@@ -1316,10 +1318,24 @@ export default function SettingsPage() {
                           </div>
                         )}
 
-                        {/* Always-editable body */}
+                        {/* SMS body for reminder triggers */}
+                        {['reminder_24h', 'reminder_1h', 'reminder_10min'].includes(tmpl.trigger) && (
+                          <div className="space-y-2 border border-dashed border-border/60 rounded-md p-3 bg-background/50">
+                            <Label className="text-xs font-semibold flex items-center gap-1.5"><span>📱</span> SMS Reminder Text</Label>
+                            <textarea
+                              className="w-full min-h-[70px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+                              placeholder={`Hi {{first_name}}, your webinar starts soon! Join here: {{webinar_link}}`}
+                              value={currentSmsBody ?? ''}
+                              onFocus={initDraft}
+                              onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: e.target.value || null } }))}
+                            />
+                            <p className="text-xs text-muted-foreground">Sent as an SMS text. Use <code className="bg-muted px-1 rounded">{'{{'+'first_name'+'}}'}</code>, <code className="bg-muted px-1 rounded">{'{{'+'webinar_link'+'}}'}</code>, <code className="bg-muted px-1 rounded">{'{{'+'session_date'+'}}'}</code>. Leave blank to skip SMS for this reminder.</p>
+                          </div>
+                        )}
+                        {/* Always-editable email body */}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <Label className="text-xs text-muted-foreground">{tmpl.trigger === 'registered' ? 'SMS & Email Body' : 'Message body'}</Label>
+                            <Label className="text-xs text-muted-foreground">{tmpl.trigger === 'registered' ? 'Email Body' : 'Email body'}</Label>
                             <div className="flex items-center gap-3">
                               <span className={`text-xs ${ charCount > 1600 ? 'text-destructive font-semibold' : charCount > 160 ? 'text-amber-600' : 'text-muted-foreground' }`}>
                                 {charCount} chars · {smsCount} segment{smsCount !== 1 ? 's' : ''}
@@ -1338,7 +1354,7 @@ export default function SettingsPage() {
                             className="w-full min-h-[90px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
                             value={currentBody}
                             onFocus={initDraft}
-                            onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: e.target.value, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset } }))}
+                            onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: e.target.value, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: currentSmsBody } }))}
                           />
                           <div className="flex gap-2 justify-between items-center">
                             <Button
@@ -1367,7 +1383,7 @@ export default function SettingsPage() {
                                 disabled={isSaving || charCount === 0 || charCount > 1600 || !isDirty}
                                 onClick={() => {
                                   setSavingTemplateId(tmpl.id);
-                                  updateTemplate.mutate({ id: tmpl.id, body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset });
+                                  updateTemplate.mutate({ id: tmpl.id, body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: currentSmsBody });
                                 }}
                               >
                                 {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
