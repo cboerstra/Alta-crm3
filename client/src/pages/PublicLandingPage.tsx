@@ -154,8 +154,11 @@ export default function PublicLandingPage() {
             className="w-full h-full object-cover"
             style={{ objectPosition: (page as any).artworkPosition || "center" }}
           />
-          {/* Dark overlay for readability */}
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" />
+          {/* Dark overlay for readability - opacity controlled by bgOverlayOpacity setting */}
+          <div
+            className="absolute inset-0 backdrop-blur-[1px]"
+            style={{ backgroundColor: `rgba(0,0,0,${page.bgOverlayOpacity != null ? Number(page.bgOverlayOpacity) : 0.5})` }}
+          />
         </div>
       )}
       {!hasBackground && (

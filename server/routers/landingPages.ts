@@ -88,6 +88,7 @@ export const landingPagesRouter = router({
       artworkUrl: z.string().nullable().optional(),
       artworkPosition: z.string().optional(),
       confirmationPdfUrl: z.string().nullable().optional(),
+      bgOverlayOpacity: z.number().min(0).max(1).optional(),
     }))
     .mutation(async ({ input }) => {
       const { id, ...data } = input;

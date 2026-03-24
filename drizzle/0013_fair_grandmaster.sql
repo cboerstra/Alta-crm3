@@ -1,0 +1,1 @@
+ALTER TABLE `landing_pages` ADD `bgOverlayOpacity` decimal(3,2) DEFAULT '0.50';

@@ -122,6 +122,8 @@ export const landingPages = mysqlTable("landing_pages", {
   confirmationPdfUrl: text("confirmationPdfUrl"),
   // NEW: Body text / description for the landing page
   bodyText: text("bodyText"),
+  // NEW: Background overlay opacity (0.0 = fully transparent, 1.0 = fully opaque dark overlay)
+  bgOverlayOpacity: decimal("bgOverlayOpacity", { precision: 3, scale: 2 }).default("0.50"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

@@ -114,6 +114,7 @@ export default function LandingPages() {
   const [form, setForm] = useState<FormState>({ ...defaultForm });
   const [artworkPreview, setArtworkPreview] = useState<string | null>(null);
   const [artworkPosition, setArtworkPosition] = useState<string>("center");
+  const [bgOverlayOpacity, setBgOverlayOpacity] = useState<number>(0.5);
   const [pdfName, setPdfName] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -271,6 +272,7 @@ export default function LandingPages() {
     });
     setArtworkPreview(page.artworkUrl || null);
     setArtworkPosition(page.artworkPosition || "center");
+    setBgOverlayOpacity(page.bgOverlayOpacity != null ? Number(page.bgOverlayOpacity) : 0.5);
     setPdfName(page.confirmationPdfUrl ? "Attached PDF" : null);
     setEditId(page.id);
     setTouched({});
@@ -797,6 +799,44 @@ export default function LandingPages() {
                         </div>
                       </div>
                       <p className="text-[10px] text-muted-foreground">Preview shows how your headline and CTA button will appear over the background. Click a position to adjust the focal point.</p>
+
+                      {/* Background Overlay Opacity Slider */}
+                      <div className="space-y-2 pt-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-semibold">Background Overlay Darkness</Label>
+                          <span className="text-xs text-muted-foreground font-mono">{Math.round(bgOverlayOpacity * 100)}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          step={5}
+                          value={Math.round(bgOverlayOpacity * 100)}
+                          onChange={(e) => {
+                            const val = Number(e.target.value) / 100;
+                            setBgOverlayOpacity(val);
+                          }}
+                          onMouseUp={(e) => {
+                            const val = Number((e.target as HTMLInputElement).value) / 100;
+                            if (editId) {
+                              updateArtworkMutation.mutate({ id: editId, bgOverlayOpacity: val });
+                            }
+                          }}
+                          onTouchEnd={(e) => {
+                            const val = Number((e.target as HTMLInputElement).value) / 100;
+                            if (editId) {
+                              updateArtworkMutation.mutate({ id: editId, bgOverlayOpacity: val });
+                            }
+                          }}
+                          className="w-full h-2 rounded-full accent-brand-green cursor-pointer"
+                        />
+                        <div className="flex justify-between text-[10px] text-muted-foreground">
+                          <span>Transparent (0%)</span>
+                          <span>Darker overlay</span>
+                          <span>Fully dark (100%)</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">Increase darkness if text is hard to read over a bright background image.</p>
+                      </div>
                     </div>
                   ) : (
                     <button onClick={() => artworkRef.current?.click()} className="w-full h-40 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-brand-green/50 hover:text-brand-green transition-colors cursor-pointer">
