@@ -45,7 +45,8 @@ export default function PublicLandingPage() {
   const foregroundLogos = useMemo(() =>
     mediaItems?.filter(m => m.placement === "foreground_logo" && m.media) || [], [mediaItems]);
   const foregroundImages = useMemo(() =>
-    mediaItems?.filter(m => m.placement === "foreground_image" && m.media) || [], [mediaItems]);
+    // Exclude any image that is also set as the background (artworkUrl) to avoid double-rendering
+    mediaItems?.filter(m => m.placement === "foreground_image" && m.media && m.media.fileUrl !== page?.artworkUrl) || [], [mediaItems, page?.artworkUrl]);
 
   const showField = (key: string) => enabledFields.includes(key);
   const accentColor = page?.accentColor || "#C9A84C";
