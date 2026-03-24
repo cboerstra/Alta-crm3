@@ -102,6 +102,19 @@ export default function PublicLandingPage() {
           )}
 
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-8 text-center border border-white/20">
+            {/* Logo inside the success card */}
+            {foregroundLogos.length > 0 && (
+              <div className="flex items-center justify-center gap-3 mb-5">
+                {foregroundLogos.map((item) => (
+                  <img
+                    key={item.mediaId}
+                    src={item.media!.fileUrl}
+                    alt={item.media!.label || ""}
+                    className="h-14 md:h-16 object-contain"
+                  />
+                ))}
+              </div>
+            )}
             <div className="h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: `${accentColor}20` }}>
               <CheckCircle className="h-8 w-8" style={{ color: accentColor }} />
             </div>
