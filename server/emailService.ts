@@ -158,27 +158,35 @@ export async function processPendingReminders(): Promise<number> {
         continue;
       }
 
-      // ── Resolve body from SMS/Email template if one is active ──
+      // ── Resolve body ──
+      // For registration_confirmation: always use the stored body/subject from the
+      // email_reminders row — it was already resolved from the landing page's
+      // custom Email tab template when the reminder was created.
+      // For other reminder types: fall back to the SMS/Email template body.
       let emailBody = reminder.body ?? "";
       const emailSubject = reminder.subject ?? "Notification from Clarke & Associates";
 
-      const triggerKey = REMINDER_TYPE_TO_TRIGGER[reminder.type ?? ""];
-      if (triggerKey) {
-        try {
-          const template = await getSmsTemplate(triggerKey as any);
-          if (template && template.isActive && template.body) {
-            // Use template body with full variable substitution
-            const resolved = await resolveTemplateBody(
-              template.body,
-              reminder.leadId,
-              reminder.webinarId,
-            );
-            // Wrap in clean HTML
-            emailBody = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333;max-width:600px;">${resolved.replace(/\n/g, "<br>")}</div>`;
+      if (reminder.type !== "registration_confirmation") {
+        const triggerKey = REMINDER_TYPE_TO_TRIGGER[reminder.type ?? ""];
+        if (triggerKey) {
+          try {
+            const template = await getSmsTemplate(triggerKey as any);
+            if (template && template.isActive && template.body) {
+              const resolved = await resolveTemplateBody(
+                template.body,
+                reminder.leadId,
+                reminder.webinarId,
+              );
+              emailBody = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333;max-width:600px;">${resolved.replace(/\n/g, "<br>")}</div>`;
+            }
+          } catch (e) {
+            console.error(`[Email] Failed to load template for trigger ${triggerKey}:`, e);
           }
-        } catch (e) {
-          console.error(`[Email] Failed to load template for trigger ${triggerKey}:`, e);
-          // Fall back to stored body
+        }
+      } else {
+        // registration_confirmation: wrap stored body in clean HTML if not already HTML
+        if (emailBody && !emailBody.includes("<")) {
+          emailBody = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333;max-width:600px;">${emailBody.replace(/\n/g, "<br>")}</div>`;
         }
       }
 
