@@ -1488,6 +1488,12 @@ export async function runAutoMigrations(): Promise<void> {
       column: "textColor",
       sql: "ALTER TABLE `landing_pages` ADD COLUMN `textColor` varchar(16) DEFAULT '#FFFFFF'",
     },
+    // 0028: Add attachmentUrl to email_reminders (PDF attachment for confirmation emails)
+    {
+      table: "email_reminders",
+      column: "attachmentUrl",
+      sql: "ALTER TABLE `email_reminders` ADD COLUMN `attachmentUrl` text DEFAULT NULL",
+    },
   ];
 
   // Create sms_reminders table if it doesn't exist (Hostinger migration)

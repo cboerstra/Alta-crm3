@@ -6,6 +6,8 @@
  */
 import nodemailer from "nodemailer";
 import type { Transporter } from "nodemailer";
+import fs from "fs";
+import path from "path";
 
 export interface SendEmailOptions {
   from: string;       // "Name <email@gmail.com>"
@@ -13,7 +15,7 @@ export interface SendEmailOptions {
   subject: string;
   html: string;
   text?: string;
-  attachmentUrl?: string; // public URL to attach as PDF
+  attachmentUrl?: string; // public URL or /uploads/... path to attach as PDF
 }
 
 /** Build a transporter for the given Gmail credentials. */
@@ -39,6 +41,49 @@ export async function verifyGmailCredentials(gmailAddress: string, appPassword: 
 }
 
 /**
+ * Resolve a PDF attachment URL to a Buffer.
+ * - If the URL is a relative /uploads/... path, read directly from disk.
+ * - Otherwise, fetch over HTTP.
+ */
+async function resolvePdfBuffer(attachmentUrl: string): Promise<{ buffer: Buffer; filename: string } | null> {
+  try {
+    // Local /uploads/... path — read from disk (avoids HTTP round-trip on Hostinger)
+    if (attachmentUrl.startsWith("/uploads/")) {
+      const uploadsDir = process.env.UPLOADS_DIR
+        ? path.resolve(process.env.UPLOADS_DIR)
+        : path.resolve(process.cwd(), "uploads");
+      const filename = path.basename(attachmentUrl);
+      const filePath = path.join(uploadsDir, filename);
+      console.log(`[Email] Reading PDF from disk: ${filePath}`);
+      if (!fs.existsSync(filePath)) {
+        console.error(`[Email] PDF file not found on disk: ${filePath}`);
+        return null;
+      }
+      const buffer = fs.readFileSync(filePath);
+      console.log(`[Email] PDF read from disk: ${filename} (${buffer.length} bytes)`);
+      return { buffer, filename };
+    }
+
+    // Remote URL — fetch over HTTP
+    console.log(`[Email] Fetching PDF from remote URL: ${attachmentUrl}`);
+    const response = await fetch(attachmentUrl);
+    if (!response.ok) {
+      console.error(`[Email] Failed to fetch PDF attachment (HTTP ${response.status}): ${attachmentUrl}`);
+      return null;
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const urlPath = new URL(attachmentUrl).pathname;
+    const filename = urlPath.split("/").pop() || "attachment.pdf";
+    console.log(`[Email] PDF fetched from remote: ${filename} (${buffer.length} bytes)`);
+    return { buffer, filename };
+  } catch (err) {
+    console.error("[Email] Error resolving PDF attachment:", err);
+    return null;
+  }
+}
+
+/**
  * Send an email via Gmail SMTP.
  * Returns true on success, throws on failure.
  */
@@ -57,25 +102,17 @@ export async function sendEmail(
     text: opts.text ?? opts.html.replace(/<[^>]+>/g, ""),
   };
 
-  // Attach PDF by fetching bytes from the URL (works with presigned/CDN URLs)
+  // Attach PDF
   if (opts.attachmentUrl) {
-    try {
-      const response = await fetch(opts.attachmentUrl);
-      if (response.ok) {
-        const arrayBuffer = await response.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        mailOptions.attachments = [
-          {
-            filename: "attachment.pdf",
-            content: buffer,
-            contentType: "application/pdf",
-          },
-        ];
-      } else {
-        console.error(`[Email] Failed to fetch PDF attachment (${response.status}): ${opts.attachmentUrl}`);
-      }
-    } catch (fetchErr) {
-      console.error("[Email] Error fetching PDF attachment:", fetchErr);
+    const result = await resolvePdfBuffer(opts.attachmentUrl);
+    if (result) {
+      mailOptions.attachments = [
+        {
+          filename: result.filename,
+          content: result.buffer,
+          contentType: "application/pdf",
+        },
+      ];
     }
   }
 
