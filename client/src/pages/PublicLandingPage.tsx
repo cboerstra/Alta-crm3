@@ -87,19 +87,6 @@ export default function PublicLandingPage() {
         )}
 
         <div className="relative z-10 max-w-md w-full mx-4">
-          {/* Foreground logos on success too */}
-          {foregroundLogos.length > 0 && (
-            <div className="flex items-center justify-center gap-4 mb-6">
-              {foregroundLogos.map((item) => (
-                <img
-                  key={item.mediaId}
-                  src={item.media!.fileUrl}
-                  alt={item.media!.label || ""}
-                  className="h-12 md:h-16 object-contain drop-shadow-lg"
-                />
-              ))}
-            </div>
-          )}
 
           <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-8 text-center border border-white/20">
             {/* Logo inside the success card */}
