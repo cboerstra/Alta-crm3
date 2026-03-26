@@ -116,6 +116,7 @@ export default function LandingPages() {
   const [artworkPreview, setArtworkPreview] = useState<string | null>(null);
   const [artworkPosition, setArtworkPosition] = useState<string>("center");
   const [bgOverlayOpacity, setBgOverlayOpacity] = useState<number>(0.5);
+  const [logoSize, setLogoSize] = useState<number>(64);
   const [pdfName, setPdfName] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -275,6 +276,7 @@ export default function LandingPages() {
     setArtworkPreview(page.artworkUrl || null);
     setArtworkPosition(page.artworkPosition || "center");
     setBgOverlayOpacity(page.bgOverlayOpacity != null ? Number(page.bgOverlayOpacity) : 0.5);
+    setLogoSize((page as any).logoSize != null ? Number((page as any).logoSize) : 64);
     setPdfName(page.confirmationPdfUrl ? "Attached PDF" : null);
     setEditId(page.id);
     setTouched({});
@@ -855,6 +857,40 @@ export default function LandingPages() {
                       <span>Fully dark (100%)</span>
                     </div>
                     <p className="text-[10px] text-muted-foreground">Controls how dark the overlay is over your background image. Increase if text is hard to read.</p>
+                  </div>
+                </div>
+
+                {/* Logo Size Slider */}
+                <div className="space-y-2 pt-3 border-t mt-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold">Logo Size</Label>
+                    <span className="text-xs text-muted-foreground font-mono">{logoSize}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={30}
+                    max={200}
+                    step={5}
+                    value={logoSize}
+                    onChange={(e) => setLogoSize(Number(e.target.value))}
+                    onMouseUp={(e) => {
+                      const val = Number((e.target as HTMLInputElement).value);
+                      if (editId) {
+                        updateArtworkMutation.mutate({ id: editId, logoSize: val });
+                      }
+                    }}
+                    onTouchEnd={(e) => {
+                      const val = Number((e.target as HTMLInputElement).value);
+                      if (editId) {
+                        updateArtworkMutation.mutate({ id: editId, logoSize: val });
+                      }
+                    }}
+                    className="w-full h-2 rounded-full accent-brand-green cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>Small (30px)</span>
+                    <span>Medium (100px)</span>
+                    <span>Large (200px)</span>
                   </div>
                 </div>
 

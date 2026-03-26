@@ -1,0 +1,1 @@
+ALTER TABLE `landing_pages` ADD `logoSize` int DEFAULT 64;

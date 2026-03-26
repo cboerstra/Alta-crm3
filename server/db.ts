@@ -1494,6 +1494,12 @@ export async function runAutoMigrations(): Promise<void> {
       column: "attachmentUrl",
       sql: "ALTER TABLE `email_reminders` ADD COLUMN `attachmentUrl` text DEFAULT NULL",
     },
+    // 0029: Add logoSize to landing_pages (admin-configurable logo height in px)
+    {
+      table: "landing_pages",
+      column: "logoSize",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `logoSize` int DEFAULT 64",
+    },
   ];
 
   // Create sms_reminders table if it doesn't exist (Hostinger migration)

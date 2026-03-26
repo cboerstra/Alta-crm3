@@ -97,7 +97,8 @@ export default function PublicLandingPage() {
                     key={item.mediaId}
                     src={item.media!.fileUrl}
                     alt={item.media!.label || ""}
-                    className="h-14 md:h-16 object-contain"
+                    style={{ height: `${(page as any).logoSize ?? 64}px` }}
+                    className="object-contain"
                   />
                 ))}
               </div>
@@ -201,7 +202,8 @@ export default function PublicLandingPage() {
                     key={item.mediaId}
                     src={item.media!.fileUrl}
                     alt={item.media!.label || ""}
-                    className="h-10 md:h-14 object-contain"
+                    style={{ height: `${(page as any).logoSize ?? 64}px` }}
+                    className="object-contain"
                   />
                 ))}
               </div>

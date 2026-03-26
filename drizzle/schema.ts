@@ -125,6 +125,8 @@ export const landingPages = mysqlTable("landing_pages", {
   bodyText: text("bodyText"),
   // NEW: Background overlay opacity (0.0 = fully transparent, 1.0 = fully opaque dark overlay)
   bgOverlayOpacity: decimal("bgOverlayOpacity", { precision: 3, scale: 2 }).default("0.50"),
+  // NEW: Logo size in pixels (height). Default 64px.
+  logoSize: int("logoSize").default(64),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
