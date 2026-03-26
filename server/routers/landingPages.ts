@@ -162,8 +162,31 @@ export const landingPagesRouter = router({
     }))
     .mutation(async ({ input }) => {
       const buffer = Buffer.from(input.fileBase64, "base64");
-      const key = `landing-pages/${input.landingPageId}/pdf-${nanoid()}.pdf`;
-      const { url } = await storagePut(key, buffer, "application/pdf");
+
+      // Try S3 first; fall back to local disk when S3 credentials are unavailable (e.g. Hostinger)
+      let url: string;
+      try {
+        const key = `landing-pages/${input.landingPageId}/pdf-${nanoid()}.pdf`;
+        const result = await storagePut(key, buffer, "application/pdf");
+        url = result.url;
+        console.log(`[PDF Upload] Stored to S3: ${url}`);
+      } catch (s3Err) {
+        console.warn("[PDF Upload] S3 unavailable, falling back to local disk:", (s3Err as Error).message);
+        // Save to local uploads directory
+        const { default: fs } = await import("fs");
+        const { default: path } = await import("path");
+        const uploadsDir = process.env.UPLOADS_DIR
+          ? path.resolve(process.env.UPLOADS_DIR)
+          : path.resolve(process.cwd(), "uploads");
+        if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+        const safeName = input.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const filename = `${Date.now()}-${nanoid()}-${safeName}`;
+        const filePath = path.join(uploadsDir, filename);
+        fs.writeFileSync(filePath, buffer);
+        url = `/uploads/${filename}`;
+        console.log(`[PDF Upload] Stored to local disk: ${filePath}`);
+      }
+
       await updateLandingPage(input.landingPageId, { confirmationPdfUrl: url });
       return { url };
     }),
