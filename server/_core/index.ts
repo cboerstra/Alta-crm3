@@ -229,6 +229,60 @@ async function startServer() {
     }
   });
 
+  // ── Open Graph meta tag injection for /lp/:slug ──────────────────────────
+  // Facebook/Twitter crawlers don't execute JS, so we intercept landing page
+  // URLs server-side and inject og:image, og:title, og:description into the HTML.
+  app.get("/lp/:slug", async (req, res, next) => {
+    try {
+      const { getLandingPageBySlug, getLandingPageLogos } = await import("../db");
+      const page = await getLandingPageBySlug(req.params.slug);
+      if (!page || !page.isActive) { next(); return; }
+
+      // Get the first foreground logo URL for og:image
+      const logoUrls = await getLandingPageLogos(page.id);
+      const ogImage = logoUrls[0] ?? "";
+
+      const title = page.title ?? "Register Now";
+      const description = (page as any).subheadline ?? (page as any).headline ?? "Sign up to reserve your spot.";
+      const pageUrl = `${req.protocol}://${req.get("host")}/lp/${req.params.slug}`;
+
+      // Read the built index.html and inject OG tags into <head>
+      let htmlPath: string;
+      if (process.env.NODE_ENV === "development") {
+        htmlPath = path.resolve(process.cwd(), "client", "index.html");
+      } else {
+        htmlPath = path.resolve(import.meta.dirname, "public", "index.html");
+      }
+
+      if (!fs.existsSync(htmlPath)) { next(); return; }
+      let html = fs.readFileSync(htmlPath, "utf-8");
+
+      const ogTags = [
+        `<meta property="og:type" content="website" />`,
+        `<meta property="og:url" content="${pageUrl}" />`,
+        `<meta property="og:title" content="${title.replace(/"/g, '&quot;')}" />`,
+        `<meta property="og:description" content="${description.replace(/"/g, '&quot;')}" />`,
+        ogImage ? `<meta property="og:image" content="${ogImage}" />` : "",
+        ogImage ? `<meta property="og:image:width" content="400" />` : "",
+        ogImage ? `<meta property="og:image:height" content="400" />` : "",
+        `<meta name="twitter:card" content="summary_large_image" />`,
+        `<meta name="twitter:title" content="${title.replace(/"/g, '&quot;')}" />`,
+        `<meta name="twitter:description" content="${description.replace(/"/g, '&quot;')}" />`,
+        ogImage ? `<meta name="twitter:image" content="${ogImage}" />` : "",
+        `<title>${title.replace(/</g, '&lt;')}</title>`,
+      ].filter(Boolean).join("\n    ");
+
+      // Replace the existing <title> and inject OG tags before </head>
+      html = html.replace(/<title>[^<]*<\/title>/, "");
+      html = html.replace("</head>", `  ${ogTags}\n  </head>`);
+
+      res.status(200).set({ "Content-Type": "text/html" }).end(html);
+    } catch (err) {
+      console.error("[OG] Error injecting meta tags:", err);
+      next();
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",
