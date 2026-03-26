@@ -158,59 +158,26 @@ export async function processPendingReminders(): Promise<number> {
         continue;
       }
 
-      // ── Determine whether this reminder should be sent as an email ──
-      // Only registration_confirmation is always sent via email.
-      // Reminder types (24h, 1h, 10min) are SMS-only UNLESS the template has an
-      // explicit emailSubject configured — in that case send via email too.
-      let shouldSendEmail = reminder.type === "registration_confirmation";
-      let emailBody = reminder.body ?? "";
-      const emailSubject = reminder.subject ?? "Notification from Clarke & Associates";
-
+      // ── Routing rule ──
+      // registration_confirmation → email (with PDF attachment)
+      // reminder_24h / reminder_1h / reminder_10min → SMS only (handled by smsReminderService)
+      //   If SMS is not configured, these reminders are simply skipped — never fall back to email.
       if (reminder.type !== "registration_confirmation") {
-        const triggerKey = REMINDER_TYPE_TO_TRIGGER[reminder.type ?? ""];
-        if (triggerKey) {
-          try {
-            const template = await getSmsTemplate(triggerKey as any);
-            // Only send as email if the template has an explicit emailSubject set
-            if (template && template.isActive && template.emailSubject) {
-              shouldSendEmail = true;
-              if (template.body) {
-                const resolved = await resolveTemplateBody(
-                  template.body,
-                  reminder.leadId,
-                  reminder.webinarId,
-                );
-                emailBody = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333;max-width:600px;">${resolved.replace(/\n/g, "<br>")}</div>`;
-              }
-            } else {
-              // No emailSubject → SMS-only reminder, mark as sent without emailing
-              console.log(`[Email] Skipping email for SMS-only reminder type '${reminder.type}' (id=${reminder.id})`);
-              await db.update(emailReminders)
-                .set({ status: "sent", sentAt: new Date() })
-                .where(eq(emailReminders.id, reminder.id));
-              continue;
-            }
-          } catch (e) {
-            console.error(`[Email] Failed to load template for trigger ${triggerKey}:`, e);
-          }
-        } else {
-          // Unknown type — skip silently
-          await db.update(emailReminders).set({ status: "sent", sentAt: new Date() }).where(eq(emailReminders.id, reminder.id));
-          continue;
-        }
-      } else {
-        // registration_confirmation: wrap stored body in clean HTML if not already HTML
-        if (emailBody && !emailBody.includes("<")) {
-          emailBody = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333;max-width:600px;">${emailBody.replace(/\n/g, "<br>")}</div>`;
-        }
-      }
-
-      if (!shouldSendEmail) {
-        await db.update(emailReminders).set({ status: "sent", sentAt: new Date() }).where(eq(emailReminders.id, reminder.id));
+        console.log(`[Email] Skipping email for SMS-only reminder type '${reminder.type}' (id=${reminder.id}) — handled by SMS service`);
+        await db.update(emailReminders)
+          .set({ status: "sent", sentAt: new Date() })
+          .where(eq(emailReminders.id, reminder.id));
         continue;
       }
 
-      console.log(`[Email] Sending ${reminder.type} email to ${reminder.leadEmail}, attachmentUrl=${reminder.attachmentUrl ?? "none"}`);
+      // registration_confirmation: use stored body (already resolved at registration time)
+      let emailBody = reminder.body ?? "";
+      const emailSubject = reminder.subject ?? "Notification from Clarke & Associates";
+      if (emailBody && !emailBody.includes("<")) {
+        emailBody = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333;max-width:600px;">${emailBody.replace(/\n/g, "<br>")}</div>`;
+      }
+
+      console.log(`[Email] Sending confirmation email to ${reminder.leadEmail}, attachmentUrl=${reminder.attachmentUrl ?? "none"}`);
 
       const success = await sendEmail({
         to: reminder.leadEmail,

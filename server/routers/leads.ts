@@ -314,10 +314,17 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
             reminder_10min: reminder10minTemplate,
           };
 
+          const nowMs = Date.now();
           for (const r of reminders) {
             const scheduledAt = r.type === "registration_confirmation"
               ? new Date()
               : new Date(webinarTime + r.offset);
+            // Only schedule future reminders; skip past-due ones (e.g. 24h reminder when webinar < 24h away)
+            // registration_confirmation always fires immediately regardless
+            if (r.type !== "registration_confirmation" && scheduledAt.getTime() <= nowMs) {
+              console.log(`[Leads] Skipping past-due ${r.type} reminder (scheduled: ${scheduledAt.toISOString()})`);
+              continue;
+            }
             if (scheduledAt > new Date() || r.type === "registration_confirmation") {
               // Schedule email reminder
               await createEmailReminder({
