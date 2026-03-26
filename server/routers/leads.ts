@@ -5,7 +5,7 @@ import {
   logActivity, getActivityByLeadId, updateLeadScore,
   getLandingPageBySlug, getWebinarById, getWebinarSessionById,
   createEmailReminder, createSmsReminder, deleteLead, deleteLeads, notifyAdminsBySms,
-  sendLeadNotifications, getSmsTemplate,
+  sendLeadNotifications, getSmsTemplate, getLandingPageLogos,
 } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { notifyOwner } from "../_core/notification";
@@ -275,12 +275,18 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
             .replace(/\{\{date\}\}|\{\{session_date\}\}/g, sessionDateStr);
 
           // Load all relevant SMS templates to use their bodies and admin-configured send offsets
-          const [registeredTemplate, reminder24hTemplate, reminder1hTemplate, reminder10minTemplate] = await Promise.all([
+          const [registeredTemplate, reminder24hTemplate, reminder1hTemplate, reminder10minTemplate, pageLogoUrls] = await Promise.all([
             getSmsTemplate("registered"),
             getSmsTemplate("reminder_24h"),
             getSmsTemplate("reminder_1h"),
             getSmsTemplate("reminder_10min"),
+            getLandingPageLogos(page.id),
           ]);
+
+          // Build a logo HTML block to prepend to confirmation emails
+          const logoHtml = pageLogoUrls.length > 0
+            ? `<div style="text-align:center;margin-bottom:16px;">${pageLogoUrls.map(url => `<img src="${url}" alt="" style="height:${(page as any).logoSize ?? 64}px;max-width:100%;object-fit:contain;" />`).join(" ")}</div>`
+            : "";
 
           // Default offsets (in ms) — used if admin has not configured a custom offset
           const DEFAULT_OFFSETS: Record<string, number> = {
@@ -321,7 +327,7 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
                 scheduledAt,
                 subject: r.subject,
                 body: r.type === "registration_confirmation"
-                  ? resolve(registeredTemplate?.body || `Thank you for registering for ${webinar.title}!`)
+                  ? logoHtml + resolve(registeredTemplate?.body || `Thank you for registering for ${webinar.title}!`)
                   : `Join link: ${joinUrl ?? "TBD"}`,
                 attachmentUrl: r.type === "registration_confirmation" ? (page.confirmationPdfUrl ?? undefined) : undefined,
               });
@@ -350,13 +356,17 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
             .replace(/\{\{firstName\}\}/g, input.firstName)
             .replace(/\{\{lastName\}\}/g, input.lastName)
             .replace(/\{\{fullName\}\}/g, `${input.firstName} ${input.lastName}`);
+          const nonWebinarLogoUrls = await getLandingPageLogos(page.id);
+          const nonWebinarLogoHtml = nonWebinarLogoUrls.length > 0
+            ? `<div style="text-align:center;margin-bottom:16px;">${nonWebinarLogoUrls.map(url => `<img src="${url}" alt="" style="height:${(page as any).logoSize ?? 64}px;max-width:100%;object-fit:contain;" />`).join(" ")}</div>`
+            : "";
           await createEmailReminder({
             leadId: id,
             webinarId: 0,
             type: "registration_confirmation",
             scheduledAt: new Date(),
             subject: resolveNonWebinar(page.confirmationEmailSubject),
-            body: resolveNonWebinar(page.confirmationEmailBody ?? "Thank you for your interest!"),
+            body: nonWebinarLogoHtml + resolveNonWebinar(page.confirmationEmailBody ?? "Thank you for your interest!"),
             attachmentUrl: page.confirmationPdfUrl ?? undefined,
           });
         }

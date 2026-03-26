@@ -17,6 +17,8 @@ import {
   pendingInvites, InsertPendingInvite,
   smsTemplates, InsertSmsTemplate, SmsTemplate,
   smsReminders,
+  landingPageMedia,
+  mediaLibrary,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -374,6 +376,22 @@ export async function getLandingPageById(id: number) {
   if (!db) return undefined;
   const r = await db.select().from(landingPages).where(eq(landingPages.id, id)).limit(1);
   return r[0] ? normalizeLandingPage(r[0]) : undefined;
+}
+
+/**
+ * Returns the foreground logo URLs for a landing page (for embedding in emails).
+ */
+export async function getLandingPageLogos(landingPageId: number): Promise<string[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const { inArray } = await import("drizzle-orm");
+  const associations = await db.select().from(landingPageMedia)
+    .where(eq(landingPageMedia.landingPageId, landingPageId));
+  const logoAssocs = associations.filter(a => a.placement === "foreground_logo");
+  if (!logoAssocs.length) return [];
+  const mediaIds = logoAssocs.map(a => a.mediaId);
+  const items = await db.select().from(mediaLibrary).where(inArray(mediaLibrary.id, mediaIds));
+  return items.map(i => i.fileUrl).filter(Boolean) as string[];
 }
 
 export async function updateLandingPage(id: number, data: Partial<InsertLandingPage>) {
