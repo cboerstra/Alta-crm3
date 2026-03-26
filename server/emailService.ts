@@ -158,11 +158,11 @@ export async function processPendingReminders(): Promise<number> {
         continue;
       }
 
-      // ── Resolve body ──
-      // For registration_confirmation: always use the stored body/subject from the
-      // email_reminders row — it was already resolved from the landing page's
-      // custom Email tab template when the reminder was created.
-      // For other reminder types: fall back to the SMS/Email template body.
+      // ── Determine whether this reminder should be sent as an email ──
+      // Only registration_confirmation is always sent via email.
+      // Reminder types (24h, 1h, 10min) are SMS-only UNLESS the template has an
+      // explicit emailSubject configured — in that case send via email too.
+      let shouldSendEmail = reminder.type === "registration_confirmation";
       let emailBody = reminder.body ?? "";
       const emailSubject = reminder.subject ?? "Notification from Clarke & Associates";
 
@@ -171,17 +171,32 @@ export async function processPendingReminders(): Promise<number> {
         if (triggerKey) {
           try {
             const template = await getSmsTemplate(triggerKey as any);
-            if (template && template.isActive && template.body) {
-              const resolved = await resolveTemplateBody(
-                template.body,
-                reminder.leadId,
-                reminder.webinarId,
-              );
-              emailBody = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333;max-width:600px;">${resolved.replace(/\n/g, "<br>")}</div>`;
+            // Only send as email if the template has an explicit emailSubject set
+            if (template && template.isActive && template.emailSubject) {
+              shouldSendEmail = true;
+              if (template.body) {
+                const resolved = await resolveTemplateBody(
+                  template.body,
+                  reminder.leadId,
+                  reminder.webinarId,
+                );
+                emailBody = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333;max-width:600px;">${resolved.replace(/\n/g, "<br>")}</div>`;
+              }
+            } else {
+              // No emailSubject → SMS-only reminder, mark as sent without emailing
+              console.log(`[Email] Skipping email for SMS-only reminder type '${reminder.type}' (id=${reminder.id})`);
+              await db.update(emailReminders)
+                .set({ status: "sent", sentAt: new Date() })
+                .where(eq(emailReminders.id, reminder.id));
+              continue;
             }
           } catch (e) {
             console.error(`[Email] Failed to load template for trigger ${triggerKey}:`, e);
           }
+        } else {
+          // Unknown type — skip silently
+          await db.update(emailReminders).set({ status: "sent", sentAt: new Date() }).where(eq(emailReminders.id, reminder.id));
+          continue;
         }
       } else {
         // registration_confirmation: wrap stored body in clean HTML if not already HTML
@@ -189,6 +204,13 @@ export async function processPendingReminders(): Promise<number> {
           emailBody = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333;max-width:600px;">${emailBody.replace(/\n/g, "<br>")}</div>`;
         }
       }
+
+      if (!shouldSendEmail) {
+        await db.update(emailReminders).set({ status: "sent", sentAt: new Date() }).where(eq(emailReminders.id, reminder.id));
+        continue;
+      }
+
+      console.log(`[Email] Sending ${reminder.type} email to ${reminder.leadEmail}, attachmentUrl=${reminder.attachmentUrl ?? "none"}`);
 
       const success = await sendEmail({
         to: reminder.leadEmail,
