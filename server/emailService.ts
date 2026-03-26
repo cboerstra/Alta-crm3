@@ -159,22 +159,43 @@ export async function processPendingReminders(): Promise<number> {
       }
 
       // ── Routing rule ──
-      // registration_confirmation → email (with PDF attachment)
-      // reminder_24h / reminder_1h / reminder_10min → SMS only (handled by smsReminderService)
-      //   If SMS is not configured, these reminders are simply skipped — never fall back to email.
-      if (reminder.type !== "registration_confirmation") {
-        console.log(`[Email] Skipping email for SMS-only reminder type '${reminder.type}' (id=${reminder.id}) — handled by SMS service`);
-        await db.update(emailReminders)
-          .set({ status: "sent", sentAt: new Date() })
-          .where(eq(emailReminders.id, reminder.id));
-        continue;
-      }
-
-      // registration_confirmation: use stored body (already resolved at registration time)
+      // registration_confirmation → always send via email (with PDF attachment)
+      // reminder types → send via email only if the template has an emailSubject set;
+      //   otherwise skip silently (SMS service handles them separately)
       let emailBody = reminder.body ?? "";
-      const emailSubject = reminder.subject ?? "Notification from Clarke & Associates";
-      if (emailBody && !emailBody.includes("<")) {
-        emailBody = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333;max-width:600px;">${emailBody.replace(/\n/g, "<br>")}</div>`;
+      let emailSubject = reminder.subject ?? "";
+
+      if (reminder.type !== "registration_confirmation") {
+        const triggerKey = REMINDER_TYPE_TO_TRIGGER[reminder.type ?? ""];
+        if (!triggerKey) {
+          await db.update(emailReminders).set({ status: "sent", sentAt: new Date() }).where(eq(emailReminders.id, reminder.id));
+          continue;
+        }
+        try {
+          const template = await getSmsTemplate(triggerKey as any);
+          if (!template || !template.isActive || !template.emailSubject) {
+            // No email subject configured → SMS-only, skip email
+            console.log(`[Email] Skipping email for reminder type '${reminder.type}' (id=${reminder.id}) — no emailSubject set`);
+            await db.update(emailReminders).set({ status: "sent", sentAt: new Date() }).where(eq(emailReminders.id, reminder.id));
+            continue;
+          }
+          // Use the template's emailSubject and body for the email
+          emailSubject = template.emailSubject;
+          if (template.body) {
+            const resolved = await resolveTemplateBody(template.body, reminder.leadId, reminder.webinarId);
+            emailBody = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333;max-width:600px;">${resolved.replace(/\n/g, "<br>")}</div>`;
+          }
+        } catch (e) {
+          console.error(`[Email] Failed to load template for trigger ${triggerKey}:`, e);
+          await db.update(emailReminders).set({ status: "failed" }).where(eq(emailReminders.id, reminder.id));
+          continue;
+        }
+      } else {
+        // registration_confirmation: use stored body (already resolved at registration time)
+        if (!emailSubject) emailSubject = "Notification from Clarke & Associates";
+        if (emailBody && !emailBody.includes("<")) {
+          emailBody = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333;max-width:600px;">${emailBody.replace(/\n/g, "<br>")}</div>`;
+        }
       }
 
       console.log(`[Email] Sending confirmation email to ${reminder.leadEmail}, attachmentUrl=${reminder.attachmentUrl ?? "none"}`);

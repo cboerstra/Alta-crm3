@@ -1303,50 +1303,29 @@ export default function SettingsPage() {
                           </div>
                         )}
 
-                        {/* Email Subject — only for registered trigger */}
-                        {tmpl.trigger === 'registered' && (
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="h-3 w-3" /> Email Subject Line</Label>
-                            <Input
-                              className="text-sm"
-                              placeholder={`You're registered for {{webinar_title}}!`}
-                              value={currentEmailSubject ?? ''}
-                              onFocus={initDraft}
-                              onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: currentActive, emailSubject: e.target.value || null } }))}
-                            />
-                            <p className="text-xs text-muted-foreground">Used as the email subject for registration confirmation emails. Leave blank to use the default.</p>
-                          </div>
-                        )}
+                        {/* 1. Email Subject — all triggers */}
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="h-3 w-3" /> Email Subject Line</Label>
+                          <Input
+                            className="text-sm"
+                            placeholder={tmpl.trigger === 'registered' ? `You're registered for {{webinar_title}}!` : `Reminder: {{webinar_title}}`}
+                            value={currentEmailSubject ?? ''}
+                            onFocus={initDraft}
+                            onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: currentActive, emailSubject: e.target.value || null, sendOffsetMinutes: currentSendOffset, smsBody: currentSmsBody } }))}
+                          />
+                          <p className="text-xs text-muted-foreground">Subject line for the email. Leave blank to skip sending an email for this trigger.</p>
+                        </div>
 
-                        {/* SMS body for all triggers */}
-                        {true && (
-                          <div className="space-y-2 border border-dashed border-border/60 rounded-md p-3 bg-background/50">
-                            <Label className="text-xs font-semibold flex items-center gap-1.5"><span>📱</span> SMS Text Message</Label>
-                            <textarea
-                              className="w-full min-h-[70px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
-                              placeholder={`Hi {{first_name}}, ...`}
-                              value={currentSmsBody ?? ''}
-                              onFocus={initDraft}
-                              onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: e.target.value || null } }))}
-                            />
-                            <p className="text-xs text-muted-foreground">Sent as an SMS text. Use <code className="bg-muted px-1 rounded">{'{{'+'first_name'+'}}'}</code>, <code className="bg-muted px-1 rounded">{'{{'+'webinar_link'+'}}'}</code>, <code className="bg-muted px-1 rounded">{'{{'+'session_date'+'}}'}</code>, <code className="bg-muted px-1 rounded">{'{{'+'webinar_title'+'}}'}</code>. Leave blank to skip SMS for this trigger.</p>
-                          </div>
-                        )}
-                        {/* Always-editable email body */}
+                        {/* 2. Email Body — all triggers */}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <Label className="text-xs font-semibold flex items-center gap-1.5"><span>✉️</span> Email Body</Label>
-                            <div className="flex items-center gap-3">
-                              <span className={`text-xs ${ charCount > 1600 ? 'text-destructive font-semibold' : charCount > 160 ? 'text-amber-600' : 'text-muted-foreground' }`}>
-                                {charCount} chars · {smsCount} segment{smsCount !== 1 ? 's' : ''}
-                              </span>
-                              <div className="flex items-center gap-1.5">
-                                <Switch
-                                  checked={currentActive}
-                                  onCheckedChange={(v) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: v } }))}
-                                />
-                                <span className="text-xs text-muted-foreground">{currentActive ? 'Active' : 'Inactive'}</span>
-                              </div>
+                            <div className="flex items-center gap-1.5">
+                              <Switch
+                                checked={currentActive}
+                                onCheckedChange={(v) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: v, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: currentSmsBody } }))}
+                              />
+                              <span className="text-xs text-muted-foreground">{currentActive ? 'Active' : 'Inactive'}</span>
                             </div>
                           </div>
                           <textarea
@@ -1356,40 +1335,57 @@ export default function SettingsPage() {
                             onFocus={initDraft}
                             onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: e.target.value, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: currentSmsBody } }))}
                           />
-                          <div className="flex gap-2 justify-between items-center">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-xs text-muted-foreground"
-                              disabled={resetTemplate.isPending}
-                              onClick={() => resetTemplate.mutate({ trigger: tmpl.trigger as any })}
-                            >
-                              {resetTemplate.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                              Reset to default
-                            </Button>
-                            <div className="flex gap-2">
-                              {isDirty && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setTemplateDrafts(prev => { const next = { ...prev }; delete next[tmpl.id]; return next; })}
-                                >
-                                  Discard
-                                </Button>
-                              )}
+                          <p className="text-xs text-muted-foreground">Sent as the email body. Use <code className="bg-muted px-1 rounded">{'{{' +'first_name'+'}}' }</code>, <code className="bg-muted px-1 rounded">{'{{' +'webinar_link'+'}}' }</code>, <code className="bg-muted px-1 rounded">{'{{' +'session_date'+'}}' }</code>, <code className="bg-muted px-1 rounded">{'{{' +'webinar_title'+'}}' }</code>.</p>
+                        </div>
+
+                        {/* 3. SMS Message — all triggers */}
+                        <div className="space-y-2 border border-dashed border-border/60 rounded-md p-3 bg-background/50">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs font-semibold flex items-center gap-1.5"><span>📱</span> SMS Text Message</Label>
+                            {(() => { const sc = (currentSmsBody ?? '').length; const ss = Math.ceil(sc / 160) || 1; return sc > 0 ? <span className={`text-xs ${sc > 320 ? 'text-destructive font-semibold' : sc > 160 ? 'text-amber-600' : 'text-muted-foreground'}`}>{sc} chars · {ss} segment{ss !== 1 ? 's' : ''}</span> : null; })()}
+                          </div>
+                          <textarea
+                            className="w-full min-h-[70px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+                            placeholder={`Hi {{first_name}}, ...`}
+                            value={currentSmsBody ?? ''}
+                            onFocus={initDraft}
+                            onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: e.target.value || null } }))}
+                          />
+                          <p className="text-xs text-muted-foreground">Sent as an SMS text. Use <code className="bg-muted px-1 rounded">{'{{' +'first_name'+'}}' }</code>, <code className="bg-muted px-1 rounded">{'{{' +'webinar_link'+'}}' }</code>, <code className="bg-muted px-1 rounded">{'{{' +'session_date'+'}}' }</code>, <code className="bg-muted px-1 rounded">{'{{' +'webinar_title'+'}}' }</code>. Leave blank to skip SMS for this trigger.</p>
+                        </div>
+                        <div className="flex gap-2 justify-between items-center pt-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-muted-foreground"
+                            disabled={resetTemplate.isPending}
+                            onClick={() => resetTemplate.mutate({ trigger: tmpl.trigger as any })}
+                          >
+                            {resetTemplate.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                            Reset to default
+                          </Button>
+                          <div className="flex gap-2">
+                            {isDirty && (
                               <Button
+                                variant="ghost"
                                 size="sm"
-                                className={`gap-1 ${ isDirty ? 'bg-brand-green hover:bg-brand-green-dark text-white' : 'bg-muted text-muted-foreground cursor-default' }`}
-                                disabled={isSaving || charCount === 0 || charCount > 1600 || !isDirty}
-                                onClick={() => {
-                                  setSavingTemplateId(tmpl.id);
-                                  updateTemplate.mutate({ id: tmpl.id, body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: currentSmsBody });
-                                }}
+                                onClick={() => setTemplateDrafts(prev => { const next = { ...prev }; delete next[tmpl.id]; return next; })}
                               >
-                                {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                                Save changes
+                                Discard
                               </Button>
-                            </div>
+                            )}
+                            <Button
+                              size="sm"
+                              className={`gap-1 ${ isDirty ? 'bg-brand-green hover:bg-brand-green-dark text-white' : 'bg-muted text-muted-foreground cursor-default' }`}
+                              disabled={isSaving || !isDirty}
+                              onClick={() => {
+                                setSavingTemplateId(tmpl.id);
+                                updateTemplate.mutate({ id: tmpl.id, body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: currentSmsBody });
+                              }}
+                            >
+                              {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                              Save changes
+                            </Button>
                           </div>
                         </div>
                       </div>
