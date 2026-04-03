@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useLocation, useParams } from "wouter";
 import {
   ArrowLeft, Mail, Phone, MapPin, Calendar, MessageSquare, Send,
-  Sparkles, Clock, User, FileText, Zap, ChevronRight, Link,
+  Sparkles, Clock, User, FileText, Zap, ChevronRight, Link, CheckCircle, XCircle, AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -54,6 +54,7 @@ export default function LeadProfile() {
   const { data: lead, refetch } = trpc.leads.getById.useQuery({ id: leadId });
   const { data: activity, refetch: refetchActivity } = trpc.leads.getActivity.useQuery({ leadId });
   const { data: smsMessages, refetch: refetchSms } = trpc.sms.getByLead.useQuery({ leadId });
+  const { data: communications } = trpc.leads.getCommunications.useQuery({ leadId });
   const { data: nextWebinar } = trpc.sms.getNextWebinarLink.useQuery({ leadId });
 
   const updateStage = trpc.leads.updateStage.useMutation({
@@ -205,6 +206,7 @@ export default function LeadProfile() {
           <Tabs defaultValue="activity" className="space-y-4">
             <TabsList className="bg-muted/30">
               <TabsTrigger value="activity">Activity</TabsTrigger>
+              <TabsTrigger value="communications">Communications</TabsTrigger>
               <TabsTrigger value="notes">Notes</TabsTrigger>
               <TabsTrigger value="sms">SMS</TabsTrigger>
               <TabsTrigger value="reminders">Reminders</TabsTrigger>
@@ -236,6 +238,71 @@ export default function LeadProfile() {
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground text-center py-8">No activity yet</p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="communications">
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-4">
+                  {communications && communications.length > 0 ? (
+                    <div className="space-y-0">
+                      {communications.map((item) => {
+                        const isEmail = item.type === "email";
+                        const isSent = item.status === "sent" || item.status === "delivered";
+                        const isFailed = item.status === "failed";
+                        const isPending = item.status === "pending" || item.status === "queued";
+                        const StatusIcon = isSent ? CheckCircle : isFailed ? XCircle : AlertCircle;
+                        const statusColor = isSent ? "text-green-500" : isFailed ? "text-red-500" : "text-amber-400";
+                        return (
+                          <div key={item.id} className="flex gap-3 py-3 border-b border-border/30 last:border-0">
+                            <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${isEmail ? "bg-blue-100" : "bg-green-100"}`}>
+                              {isEmail
+                                ? <Mail className="h-3.5 w-3.5 text-blue-600" />
+                                : <MessageSquare className={`h-3.5 w-3.5 ${item.direction === "inbound" ? "text-gray-500" : "text-green-600"}`} />
+                              }
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-medium truncate">
+                                  {isEmail
+                                    ? item.subject
+                                    : item.direction === "inbound" ? "SMS Received" : "SMS Sent"
+                                  }
+                                </p>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <StatusIcon className={`h-3.5 w-3.5 ${statusColor}`} />
+                                  <span className={`text-xs capitalize ${statusColor}`}>{item.status}</span>
+                                </div>
+                              </div>
+                              {item.preview && (
+                                <p className="text-xs text-muted-foreground mt-0.5 truncate">{item.preview}</p>
+                              )}
+                              <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground/60">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {item.sentAt
+                                    ? new Date(item.sentAt).toLocaleString()
+                                    : `Scheduled: ${new Date(item.scheduledAt!).toLocaleString()}`
+                                  }
+                                </span>
+                                {isEmail && item.reminderType && (
+                                  <span className="bg-muted px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide">
+                                    {item.reminderType.replace(/_/g, " ")}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Mail className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">No communications yet</p>
+                    </div>
                   )}
                 </CardContent>
               </Card>

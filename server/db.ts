@@ -519,6 +519,47 @@ export async function getRemindersByLead(leadId: number) {
   return db.select().from(emailReminders).where(eq(emailReminders.leadId, leadId)).orderBy(emailReminders.scheduledAt);
 }
 
+// ─── Communications Log (unified email + SMS history per lead) ────────────────
+export async function getCommunicationsLog(leadId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const [emails, smsList] = await Promise.all([
+    db.select().from(emailReminders).where(eq(emailReminders.leadId, leadId)),
+    db.select().from(smsMessages).where(eq(smsMessages.leadId, leadId)),
+  ]);
+
+  const emailItems = emails.map((e) => ({
+    id: `email-${e.id}`,
+    type: "email" as const,
+    direction: "outbound" as const,
+    subject: e.subject ?? "(No subject)",
+    preview: e.body ? e.body.replace(/<[^>]+>/g, "").substring(0, 160) : "",
+    status: e.status,
+    sentAt: e.sentAt ?? null,
+    scheduledAt: e.scheduledAt,
+    createdAt: e.createdAt,
+    reminderType: e.type,
+  }));
+
+  const smsItems = smsList.map((s) => ({
+    id: `sms-${s.id}`,
+    type: "sms" as const,
+    direction: s.direction,
+    subject: null as string | null,
+    preview: s.body.substring(0, 160),
+    status: s.status,
+    sentAt: s.createdAt,
+    scheduledAt: null as Date | null,
+    createdAt: s.createdAt,
+    reminderType: null as string | null,
+  }));
+
+  return [...emailItems, ...smsItems].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  );
+}
+
 // ─── Deals ────────────────────────────────────────────────────────────────────
 export async function createDeal(data: InsertDeal) {
   const db = await getDb();

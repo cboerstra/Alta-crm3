@@ -5,7 +5,7 @@ import {
   logActivity, getActivityByLeadId, updateLeadScore,
   getLandingPageBySlug, getWebinarById, getWebinarSessionById,
   createEmailReminder, createSmsReminder, deleteLead, deleteLeads, notifyAdminsBySms,
-  sendLeadNotifications, getSmsTemplate, getLandingPageLogos,
+  sendLeadNotifications, getSmsTemplate, getLandingPageLogos, getCommunicationsLog,
 } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { notifyOwner } from "../_core/notification";
@@ -117,6 +117,10 @@ export const leadsRouter = router({
   getActivity: protectedProcedure
     .input(z.object({ leadId: z.number() }))
     .query(({ input }) => getActivityByLeadId(input.leadId)),
+
+  getCommunications: protectedProcedure
+    .input(z.object({ leadId: z.number() }))
+    .query(({ input }) => getCommunicationsLog(input.leadId)),
 
   scoreWithLLM: protectedProcedure
     .input(z.object({ leadId: z.number() }))

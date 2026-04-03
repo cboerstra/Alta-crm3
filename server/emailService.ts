@@ -5,7 +5,7 @@
  * Reminder emails use the active SMS/Email template body so all content
  * is managed from the Settings → SMS & Email Templates tab.
  */
-import { getDb, getLeadById, getWebinarById, getWebinarSessionById, getSmsTemplate } from "./db";
+import { getDb, getLeadById, getWebinarById, getWebinarSessionById, getSmsTemplate, logActivity } from "./db";
 import { emailReminders, leads, integrations } from "../drizzle/schema";
 import { eq, and, lte } from "drizzle-orm";
 import { notifyOwner } from "./_core/notification";
@@ -214,7 +214,15 @@ export async function processPendingReminders(): Promise<number> {
         })
         .where(eq(emailReminders.id, reminder.id));
 
-      if (success) sent++;
+      if (success) {
+        sent++;
+        await logActivity({
+          leadId: reminder.leadId,
+          type: reminder.type === "registration_confirmation" ? "confirmation_email" : "email_sent",
+          title: `Email sent: ${emailSubject}`,
+          content: emailBody.replace(/<[^>]+>/g, "").substring(0, 200),
+        }).catch(() => {});
+      }
     }
 
     return sent;
