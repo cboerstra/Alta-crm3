@@ -371,6 +371,12 @@ export async function getLandingPageBySlug(slug: string) {
   const r = await db.select().from(landingPages).where(eq(landingPages.slug, slug)).limit(1);
   return r[0] ? normalizeLandingPage(r[0]) : undefined;
 }
+export async function getLandingPagesByWebinarId(webinarId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.select().from(landingPages).where(eq(landingPages.webinarId, webinarId)).orderBy(desc(landingPages.createdAt));
+  return rows.map(normalizeLandingPage);
+}
 export async function getLandingPageById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
