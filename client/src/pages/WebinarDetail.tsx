@@ -10,8 +10,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useLocation, useParams } from "wouter";
 import {
   ArrowLeft, Calendar, Clock, Users, UserCheck, UserX,
-  ExternalLink, Plus, Trash2, Video, CheckCircle, AlertCircle, Loader2,
+  ExternalLink, Plus, Trash2, Video, CheckCircle, AlertCircle, Loader2, FileText, Copy,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
 export default function WebinarDetail() {
@@ -29,6 +31,17 @@ export default function WebinarDetail() {
     durationMinutes: 60,
     label: "",
   });
+
+  const [showAddLandingPage, setShowAddLandingPage] = useState(false);
+  const [lpForm, setLpForm] = useState({
+    title: "",
+    slug: "",
+    headline: "",
+    subheadline: "",
+    ctaText: "Register Now",
+    campaignTag: "",
+    accentColor: "#C9A84C",
+  });
   const [lastCreatedSession, setLastCreatedSession] = useState<{
     zoomCreated: boolean;
     zoomMeetingId?: string;
@@ -37,6 +50,7 @@ export default function WebinarDetail() {
   } | null>(null);
 
   const { data: webinar, refetch } = trpc.webinars.getById.useQuery({ id: webinarId });
+  const { data: linkedLandingPages, refetch: refetchLandingPages } = trpc.webinars.getLandingPages.useQuery({ webinarId });
   const { data: zoomStatus } = trpc.integrations.getStatus.useQuery();
   const zoomConnected = zoomStatus?.zoom?.connected ?? false;
 
@@ -76,6 +90,16 @@ export default function WebinarDetail() {
 
   const deleteSession = trpc.webinars.deleteSession.useMutation({
     onSuccess: () => { toast.success("Session deleted"); refetch(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const createLandingPage = trpc.webinars.createLandingPage.useMutation({
+    onSuccess: (data) => {
+      toast.success("Landing page created!");
+      setShowAddLandingPage(false);
+      setLpForm({ title: "", slug: "", headline: "", subheadline: "", ctaText: "Register Now", campaignTag: "", accentColor: "#C9A84C" });
+      refetchLandingPages();
+    },
     onError: (e) => toast.error(e.message),
   });
 
@@ -414,6 +438,180 @@ export default function WebinarDetail() {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ─── Landing Pages ─────────────────────────────────────────────────────── */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <CardTitle className="text-base" style={{ fontFamily: "Raleway, sans-serif" }}>
+            Landing Pages ({linkedLandingPages?.length ?? 0})
+          </CardTitle>
+          <Dialog open={showAddLandingPage} onOpenChange={setShowAddLandingPage}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5 h-8 text-xs">
+                <Plus className="h-3.5 w-3.5" /> Add Landing Page
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Add Landing Page</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground -mt-2">
+                Create a new registration page linked to <strong>{webinar?.title}</strong>.
+              </p>
+              <div className="space-y-4 pt-1">
+                <div className="space-y-1.5">
+                  <Label>Page Title <span className="text-destructive">*</span></Label>
+                  <Input
+                    placeholder="e.g. Alta Mortgage Webinar — Evening Registration"
+                    value={lpForm.title}
+                    onChange={(e) => {
+                      const title = e.target.value;
+                      const autoSlug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+                      setLpForm(f => ({ ...f, title, slug: autoSlug }));
+                    }}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>URL Slug <span className="text-destructive">*</span></Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">/lp/</span>
+                    <Input
+                      placeholder="my-landing-page"
+                      value={lpForm.slug}
+                      onChange={(e) => setLpForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "") }))}
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                  {lpForm.slug && (
+                    <p className="text-xs text-muted-foreground">
+                      URL: <span className="font-mono text-brand-green">/lp/{lpForm.slug}</span>
+                    </p>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Headline</Label>
+                    <Input
+                      placeholder="Join Our Free Webinar"
+                      value={lpForm.headline}
+                      onChange={(e) => setLpForm(f => ({ ...f, headline: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Subheadline</Label>
+                    <Input
+                      placeholder="Register your spot today"
+                      value={lpForm.subheadline}
+                      onChange={(e) => setLpForm(f => ({ ...f, subheadline: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Button Text</Label>
+                    <Input
+                      value={lpForm.ctaText}
+                      onChange={(e) => setLpForm(f => ({ ...f, ctaText: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Campaign Tag</Label>
+                    <Input
+                      placeholder="e.g. facebook-ad"
+                      value={lpForm.campaignTag}
+                      onChange={(e) => setLpForm(f => ({ ...f, campaignTag: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Accent Color</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={lpForm.accentColor}
+                      onChange={(e) => setLpForm(f => ({ ...f, accentColor: e.target.value }))}
+                      className="h-9 w-12 rounded border border-gray-200 cursor-pointer p-0.5"
+                    />
+                    <span className="text-xs font-mono text-muted-foreground">{lpForm.accentColor}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg p-3">
+                  The new page will inherit this webinar's session dates and include phone, name, email, and session selection fields by default. You can customize it further from the Landing Pages page.
+                </p>
+                <Button
+                  className="w-full bg-brand-green hover:bg-brand-green-dark text-white"
+                  disabled={!lpForm.title || !lpForm.slug || createLandingPage.isPending}
+                  onClick={() => createLandingPage.mutate({
+                    webinarId,
+                    title: lpForm.title,
+                    slug: lpForm.slug,
+                    headline: lpForm.headline || undefined,
+                    subheadline: lpForm.subheadline || undefined,
+                    ctaText: lpForm.ctaText,
+                    campaignTag: lpForm.campaignTag || undefined,
+                    accentColor: lpForm.accentColor,
+                  })}
+                >
+                  {createLandingPage.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create Landing Page"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </CardHeader>
+        <CardContent>
+          {!linkedLandingPages || linkedLandingPages.length === 0 ? (
+            <div className="text-center py-8">
+              <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">No landing pages linked to this webinar yet.</p>
+              <p className="text-xs text-muted-foreground mt-1">Click "Add Landing Page" to create one.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {linkedLandingPages.map((lp) => {
+                const url = `/lp/${lp.slug}`;
+                const fullUrl = `${window.location.origin}${url}`;
+                return (
+                  <div key={lp.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/20 hover:bg-muted/40 transition-colors gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-9 w-9 rounded-lg bg-brand-green/10 flex items-center justify-center flex-shrink-0">
+                        <FileText className="h-4 w-4 text-brand-green" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">{lp.title}</p>
+                        <p className="text-xs text-muted-foreground font-mono truncate">/lp/{lp.slug}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {lp.isActive ? (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Active</span>
+                      ) : (
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Inactive</span>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => { window.open(url, "_blank"); }}
+                      >
+                        <ExternalLink className="h-3 w-3" /> Preview
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                        title="Copy URL"
+                        onClick={() => { navigator.clipboard.writeText(fullUrl); toast.success("Link copied!"); }}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
