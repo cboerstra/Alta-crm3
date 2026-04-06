@@ -21,6 +21,7 @@ import PublicLandingPage from "./pages/PublicLandingPage";
 import PublicBooking from "./pages/PublicBooking";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
+import SmsOptIn from "./pages/SmsOptIn";
 import Login from "./pages/Login";
 import Setup from "./pages/Setup";
 import SmsInbox from "./pages/SmsInbox";
@@ -96,6 +97,7 @@ function Router() {
       <Route path="/schedule/:slug" component={PublicBooking} />
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route path="/terms" component={TermsOfService} />
+      <Route path="/sms-optin" component={SmsOptIn} />
       {/* CRM routes (protected via DashboardLayout) */}
       <Route component={CRMRoutes} />
     </Switch>
