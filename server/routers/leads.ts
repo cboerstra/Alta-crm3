@@ -9,6 +9,7 @@ import {
 } from "../db";
 import { invokeLLM } from "../_core/llm";
 import { notifyOwner } from "../_core/notification";
+import { sendSmsOptInConfirmation } from "../smsReminderService";
 
 const stageEnum = z.enum([
   "new_lead", "registered", "attended", "no_show",
@@ -233,6 +234,11 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
         title: "Lead captured from landing page",
         content: `Captured via landing page: ${page.title}`,
       });
+
+      // 10DLC: send opt-in confirmation SMS immediately when consent is given
+      if (input.smsConsent && input.phone) {
+        sendSmsOptInConfirmation(id, input.phone).catch(() => {});
+      }
 
       // If linked to webinar, get join URL from session or webinar
       let joinUrl: string | undefined;

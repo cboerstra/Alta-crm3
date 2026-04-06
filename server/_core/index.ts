@@ -13,7 +13,7 @@ import { serveStatic, setupVite } from "./vite";
 import { processPendingReminders } from "../emailService";
 import { processPendingSmsReminders } from "../smsReminderService";
 import { registerWebsiteLeadRoute } from "../websiteLeads";
-import { getIntegration, createSmsMessage, logActivity, getLeads, migrateDefaultSmsTemplates, runAutoMigrations } from "../db";
+import { getIntegration, createSmsMessage, logActivity, getLeads, updateLead, migrateDefaultSmsTemplates, runAutoMigrations } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -84,7 +84,58 @@ async function startServer() {
           const clean = (p: string) => p?.replace(/\D/g, "").slice(-10);
           return clean(l.phone ?? "") === clean(fromPhone);
         });
-        if (lead) {
+        // Helper to send an auto-reply via Telnyx
+        const sendAutoReply = async (toPhone: string, replyBody: string) => {
+          try {
+            const { integrations } = await import("../../drizzle/schema");
+            const { eq } = await import("drizzle-orm");
+            const { getDb } = await import("../db");
+            const db = await getDb();
+            if (!db) return;
+            const rows = await db.select().from(integrations).where(eq(integrations.provider, "twilio")).limit(1);
+            const row = rows[0];
+            if (!row?.accessToken || !row.accountEmail) return;
+            const normalizePhone = (p: string) => {
+              const digits = p.replace(/\D/g, "");
+              if (digits.length === 10) return `+1${digits}`;
+              if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+              return `+${digits}`;
+            };
+            const fromPhone = normalizePhone(row.accountEmail);
+            await fetch("https://api.telnyx.com/v2/messages", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${row.accessToken}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ from: fromPhone, to: toPhone, text: replyBody }),
+            });
+          } catch (e) {
+            console.error("[Telnyx] Auto-reply error:", e);
+          }
+        };
+
+        const keyword = body.trim().toUpperCase();
+
+        if (keyword === "STOP" || keyword === "STOPALL" || keyword === "UNSUBSCRIBE" || keyword === "CANCEL" || keyword === "END" || keyword === "QUIT") {
+          // Opt the lead out and log
+          if (lead) {
+            await updateLead(lead.id, { smsConsent: false });
+            await createSmsMessage({ leadId: lead.id, direction: "inbound", body, status: "received" });
+            await logActivity({
+              leadId: lead.id,
+              type: "sms_received",
+              title: "SMS opt-out received (STOP)",
+              content: body,
+            });
+          }
+          // 10DLC-required STOP auto-response — must include brand name
+          await sendAutoReply(fromPhone, "Alta Mortgage Group: You have been unsubscribed and will receive no further messages. No action is needed. For help, reply HELP or contact us at info@altamortgagegroup.net.");
+        } else if (keyword === "HELP" || keyword === "INFO") {
+          // 10DLC-required HELP auto-response
+          if (lead) {
+            await createSmsMessage({ leadId: lead.id, direction: "inbound", body, status: "received" });
+            await logActivity({ leadId: lead.id, type: "sms_received", title: "SMS HELP request received", content: body });
+          }
+          await sendAutoReply(fromPhone, "Alta Mortgage Group: For help, contact us at info@altamortgagegroup.net or call (801) 888-1234. Msg & data rates may apply. Reply STOP to unsubscribe.");
+        } else if (lead) {
           await createSmsMessage({
             leadId: lead.id,
             direction: "inbound",

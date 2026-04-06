@@ -28,6 +28,7 @@
 import { Router } from "express";
 import { createLead, logActivity, notifyAdminsBySms } from "./db";
 import { notifyOwner } from "./_core/notification";
+import { sendSmsOptInConfirmation } from "./smsReminderService";
 
 export function registerWebsiteLeadRoute(app: Router) {
   // Allow preflight OPTIONS requests from altamortgagegroup.net
@@ -114,6 +115,11 @@ export function registerWebsiteLeadRoute(app: Router) {
         title: "Lead captured from website",
         content: noteLines.join("\n"),
       });
+
+      // ── 10DLC: send opt-in confirmation SMS if consent given ────────────────
+      if (smsConsent && phone?.trim()) {
+        sendSmsOptInConfirmation(leadId, phone.trim()).catch(() => {});
+      }
 
       // ── Notify owner (non-blocking) ─────────────────────────────────────────
       notifyOwner({
