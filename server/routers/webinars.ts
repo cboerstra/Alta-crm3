@@ -5,7 +5,7 @@ import {
   getWebinarAttendanceStats, logActivity, updateLead, getLeadById,
   createEmailReminder, getRemindersByLead,
   createWebinarSession, getWebinarSessions, deleteWebinarSessions, getWebinarSessionById,
-  createLandingPage, getLandingPageBySlug, updateLandingPage,
+  createLandingPage, getLandingPageBySlug, updateLandingPage, getLandingPagesByWebinarId,
   deleteWebinar, deleteWebinars, sendLeadSms, sendLeadNotifications, getIntegration, getGlobalIntegration,
 } from "../db";
 import { createZoomMeeting } from "../zoom";
@@ -480,5 +480,45 @@ export const webinarsRouter = router({
     .mutation(async ({ input }) => {
       await deleteWebinars(input.ids);
       return { success: true, count: input.ids.length };
+    }),
+
+  // Get all landing pages linked to a specific webinar
+  getLandingPages: protectedProcedure
+    .input(z.object({ webinarId: z.number() }))
+    .query(({ input }) => getLandingPagesByWebinarId(input.webinarId)),
+
+  // Create a new landing page linked to a webinar
+  createLandingPage: protectedProcedure
+    .input(z.object({
+      webinarId: z.number(),
+      title: z.string().min(1),
+      slug: z.string().min(1).regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with hyphens"),
+      headline: z.string().optional(),
+      subheadline: z.string().optional(),
+      ctaText: z.string().optional(),
+      campaignTag: z.string().optional(),
+      sourceTag: z.string().optional(),
+      accentColor: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      // Ensure slug is unique
+      const existing = await getLandingPageBySlug(input.slug);
+      if (existing) throw new Error(`Slug "${input.slug}" is already in use. Choose a different slug.`);
+      const id = await createLandingPage({
+        title: input.title,
+        slug: input.slug,
+        headline: input.headline,
+        subheadline: input.subheadline,
+        ctaText: input.ctaText ?? "Register Now",
+        campaignTag: input.campaignTag,
+        sourceTag: input.sourceTag ?? "landing_page",
+        webinarId: input.webinarId,
+        isActive: true,
+        accentColor: input.accentColor ?? "#C9A84C",
+        enabledFields: ["firstName", "lastName", "email", "phone", "sessionSelect"],
+        showOptIn: true,
+        createdBy: ctx.user.id,
+      });
+      return { id, slug: input.slug };
     }),
 });
