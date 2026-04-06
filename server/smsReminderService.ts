@@ -26,6 +26,33 @@ const normalizePhone = (p: string) => {
   return `+${digits}`;
 };
 
+export { getTelnyxConfig, normalizePhone };
+
+/**
+ * Sends the 10DLC-required opt-in confirmation SMS immediately after a lead consents.
+ * Must include: brand name, frequency, data rates, STOP, HELP.
+ */
+export async function sendSmsOptInConfirmation(leadId: number, phone: string): Promise<void> {
+  try {
+    const config = await getTelnyxConfig();
+    if (!config) return;
+    const toPhone = normalizePhone(phone);
+    const fromPhone = normalizePhone(config.accountEmail);
+    const body =
+      "Alta Mortgage Group: You're now opted in to SMS updates. Msg frequency varies. Msg & data rates may apply. Reply STOP to unsubscribe anytime, HELP for help.";
+    const res = await fetch("https://api.telnyx.com/v2/messages", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${config.accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: fromPhone, to: toPhone, text: body }),
+    });
+    if (res.ok) {
+      await createSmsMessage({ leadId, direction: "outbound", body, status: "sent" });
+    }
+  } catch (e) {
+    console.error("[SMS OptIn] Failed to send opt-in confirmation:", e);
+  }
+}
+
 export async function processPendingSmsReminders(): Promise<number> {
   try {
     const now = new Date();
