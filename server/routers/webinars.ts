@@ -516,7 +516,7 @@ export const webinarsRouter = router({
         webinarId: input.webinarId,
         isActive: true,
         accentColor: input.accentColor ?? "#C9A84C",
-        textColor: input.textColor ?? "#FFFFFF",
+        textColor: input.textColor ?? "#000000",
         enabledFields: ["firstName", "lastName", "email", "phone", "sessionSelect"],
         showOptIn: true,
         createdBy: ctx.user.id,

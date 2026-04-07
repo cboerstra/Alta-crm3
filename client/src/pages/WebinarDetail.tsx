@@ -41,7 +41,7 @@ export default function WebinarDetail() {
     ctaText: "Register Now",
     campaignTag: "",
     accentColor: "#C9A84C",
-    textColor: "#FFFFFF",
+    textColor: "#000000",
   });
   const [lastCreatedSession, setLastCreatedSession] = useState<{
     zoomCreated: boolean;
@@ -98,7 +98,7 @@ export default function WebinarDetail() {
     onSuccess: (data) => {
       toast.success("Landing page created!");
       setShowAddLandingPage(false);
-      setLpForm({ title: "", slug: "", headline: "", subheadline: "", ctaText: "Register Now", campaignTag: "", accentColor: "#C9A84C", textColor: "#FFFFFF" });
+      setLpForm({ title: "", slug: "", headline: "", subheadline: "", ctaText: "Register Now", campaignTag: "", accentColor: "#C9A84C", textColor: "#000000" });
       refetchLandingPages();
     },
     onError: (e) => toast.error(e.message),
