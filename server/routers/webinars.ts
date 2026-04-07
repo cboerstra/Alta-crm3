@@ -5,7 +5,7 @@ import {
   getWebinarAttendanceStats, logActivity, updateLead, getLeadById,
   createEmailReminder, getRemindersByLead,
   createWebinarSession, getWebinarSessions, deleteWebinarSessions, getWebinarSessionById,
-  createLandingPage, getLandingPageBySlug, updateLandingPage, getLandingPagesByWebinarId,
+  createLandingPage as dbCreateLandingPage, getLandingPageBySlug, updateLandingPage, getLandingPagesByWebinarId,
   deleteWebinar, deleteWebinars, sendLeadSms, sendLeadNotifications, getIntegration, getGlobalIntegration,
 } from "../db";
 import { createZoomMeeting } from "../zoom";
@@ -505,7 +505,7 @@ export const webinarsRouter = router({
       // Ensure slug is unique
       const existing = await getLandingPageBySlug(input.slug);
       if (existing) throw new Error(`Slug "${input.slug}" is already in use. Choose a different slug.`);
-      const id = await createLandingPage({
+      const id = await dbCreateLandingPage({
         title: input.title,
         slug: input.slug,
         headline: input.headline,
