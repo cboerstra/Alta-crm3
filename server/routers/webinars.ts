@@ -499,6 +499,7 @@ export const webinarsRouter = router({
       campaignTag: z.string().optional(),
       sourceTag: z.string().optional(),
       accentColor: z.string().optional(),
+      textColor: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       // Ensure slug is unique
@@ -515,6 +516,7 @@ export const webinarsRouter = router({
         webinarId: input.webinarId,
         isActive: true,
         accentColor: input.accentColor ?? "#C9A84C",
+        textColor: input.textColor ?? "#FFFFFF",
         enabledFields: ["firstName", "lastName", "email", "phone", "sessionSelect"],
         showOptIn: true,
         createdBy: ctx.user.id,

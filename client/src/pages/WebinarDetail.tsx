@@ -41,6 +41,7 @@ export default function WebinarDetail() {
     ctaText: "Register Now",
     campaignTag: "",
     accentColor: "#C9A84C",
+    textColor: "#FFFFFF",
   });
   const [lastCreatedSession, setLastCreatedSession] = useState<{
     zoomCreated: boolean;
@@ -97,7 +98,7 @@ export default function WebinarDetail() {
     onSuccess: (data) => {
       toast.success("Landing page created!");
       setShowAddLandingPage(false);
-      setLpForm({ title: "", slug: "", headline: "", subheadline: "", ctaText: "Register Now", campaignTag: "", accentColor: "#C9A84C" });
+      setLpForm({ title: "", slug: "", headline: "", subheadline: "", ctaText: "Register Now", campaignTag: "", accentColor: "#C9A84C", textColor: "#FFFFFF" });
       refetchLandingPages();
     },
     onError: (e) => toast.error(e.message),
@@ -527,16 +528,30 @@ export default function WebinarDetail() {
                     />
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Accent Color</Label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={lpForm.accentColor}
-                      onChange={(e) => setLpForm(f => ({ ...f, accentColor: e.target.value }))}
-                      className="h-9 w-12 rounded border border-gray-200 cursor-pointer p-0.5"
-                    />
-                    <span className="text-xs font-mono text-muted-foreground">{lpForm.accentColor}</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Accent Color</Label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={lpForm.accentColor}
+                        onChange={(e) => setLpForm(f => ({ ...f, accentColor: e.target.value }))}
+                        className="h-9 w-12 rounded border border-gray-200 cursor-pointer p-0.5"
+                      />
+                      <span className="text-xs font-mono text-muted-foreground">{lpForm.accentColor}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Text Color</Label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={lpForm.textColor}
+                        onChange={(e) => setLpForm(f => ({ ...f, textColor: e.target.value }))}
+                        className="h-9 w-12 rounded border border-gray-200 cursor-pointer p-0.5"
+                      />
+                      <span className="text-xs font-mono text-muted-foreground">{lpForm.textColor}</span>
+                    </div>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground bg-muted/40 rounded-lg p-3">
@@ -554,6 +569,7 @@ export default function WebinarDetail() {
                     ctaText: lpForm.ctaText,
                     campaignTag: lpForm.campaignTag || undefined,
                     accentColor: lpForm.accentColor,
+                    textColor: lpForm.textColor,
                   })}
                 >
                   {createLandingPage.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create Landing Page"}
