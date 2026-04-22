@@ -1,5 +1,5 @@
 import "dotenv/config";
-import express from "express";
+import express, { type RequestHandler } from "express";
 import { createServer } from "http";
 import net from "net";
 import path from "path";
@@ -263,8 +263,31 @@ async function startServer() {
     },
   });
 
+  const wrapUpload = (middleware: RequestHandler): RequestHandler => {
+    return (req, res, next) => {
+      middleware(req, res, (err?: unknown) => {
+        if (!err) {
+          next();
+          return;
+        }
+
+        if (err instanceof multer.MulterError) {
+          res.status(400).json({ error: err.message || "Upload failed" });
+          return;
+        }
+
+        if (err instanceof Error) {
+          res.status(400).json({ error: err.message || "Upload failed" });
+          return;
+        }
+
+        next(err);
+      });
+    };
+  };
+
   // POST /api/upload-pdf — authenticated PDF upload (up to 25MB)
-  app.post("/api/upload-pdf", pdfUpload.single("file"), async (req, res) => {
+  app.post("/api/upload-pdf", wrapUpload(pdfUpload.single("file")), async (req, res) => {
     try {
       const { sdk } = await import("./sdk");
       let userId: number | null = null;
@@ -283,7 +306,7 @@ async function startServer() {
   });
 
   // POST /api/upload-html — authenticated HTML upload (up to 10MB)
-  app.post("/api/upload-html", htmlUpload.single("file"), async (req, res) => {
+  app.post("/api/upload-html", wrapUpload(htmlUpload.single("file")), async (req, res) => {
     try {
       const { sdk } = await import("./sdk");
       let userId: number | null = null;
@@ -302,7 +325,7 @@ async function startServer() {
   });
 
   // POST /api/upload — authenticated multipart upload
-  app.post("/api/upload", upload.single("file"), async (req, res) => {
+  app.post("/api/upload", wrapUpload(upload.single("file")), async (req, res) => {
     try {
       const { sdk } = await import("./sdk");
       let userId: number | null = null;

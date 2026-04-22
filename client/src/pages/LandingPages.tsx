@@ -220,14 +220,51 @@ export default function LandingPages() {
     }
   }, [existingMedia, editId]);
 
+  async function uploadFileAndGetUrl(endpoint: string, file: File): Promise<string> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    });
+
+    const raw = await res.text();
+    let payload: { url?: string; error?: string; message?: string } | null = null;
+
+    if (raw.trim()) {
+      try {
+        payload = JSON.parse(raw) as { url?: string; error?: string; message?: string };
+      } catch {
+        payload = null;
+      }
+    }
+
+    if (!res.ok) {
+      const fallbackError = res.status === 401
+        ? "Your session expired. Please sign in again and retry."
+        : `Upload failed (HTTP ${res.status}).`;
+
+      throw new Error(payload?.error || payload?.message || fallbackError);
+    }
+
+    if (payload?.url) {
+      return payload.url;
+    }
+
+    if (/^\s*<!doctype html|^\s*<html/i.test(raw)) {
+      throw new Error("Server returned HTML instead of JSON. Please verify API routing and try again.");
+    }
+
+    throw new Error("Upload succeeded but server response was invalid.");
+  }
+
   async function handlePostCreateUploads(pageId: number) {
     if (pendingArtworkFile) {
       try {
-        const formData = new FormData();
-        formData.append("file", pendingArtworkFile);
-        const res = await fetch("/api/upload", { method: "POST", body: formData });
-        if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error ?? "Upload failed"); }
-        const { url } = await res.json();
+        const url = await uploadFileAndGetUrl("/api/upload", pendingArtworkFile);
         updateMutation.mutate({ id: pageId, artworkUrl: url });
       } catch (err: any) {
         toast.error("Failed to upload background image: " + err.message);
@@ -236,11 +273,7 @@ export default function LandingPages() {
     }
     if (pendingHtmlFile) {
       try {
-        const formData = new FormData();
-        formData.append("file", pendingHtmlFile);
-        const res = await fetch("/api/upload-html", { method: "POST", body: formData });
-        if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error ?? "Upload failed"); }
-        const { url } = await res.json();
+        const url = await uploadFileAndGetUrl("/api/upload-html", pendingHtmlFile);
         updateMutation.mutate({ id: pageId, backgroundHtmlUrl: url });
       } catch (err: any) {
         toast.error("Failed to upload HTML background: " + err.message);
@@ -249,11 +282,7 @@ export default function LandingPages() {
     }
     if (pendingPdfFile) {
       try {
-        const formData = new FormData();
-        formData.append("file", pendingPdfFile);
-        const res = await fetch("/api/upload-pdf", { method: "POST", body: formData });
-        if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error ?? "Upload failed"); }
-        const { url } = await res.json();
+        const url = await uploadFileAndGetUrl("/api/upload-pdf", pendingPdfFile);
         updateMutation.mutate({ id: pageId, confirmationPdfUrl: url });
       } catch (err: any) {
         toast.error("Failed to upload PDF: " + err.message);
@@ -312,11 +341,7 @@ export default function LandingPages() {
       // Upload now and save URL to DB
       setUploading(true);
       try {
-        const formData = new FormData();
-        formData.append("file", file);
-        const res = await fetch("/api/upload", { method: "POST", body: formData });
-        if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error ?? "Upload failed"); }
-        const { url } = await res.json();
+        const url = await uploadFileAndGetUrl("/api/upload", file);
         updateArtworkMutation.mutate({ id: editId, artworkUrl: url });
       } catch (err: any) {
         toast.error("Failed to upload background image: " + err.message);
@@ -345,11 +370,7 @@ export default function LandingPages() {
     if (editId) {
       setUploading(true);
       try {
-        const formData = new FormData();
-        formData.append("file", file);
-        const res = await fetch("/api/upload-html", { method: "POST", body: formData });
-        if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error ?? "Upload failed"); }
-        const { url } = await res.json();
+        const url = await uploadFileAndGetUrl("/api/upload-html", file);
         updateArtworkMutation.mutate({ id: editId, backgroundHtmlUrl: url });
         setBackgroundHtmlPreview(url);
       } catch (err: any) {
@@ -373,11 +394,7 @@ export default function LandingPages() {
     if (editId) {
       setUploading(true);
       try {
-        const formData = new FormData();
-        formData.append("file", file);
-        const res = await fetch("/api/upload-pdf", { method: "POST", body: formData });
-        if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error ?? "Upload failed"); }
-        const { url } = await res.json();
+        const url = await uploadFileAndGetUrl("/api/upload-pdf", file);
         updateMutation.mutate({ id: editId, confirmationPdfUrl: url });
         toast.success("PDF uploaded");
       } catch (err: any) {
