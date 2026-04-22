@@ -214,11 +214,15 @@ async function startServer() {
     }),
     limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
     fileFilter: (_req, file, cb) => {
-      const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"];
-      if (allowed.includes(file.mimetype)) {
+      const allowedMimes = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml", "application/octet-stream"];
+      const allowedExts = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"];
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (allowedMimes.includes(file.mimetype) && allowedExts.includes(ext)) {
+        cb(null, true);
+      } else if (allowedExts.includes(ext)) {
         cb(null, true);
       } else {
-        cb(new Error(`File type not allowed: ${file.mimetype}`));
+        cb(new Error(`File type not allowed: ${file.mimetype || "unknown"} (${ext || "no extension"})`));
       }
     },
   });
@@ -336,7 +340,7 @@ async function startServer() {
       if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
       if (!req.file) { res.status(400).json({ error: "No file provided" }); return; }
       const url = `/uploads/${req.file.filename}`;
-      res.json({ url, filename: req.file.originalname, size: req.file.size });
+      res.json({ url, filename: req.file.filename, size: req.file.size });
     } catch (err: any) {
       console.error("[Upload] Error:", err);
       res.status(500).json({ error: err.message ?? "Upload failed" });

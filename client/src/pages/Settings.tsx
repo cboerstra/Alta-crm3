@@ -427,6 +427,15 @@ export default function SettingsPage() {
               <div
                 className="mb-6 border-2 border-dashed rounded-xl p-6 text-center cursor-pointer hover:border-brand-green/50 hover:bg-brand-green/5 transition-colors"
                 onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const dt = e.dataTransfer;
+                  if (dt.files?.length && fileInputRef.current) {
+                    Object.defineProperty(fileInputRef.current, "files", { value: dt.files, configurable: true });
+                    handleFileUpload({ target: { files: dt.files } } as any);
+                  }
+                }}
               >
                 <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
                 <p className="text-sm text-muted-foreground">Click or drag files here to upload logos, images, and artwork</p>
