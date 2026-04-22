@@ -104,6 +104,24 @@ describe("Enhanced Landing Pages", () => {
     expect(page?.showOptIn).toBe(false);
     expect(page?.bodyText).toBe("Updated body text");
   });
+
+  it("stores html background urls on landing pages", async () => {
+    const ctx = createAuthContext();
+    const caller = appRouter.createCaller(ctx);
+    const slug = `html-background-${Date.now()}`;
+    const { id } = await caller.landingPages.create({
+      title: "HTML Background Test",
+      slug,
+    });
+
+    await caller.landingPages.update({
+      id,
+      backgroundHtmlUrl: "/uploads/test-background.html",
+    });
+
+    const page = await caller.landingPages.getBySlug({ slug });
+    expect((page as any)?.backgroundHtmlUrl).toBe("/uploads/test-background.html");
+  });
 });
 
 describe("Webinar with Sessions and Landing Page", () => {

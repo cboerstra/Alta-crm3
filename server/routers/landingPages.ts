@@ -50,6 +50,7 @@ export const landingPagesRouter = router({
       isActive: z.boolean().default(true),
       accentColor: z.string().optional(),
       textColor: z.string().optional(),
+      backgroundHtmlUrl: z.string().optional(),
       // NEW fields
       enabledFields: z.array(z.string()).optional(),
       optInLabel: z.string().optional(),
@@ -82,6 +83,7 @@ export const landingPagesRouter = router({
       isActive: z.boolean().optional(),
       accentColor: z.string().optional(),
       textColor: z.string().optional(),
+      backgroundHtmlUrl: z.string().nullable().optional(),
       enabledFields: z.array(z.string()).optional(),
       optInLabel: z.string().optional(),
       showOptIn: z.boolean().optional(),
@@ -125,12 +127,14 @@ export const landingPagesRouter = router({
         webinarId: page.webinarId ?? undefined,
         isActive: false, // start as draft
         accentColor: page.accentColor ?? undefined,
+        textColor: page.textColor ?? undefined,
         enabledFields: page.enabledFields ?? ["firstName", "lastName", "email", "phone"],
         optInLabel: page.optInLabel ?? undefined,
         showOptIn: page.showOptIn ?? false,
         confirmationEmailSubject: page.confirmationEmailSubject ?? undefined,
         confirmationEmailBody: page.confirmationEmailBody ?? undefined,
         artworkUrl: page.artworkUrl ?? undefined,
+        backgroundHtmlUrl: page.backgroundHtmlUrl ?? undefined,
         createdBy: ctx.user.id,
       });
       return { id, slug: newSlug };

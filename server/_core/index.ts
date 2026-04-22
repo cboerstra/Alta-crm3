@@ -242,6 +242,27 @@ async function startServer() {
     },
   });
 
+  // Multer for HTML uploads (landing page background templates)
+  const htmlUpload = multer({
+    storage: multer.diskStorage({
+      destination: (_req, _file, cb) => cb(null, uploadsDir),
+      filename: (_req, file, cb) => {
+        const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
+        cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 9)}-${safeName}`);
+      },
+    }),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const allowedMimeTypes = ["text/html", "application/xhtml+xml"];
+      if (allowedMimeTypes.includes(file.mimetype) || ext === ".html" || ext === ".htm") {
+        cb(null, true);
+      } else {
+        cb(new Error(`Only HTML files are allowed, got: ${file.mimetype || ext || "unknown"}`));
+      }
+    },
+  });
+
   // POST /api/upload-pdf — authenticated PDF upload (up to 25MB)
   app.post("/api/upload-pdf", pdfUpload.single("file"), async (req, res) => {
     try {
@@ -257,6 +278,25 @@ async function startServer() {
       res.json({ url, filename: req.file.originalname, size: req.file.size });
     } catch (err: any) {
       console.error("[Upload-PDF] Error:", err);
+      res.status(500).json({ error: err.message ?? "Upload failed" });
+    }
+  });
+
+  // POST /api/upload-html — authenticated HTML upload (up to 10MB)
+  app.post("/api/upload-html", htmlUpload.single("file"), async (req, res) => {
+    try {
+      const { sdk } = await import("./sdk");
+      let userId: number | null = null;
+      try {
+        const user = await sdk.authenticateRequest(req as any);
+        userId = user?.id ?? null;
+      } catch { /* not authenticated */ }
+      if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+      if (!req.file) { res.status(400).json({ error: "No file provided" }); return; }
+      const url = `/uploads/${req.file.filename}`;
+      res.json({ url, filename: req.file.originalname, size: req.file.size });
+    } catch (err: any) {
+      console.error("[Upload-HTML] Error:", err);
       res.status(500).json({ error: err.message ?? "Upload failed" });
     }
   });

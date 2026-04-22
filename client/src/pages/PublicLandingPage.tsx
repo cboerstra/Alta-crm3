@@ -50,7 +50,9 @@ export default function PublicLandingPage() {
 
   const showField = (key: string) => enabledFields.includes(key);
   const accentColor = page?.accentColor || "#C9A84C";
-  const hasBackground = !!page?.artworkUrl;
+  const hasHtmlBackground = !!(page as any)?.backgroundHtmlUrl;
+  const hasImageBackground = !!page?.artworkUrl && !hasHtmlBackground;
+  const hasBackground = hasHtmlBackground || hasImageBackground;
 
   if (pageLoading) {
     return (
@@ -76,7 +78,18 @@ export default function PublicLandingPage() {
     return (
       <div className="min-h-screen relative flex items-center justify-center">
         {/* Full-bleed background */}
-        {hasBackground && (
+        {hasHtmlBackground && (
+          <div className="absolute inset-0">
+            <iframe
+              src={(page as any).backgroundHtmlUrl}
+              title=""
+              aria-hidden="true"
+              tabIndex={-1}
+              className="h-full w-full border-0 pointer-events-none"
+            />
+          </div>
+        )}
+        {hasImageBackground && (
           <div className="absolute inset-0">
             <img src={page.artworkUrl!} alt="" className="w-full h-full object-cover" style={{ objectPosition: (page as any).artworkPosition || "center" }} />
             <div className="absolute inset-0 bg-black/60" />
@@ -147,7 +160,18 @@ export default function PublicLandingPage() {
       {/* ═══════════════════════════════════════════════════════════
           FULL-BLEED BACKGROUND IMAGE
           ═══════════════════════════════════════════════════════════ */}
-      {hasBackground && (
+      {hasHtmlBackground && (
+        <div className="fixed inset-0 z-0">
+          <iframe
+            src={(page as any).backgroundHtmlUrl}
+            title=""
+            aria-hidden="true"
+            tabIndex={-1}
+            className="h-full w-full border-0 pointer-events-none"
+          />
+        </div>
+      )}
+      {hasImageBackground && (
         <div className="fixed inset-0 z-0">
           <img
             src={page.artworkUrl!}

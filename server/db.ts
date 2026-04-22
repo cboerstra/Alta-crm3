@@ -1565,6 +1565,12 @@ export async function runAutoMigrations(): Promise<void> {
       column: "logoSize",
       sql: "ALTER TABLE `landing_pages` ADD COLUMN `logoSize` int DEFAULT 64",
     },
+    // 0030: Add backgroundHtmlUrl to landing_pages (uploaded HTML background file)
+    {
+      table: "landing_pages",
+      column: "backgroundHtmlUrl",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `backgroundHtmlUrl` text DEFAULT NULL",
+    },
   ];
 
   // Create sms_reminders table if it doesn't exist (Hostinger migration)

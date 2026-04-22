@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Copy, Trash2, Edit, Upload, Image, FileIcon, X, Eye, Calendar, Clock, AlertCircle, Link as LinkIcon, Check, ImagePlus, Users } from "lucide-react";
+import { Plus, FileText, Copy, Trash2, Edit, Upload, Image, FileIcon, X, Eye, Calendar, Clock, AlertCircle, Link as LinkIcon, Check, ImagePlus, Users, FileCode2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -114,6 +114,7 @@ export default function LandingPages() {
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>({ ...defaultForm });
   const [artworkPreview, setArtworkPreview] = useState<string | null>(null);
+  const [backgroundHtmlPreview, setBackgroundHtmlPreview] = useState<string | null>(null);
   const [artworkPosition, setArtworkPosition] = useState<string>("center");
   const [bgOverlayOpacity, setBgOverlayOpacity] = useState<number>(0.5);
   const [logoSize, setLogoSize] = useState<number>(64);
@@ -123,6 +124,7 @@ export default function LandingPages() {
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<MediaSelection[]>([]);
   const artworkRef = useRef<HTMLInputElement>(null);
+  const htmlRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
 
   const { data: pages, isLoading, refetch } = trpc.landingPages.list.useQuery();
@@ -193,11 +195,12 @@ export default function LandingPages() {
 
   // Separate mutation for saving artwork/position without closing the dialog
   const updateArtworkMutation = trpc.landingPages.update.useMutation({
-    onSuccess: () => { toast.success("Background image saved"); refetch(); },
+    onSuccess: () => { toast.success("Background saved"); refetch(); },
     onError: (e) => toast.error("Failed to save background: " + e.message),
   });
 
   const [pendingArtworkFile, setPendingArtworkFile] = useState<File | null>(null);
+  const [pendingHtmlFile, setPendingHtmlFile] = useState<File | null>(null);
   const [pendingPdfFile, setPendingPdfFile] = useState<File | null>(null);
   const [savingMedia, setSavingMedia] = useState(false);
 
@@ -231,6 +234,19 @@ export default function LandingPages() {
       }
       setPendingArtworkFile(null);
     }
+    if (pendingHtmlFile) {
+      try {
+        const formData = new FormData();
+        formData.append("file", pendingHtmlFile);
+        const res = await fetch("/api/upload-html", { method: "POST", body: formData });
+        if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error ?? "Upload failed"); }
+        const { url } = await res.json();
+        updateMutation.mutate({ id: pageId, backgroundHtmlUrl: url });
+      } catch (err: any) {
+        toast.error("Failed to upload HTML background: " + err.message);
+      }
+      setPendingHtmlFile(null);
+    }
     if (pendingPdfFile) {
       try {
         const formData = new FormData();
@@ -249,9 +265,11 @@ export default function LandingPages() {
   function resetForm() {
     setForm({ ...defaultForm });
     setArtworkPreview(null);
+    setBackgroundHtmlPreview(null);
     setArtworkPosition("center");
     setPdfName(null);
     setPendingArtworkFile(null);
+    setPendingHtmlFile(null);
     setPendingPdfFile(null);
     setTouched({});
     setSubmitAttempted(false);
@@ -274,6 +292,7 @@ export default function LandingPages() {
       confirmationEmailBody: page.confirmationEmailBody || DEFAULT_EMAIL_BODY,
     });
     setArtworkPreview(page.artworkUrl || null);
+    setBackgroundHtmlPreview((page as any).backgroundHtmlUrl || null);
     setArtworkPosition(page.artworkPosition || "center");
     setBgOverlayOpacity(page.bgOverlayOpacity != null ? Number(page.bgOverlayOpacity) : 0.5);
     setLogoSize((page as any).logoSize != null ? Number((page as any).logoSize) : 64);
@@ -311,6 +330,39 @@ export default function LandingPages() {
     }
     // Reset input so same file can be re-selected
     if (artworkRef.current) artworkRef.current.value = "";
+  };
+
+  const handleHtmlSelect = async (file?: File | null) => {
+    if (!file) return;
+    const lowerName = file.name.toLowerCase();
+    const isHtmlFile = lowerName.endsWith(".html") || lowerName.endsWith(".htm") || file.type === "text/html";
+    if (!isHtmlFile) { toast.error("Please upload an HTML file"); return; }
+    if (file.size > 10 * 1024 * 1024) { toast.error("HTML file must be under 10MB"); return; }
+
+    const previewUrl = URL.createObjectURL(file);
+    setBackgroundHtmlPreview(previewUrl);
+
+    if (editId) {
+      setUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/upload-html", { method: "POST", body: formData });
+        if (!res.ok) { const err = await res.json().catch(() => ({ error: res.statusText })); throw new Error(err.error ?? "Upload failed"); }
+        const { url } = await res.json();
+        updateArtworkMutation.mutate({ id: editId, backgroundHtmlUrl: url });
+        setBackgroundHtmlPreview(url);
+      } catch (err: any) {
+        toast.error("Failed to upload HTML background: " + err.message);
+        setBackgroundHtmlPreview(null);
+      } finally {
+        setUploading(false);
+      }
+    } else {
+      setPendingHtmlFile(file);
+    }
+
+    if (htmlRef.current) htmlRef.current.value = "";
   };
 
   const handlePdfSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -494,6 +546,7 @@ export default function LandingPages() {
                     </span>
                   )}
                 </TabsTrigger>
+                <TabsTrigger value="other">Other</TabsTrigger>
               </TabsList>
 
               {/* ─── Content Tab ─── */}
@@ -1093,6 +1146,80 @@ export default function LandingPages() {
                     </button>
                   )}
                   <input ref={pdfRef} type="file" accept=".pdf" className="hidden" onChange={handlePdfSelect} />
+                </div>
+              </TabsContent>
+
+              {/* ─── Other Tab ─── */}
+              <TabsContent value="other" className="space-y-5 mt-4">
+                <div>
+                  <Label className="mb-2 block font-semibold">HTML Background Template</Label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Upload an HTML file to use as the landing page background behind the form. This is useful for custom animated or designed backgrounds.
+                  </p>
+
+                  {backgroundHtmlPreview ? (
+                    <div className="space-y-3">
+                      <div className="relative rounded-lg overflow-hidden border shadow-sm bg-white" style={{ height: "320px" }}>
+                        <iframe
+                          src={backgroundHtmlPreview}
+                          title="HTML background preview"
+                          className="absolute inset-0 h-full w-full border-0"
+                        />
+                        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white/95 to-transparent" />
+                        <div className="absolute right-2 top-2 flex gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="bg-black/50 hover:bg-black/70 text-white border-0"
+                            onClick={() => htmlRef.current?.click()}
+                          >
+                            Change
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="bg-black/50 hover:bg-black/70 text-white border-0"
+                            onClick={() => {
+                              setBackgroundHtmlPreview(null);
+                              setPendingHtmlFile(null);
+                              if (editId) {
+                                updateArtworkMutation.mutate({ id: editId, backgroundHtmlUrl: null });
+                              }
+                            }}
+                          >
+                            <X className="h-3 w-3 mr-1" /> Remove
+                          </Button>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">
+                        Preview updates immediately after you drop a file. Uploaded logos are still managed from the Media tab using the shared media library.
+                      </p>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => htmlRef.current?.click()}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "copy";
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        handleHtmlSelect(e.dataTransfer.files?.[0]);
+                      }}
+                      className="w-full h-44 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-brand-green/50 hover:text-brand-green transition-colors cursor-pointer bg-muted/20"
+                    >
+                      <FileCode2 className="h-8 w-8" />
+                      <span className="text-sm font-medium">Drag and drop HTML background</span>
+                      <span className="text-xs">or click to browse `.html` files up to 10MB</span>
+                    </div>
+                  )}
+                  <input
+                    ref={htmlRef}
+                    type="file"
+                    accept=".html,.htm,text/html"
+                    className="hidden"
+                    onChange={(e) => handleHtmlSelect(e.target.files?.[0])}
+                  />
                 </div>
               </TabsContent>
 
