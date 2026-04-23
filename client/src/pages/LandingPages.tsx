@@ -120,6 +120,7 @@ export default function LandingPages() {
   const [logoSize, setLogoSize] = useState<number>(64);
   const [logoOnHtmlBackground, setLogoOnHtmlBackground] = useState(false);
   const [formEmbedded, setFormEmbedded] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [pdfName, setPdfName] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -222,6 +223,33 @@ export default function LandingPages() {
     }
   }, [existingMedia, editId]);
 
+  // Build preview HTML with placeholders substituted so the editor iframe shows real logos/form indicator
+  useEffect(() => {
+    if (!backgroundHtmlPreview) {
+      setPreviewHtml(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(backgroundHtmlPreview)
+      .then(r => r.text())
+      .then(html => {
+        if (cancelled) return;
+        const logoIds = selectedMedia.filter(m => m.placement === "foreground_logo").map(m => m.mediaId);
+        const logoItems = mediaLibraryItems?.filter(m => logoIds.includes(m.id)) ?? [];
+        const logoHtml = logoItems.length > 0
+          ? logoItems.map(item =>
+              `<img src="${item.fileUrl}" alt="${item.label ?? ""}" style="height:${logoSize}px;width:auto;object-fit:contain;display:block;">`
+            ).join("")
+          : `<span style="color:#B8924A;font-style:italic;font-size:13px;">[Logo will appear here]</span>`;
+        const formPlaceholder = `<div style="background:rgba(184,146,74,0.12);border:2px dashed #B8924A;border-radius:8px;padding:32px;text-align:center;margin:20px auto;max-width:480px;"><p style="color:#B8924A;font-weight:600;font-size:16px;margin:0;">&#128203; Registration Form</p><p style="color:#666;font-size:13px;margin:8px 0 0;">The CRM registration form will appear here on the live page</p></div>`;
+        let modified = html.replace(/\{\{alta_logo\}\}/g, logoHtml);
+        modified = modified.replace(/\{\{alta_form\}\}/g, formPlaceholder);
+        setPreviewHtml(modified);
+      })
+      .catch(() => { if (!cancelled) setPreviewHtml(null); });
+    return () => { cancelled = true; };
+  }, [backgroundHtmlPreview, selectedMedia, mediaLibraryItems, logoSize]);
+
   async function uploadFileAndGetUrl(endpoint: string, file: File): Promise<string> {
     const formData = new FormData();
     formData.append("file", file);
@@ -297,6 +325,7 @@ export default function LandingPages() {
     setForm({ ...defaultForm });
     setArtworkPreview(null);
     setBackgroundHtmlPreview(null);
+    setPreviewHtml(null);
     setArtworkPosition("center");
     setLogoOnHtmlBackground(false);
     setFormEmbedded(false);
@@ -1184,7 +1213,7 @@ export default function LandingPages() {
                     <div className="space-y-3">
                       <div className="relative rounded-lg overflow-hidden border shadow-sm bg-white" style={{ height: "320px" }}>
                         <iframe
-                          src={backgroundHtmlPreview}
+                          {...(previewHtml ? { srcDoc: previewHtml } : { src: backgroundHtmlPreview ?? undefined })}
                           title="HTML background preview"
                           className="absolute inset-0 h-full w-full border-0"
                         />
