@@ -118,6 +118,8 @@ export default function LandingPages() {
   const [artworkPosition, setArtworkPosition] = useState<string>("center");
   const [bgOverlayOpacity, setBgOverlayOpacity] = useState<number>(0.5);
   const [logoSize, setLogoSize] = useState<number>(64);
+  const [logoOnHtmlBackground, setLogoOnHtmlBackground] = useState(false);
+  const [formEmbedded, setFormEmbedded] = useState(false);
   const [pdfName, setPdfName] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -296,6 +298,8 @@ export default function LandingPages() {
     setArtworkPreview(null);
     setBackgroundHtmlPreview(null);
     setArtworkPosition("center");
+    setLogoOnHtmlBackground(false);
+    setFormEmbedded(false);
     setPdfName(null);
     setPendingArtworkFile(null);
     setPendingHtmlFile(null);
@@ -325,6 +329,8 @@ export default function LandingPages() {
     setArtworkPosition(page.artworkPosition || "center");
     setBgOverlayOpacity(page.bgOverlayOpacity != null ? Number(page.bgOverlayOpacity) : 0.5);
     setLogoSize((page as any).logoSize != null ? Number((page as any).logoSize) : 64);
+    setLogoOnHtmlBackground(!!(page as any).logoOnHtmlBackground);
+    setFormEmbedded(!!(page as any).formEmbedded);
     setPdfName(page.confirmationPdfUrl ? "Attached PDF" : null);
     setEditId(page.id);
     setTouched({});
@@ -1238,6 +1244,49 @@ export default function LandingPages() {
                     onChange={(e) => handleHtmlSelect(e.target.files?.[0])}
                   />
                 </div>
+
+                {/* ─── HTML Background Options (only when HTML is loaded) ─── */}
+                {backgroundHtmlPreview && (
+                  <div className="space-y-4 border-t pt-4 mt-2">
+                    <Label className="text-sm font-semibold">HTML Background Options</Label>
+
+                    {/* Logo on background */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium">Show logo on background</p>
+                        <p className="text-xs text-muted-foreground">
+                          Display your selected logo(s) overlaid at the top of the HTML background, above the page content.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={logoOnHtmlBackground}
+                        onCheckedChange={(val) => {
+                          setLogoOnHtmlBackground(val);
+                          if (editId) updateArtworkMutation.mutate({ id: editId, logoOnHtmlBackground: val });
+                        }}
+                      />
+                    </div>
+
+                    {/* Form embedded into HTML */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium">Embed form into HTML page</p>
+                        <p className="text-xs text-muted-foreground">
+                          Integrate the registration form directly into the HTML template instead of showing it as a floating card.
+                          Add <code className="bg-muted px-1 rounded text-[11px]">{"{{alta_form}}"}</code> anywhere in your HTML where the form should appear,
+                          or it will be appended before <code className="bg-muted px-1 rounded text-[11px]">&lt;/body&gt;</code>.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={formEmbedded}
+                        onCheckedChange={(val) => {
+                          setFormEmbedded(val);
+                          if (editId) updateArtworkMutation.mutate({ id: editId, formEmbedded: val });
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
               </TabsContent>
 
 

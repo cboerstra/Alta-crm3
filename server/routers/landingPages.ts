@@ -94,6 +94,8 @@ export const landingPagesRouter = router({
       confirmationPdfUrl: z.string().nullable().optional(),
       bgOverlayOpacity: z.number().min(0).max(1).optional(),
       logoSize: z.number().min(20).max(300).optional(),
+      logoOnHtmlBackground: z.boolean().optional(),
+      formEmbedded: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
       const { id, ...data } = input;

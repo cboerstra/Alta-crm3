@@ -129,6 +129,10 @@ export const landingPages = mysqlTable("landing_pages", {
   bgOverlayOpacity: decimal("bgOverlayOpacity", { precision: 3, scale: 2 }).default("0.50"),
   // NEW: Logo size in pixels (height). Default 64px.
   logoSize: int("logoSize").default(64),
+  // NEW: Show logo overlaid on top of the HTML background (above the iframe)
+  logoOnHtmlBackground: boolean("logoOnHtmlBackground").default(false),
+  // NEW: Embed the registration form directly into the HTML background template
+  formEmbedded: boolean("formEmbedded").default(false),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

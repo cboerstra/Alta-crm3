@@ -50,8 +50,34 @@ CREATE TABLE IF NOT EXISTS `sms_templates` (
   CONSTRAINT `sms_templates_trigger_unique` UNIQUE (`trigger`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 4. Add logoOnHtmlBackground column to landing_pages
+SET @col4_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME   = 'landing_pages'
+    AND COLUMN_NAME  = 'logoOnHtmlBackground'
+);
+SET @sql4 = IF(@col4_exists = 0,
+  'ALTER TABLE `landing_pages` ADD COLUMN `logoOnHtmlBackground` tinyint(1) NOT NULL DEFAULT 0',
+  'SELECT ''logoOnHtmlBackground column already exists'' AS info'
+);
+PREPARE stmt4 FROM @sql4; EXECUTE stmt4; DEALLOCATE PREPARE stmt4;
+
+-- 5. Add formEmbedded column to landing_pages
+SET @col5_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME   = 'landing_pages'
+    AND COLUMN_NAME  = 'formEmbedded'
+);
+SET @sql5 = IF(@col5_exists = 0,
+  'ALTER TABLE `landing_pages` ADD COLUMN `formEmbedded` tinyint(1) NOT NULL DEFAULT 0',
+  'SELECT ''formEmbedded column already exists'' AS info'
+);
+PREPARE stmt5 FROM @sql5; EXECUTE stmt5; DEALLOCATE PREPARE stmt5;
+
 -- ============================================================
--- Verification — should show all 3 items as OK
+-- Verification — should show all 5 items as OK
 -- ============================================================
 SELECT
   'passwordHash column'   AS check_item,
@@ -73,4 +99,20 @@ SELECT
   'sms_templates table',
   IF(COUNT(*) > 0, 'OK', 'MISSING')
 FROM information_schema.TABLES
-WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sms_templates';
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sms_templates'
+
+UNION ALL
+
+SELECT
+  'logoOnHtmlBackground column',
+  IF(COUNT(*) > 0, 'OK', 'MISSING')
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'landing_pages' AND COLUMN_NAME = 'logoOnHtmlBackground'
+
+UNION ALL
+
+SELECT
+  'formEmbedded column',
+  IF(COUNT(*) > 0, 'OK', 'MISSING')
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'landing_pages' AND COLUMN_NAME = 'formEmbedded';
