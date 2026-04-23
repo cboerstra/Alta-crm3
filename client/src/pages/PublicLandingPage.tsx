@@ -82,6 +82,11 @@ export default function PublicLandingPage() {
     const modified = fetchedHtml.includes("{{alta_form}}")
       ? fetchedHtml.replace(/\{\{alta_form\}\}/g, placeholder)
       : fetchedHtml.replace(/<\/body>/i, `${placeholder}</body>`);
+    // Replace {{alta_logo}} with actual logo img tags from the media library
+    const logoHtml = foregroundLogos.map(item =>
+      `<img src="${item.media!.fileUrl}" alt="${item.media!.label || ""}" style="height:${logoSize}px;width:auto;object-fit:contain;display:block;">`
+    ).join("");
+    modified = modified.replace(/\{\{alta_logo\}\}/g, logoHtml);
     htmlContainerRef.current.innerHTML = modified;
     // Re-execute any inline scripts so the HTML template animations run
     htmlContainerRef.current.querySelectorAll("script").forEach((oldScript) => {
@@ -92,7 +97,7 @@ export default function PublicLandingPage() {
     });
     const mountEl = htmlContainerRef.current.querySelector("#alta-crm-form-mount") as HTMLElement | null;
     setFormMountPoint(mountEl);
-  }, [fetchedHtml]);
+  }, [fetchedHtml, foregroundLogos, logoSize]);
 
   if (pageLoading) {
     return (
