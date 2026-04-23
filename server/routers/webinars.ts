@@ -182,7 +182,7 @@ export const webinarsRouter = router({
           attempt++;
           slug = `${baseSlug}-${attempt}`;
         }
-        landingPageId = await createLandingPage({
+        landingPageId = await dbCreateLandingPage({
           createdBy: ctx.user.id,
           title: `${input.title} - Registration`,
           slug,
