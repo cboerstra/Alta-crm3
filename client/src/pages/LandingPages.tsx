@@ -13,9 +13,10 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Copy, Trash2, Edit, Upload, Image, FileIcon, X, Eye, Calendar, Clock, AlertCircle, Link as LinkIcon, Check, ImagePlus, Users, FileCode2 } from "lucide-react";
+import { Plus, FileText, Copy, Trash2, Edit, Upload, Image, FileIcon, X, Eye, Calendar, Clock, AlertCircle, Link as LinkIcon, Check, ImagePlus, Users, FileCode2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { IntegrateCodeDialog } from "@/components/IntegrateCodeDialog";
 
 const ALL_FORM_FIELDS = [
   { key: "firstName", label: "First Name", required: true },
@@ -123,6 +124,7 @@ export default function LandingPages() {
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [pdfName, setPdfName] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [showIntegrate, setShowIntegrate] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<MediaSelection[]>([]);
@@ -1272,6 +1274,28 @@ export default function LandingPages() {
                     className="hidden"
                     onChange={(e) => handleHtmlSelect(e.target.files?.[0])}
                   />
+
+                  {(backgroundHtmlPreview || pendingHtmlFile) && (
+                    <div className="mt-4 rounded-md border bg-muted/30 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold">Integrate Code</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Auto-detect the form in your uploaded HTML, map its inputs to CRM fields, and inject the embed script so submissions flow into the CRM.
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setShowIntegrate(true)}
+                          disabled={uploading}
+                        >
+                          <Wand2 className="h-4 w-4 mr-1" /> Integrate Code
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* ─── HTML Background Options (only when HTML is loaded) ─── */}
@@ -1463,6 +1487,32 @@ export default function LandingPages() {
           })}
         </div>
       )}
+
+      <IntegrateCodeDialog
+        open={showIntegrate}
+        onOpenChange={setShowIntegrate}
+        htmlUrl={backgroundHtmlPreview}
+        pendingFile={pendingHtmlFile}
+        defaultSource={form.sourceTag || "website_form"}
+        onApply={async (blob, filename) => {
+          const file = new File([blob], filename, { type: "text/html" });
+          if (editId) {
+            setUploading(true);
+            try {
+              const url = await uploadFileAndGetUrl("/api/upload-html", file);
+              updateArtworkMutation.mutate({ id: editId, backgroundHtmlUrl: url });
+              setBackgroundHtmlPreview(url);
+            } catch (err: any) {
+              toast.error("Failed to save integrated HTML: " + (err?.message ?? "unknown error"));
+            } finally {
+              setUploading(false);
+            }
+          } else {
+            setPendingHtmlFile(file);
+            setBackgroundHtmlPreview(URL.createObjectURL(file));
+          }
+        }}
+      />
     </div>
   );
 }

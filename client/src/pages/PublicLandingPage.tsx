@@ -79,7 +79,7 @@ export default function PublicLandingPage() {
   useEffect(() => {
     if (fetchedHtml === null || !htmlContainerRef.current) return;
     const placeholder = '<div id="alta-crm-form-mount"></div>';
-    const modified = fetchedHtml.includes("{{alta_form}}")
+    let modified = fetchedHtml.includes("{{alta_form}}")
       ? fetchedHtml.replace(/\{\{alta_form\}\}/g, placeholder)
       : fetchedHtml.replace(/<\/body>/i, `${placeholder}</body>`);
     // Replace {{alta_logo}} with actual logo img tags from the media library
