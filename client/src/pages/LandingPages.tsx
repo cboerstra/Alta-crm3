@@ -106,6 +106,49 @@ function serializeHtmlDocument(doc: Document, originalHtml: string) {
   return /^\s*<!doctype/i.test(originalHtml) ? `<!DOCTYPE html>\n${serialized}` : serialized;
 }
 
+function replaceElementWithAltaForm(element: Element) {
+  element.insertAdjacentHTML("beforebegin", ALTA_FORM_BLOCK);
+  element.remove();
+}
+
+function getUserInputCount(element: Element) {
+  return element.querySelectorAll(
+    'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]), textarea, select'
+  ).length;
+}
+
+function findFormLikeContainer(doc: Document) {
+  const inputs = Array.from(doc.querySelectorAll(
+    'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]), textarea, select'
+  ));
+  let best: { element: Element; score: number } | null = null;
+
+  for (const input of inputs) {
+    let el = input.parentElement;
+    while (el && el !== doc.body) {
+      const inputCount = getUserInputCount(el);
+      const hasSubmit = !!el.querySelector('button, input[type="submit"], [role="button"]');
+      const hints = `${el.id} ${el.className} ${el.getAttribute("aria-label") ?? ""}`.toLowerCase();
+      const hasFormHint = /form|register|signup|sign-up|lead|contact|email|phone|cta/.test(hints);
+      const isSectionLike = /^(FORM|SECTION|ASIDE|DIV|MAIN)$/i.test(el.tagName);
+
+      if (isSectionLike && inputCount > 0) {
+        let score = inputCount * 10;
+        if (hasSubmit) score += 20;
+        if (hasFormHint) score += 30;
+        if (/^(SECTION|ASIDE|FORM)$/i.test(el.tagName)) score += 5;
+        if (el.parentElement === doc.body) score -= 12;
+
+        if (!best || score > best.score) best = { element: el, score };
+      }
+
+      el = el.parentElement;
+    }
+  }
+
+  return best?.element ?? null;
+}
+
 function smartPrepareLandingPageHtml(html: string) {
   if (html.includes("{{alta_form}}")) {
     if (html.includes("alta-crm-form-shell")) return { html, changed: false };
@@ -129,8 +172,13 @@ function smartPrepareLandingPageHtml(html: string) {
 
   const existingForm = doc.querySelector("form");
   if (existingForm) {
-    existingForm.insertAdjacentHTML("beforebegin", ALTA_FORM_BLOCK);
-    existingForm.remove();
+    replaceElementWithAltaForm(existingForm);
+    return { html: serializeHtmlDocument(doc, html), changed: true };
+  }
+
+  const formLikeContainer = findFormLikeContainer(doc);
+  if (formLikeContainer) {
+    replaceElementWithAltaForm(formLikeContainer);
     return { html: serializeHtmlDocument(doc, html), changed: true };
   }
 
