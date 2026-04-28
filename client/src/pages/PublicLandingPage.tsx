@@ -401,29 +401,9 @@ export default function PublicLandingPage() {
   // ─── Success Screen ───
   if (submitted || isThanksPage) {
     return (
-      <div className="min-h-screen relative flex items-center justify-center">
-        {hasHtmlBackground && (
-          <div className="absolute inset-0">
-            <iframe
-              src={(page as any).backgroundHtmlUrl}
-              title=""
-              aria-hidden="true"
-              tabIndex={-1}
-              className="h-full w-full border-0 pointer-events-none"
-            />
-          </div>
-        )}
-        {hasImageBackground && (
-          <div className="absolute inset-0">
-            <img src={page.artworkUrl!} alt="" className="w-full h-full object-cover" style={{ objectPosition: (page as any).artworkPosition || "center" }} />
-            <div className="absolute inset-0 bg-black/60" />
-          </div>
-        )}
-        {!hasBackground && (
-          <div className="absolute inset-0 bg-gradient-to-br from-[#2A5B3F] via-[#1F7B47] to-[#165E2E]" />
-        )}
-        <div className="relative z-10 max-w-md w-full mx-4">
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl p-8 text-center border border-white/20">
+      <div className="min-h-screen bg-[#F8F4EC] flex items-center justify-center px-4 py-12">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 text-center border border-[#E5E1D8]">
             {foregroundLogos.length > 0 && (
               <div className="flex items-center justify-center gap-3 mb-5">
                 {foregroundLogos.map((item) => (
