@@ -18,6 +18,7 @@ import Revenue from "./pages/Revenue";
 import SettingsPage from "./pages/Settings";
 import UserManagement from "./pages/UserManagement";
 import PublicLandingPage from "./pages/PublicLandingPage";
+import PublicLandingThanks from "./pages/PublicLandingThanks";
 import PublicBooking from "./pages/PublicBooking";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
@@ -93,7 +94,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/setup" component={Setup} />
       {/* Public routes */}
-      <Route path="/lp/:slug/thanks" component={PublicLandingPage} />
+      <Route path="/lp/:slug/thanks" component={PublicLandingThanks} />
       <Route path="/lp/:slug" component={PublicLandingPage} />
       <Route path="/schedule/:slug" component={PublicBooking} />
       <Route path="/privacy" component={PrivacyPolicy} />

@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { useLocation, useParams } from "wouter";
-import { CheckCircle, Loader2, Calendar, Clock } from "lucide-react";
+import { Loader2, Calendar, Clock } from "lucide-react";
 
 const TEMPLATE_HEAD_ATTR = "data-alta-template-head";
 const EMBEDDED_FORM_CLASS = "alta-crm-embedded-form";
@@ -232,8 +232,6 @@ export default function PublicLandingPage() {
   const [smsConsent, setSmsConsent] = useState(false);
   const [contactOptIn, setContactOptIn] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string>("");
-  const [submitted, setSubmitted] = useState(false);
-  const [joinUrl, setJoinUrl] = useState<string | null>(null);
 
   // ─── Embedded HTML state ───
   const htmlContainerRef = useRef<HTMLDivElement>(null);
@@ -248,16 +246,13 @@ export default function PublicLandingPage() {
 
   const submitLead = trpc.leads.captureFromLandingPage.useMutation({
     onSuccess: (data) => {
-      setSubmitted(true);
       if (data.joinUrl) {
-        setJoinUrl(data.joinUrl);
         window.sessionStorage.setItem(`lp:${params.slug}:joinUrl`, data.joinUrl);
       } else {
         window.sessionStorage.removeItem(`lp:${params.slug}:joinUrl`);
       }
       navigate(`/lp/${params.slug}/thanks`);
     },
-    onError: () => setSubmitted(true),
   });
 
   const enabledFields = useMemo(() => {
@@ -294,12 +289,6 @@ export default function PublicLandingPage() {
   const formEmbedded = !!(page as any)?.formEmbedded && hasHtmlBackground;
   // logoOnBackground only applies in non-embedded mode (embedded mode has the logo inside the form card in the HTML)
   const logoOnBackground = !!(page as any)?.logoOnHtmlBackground && hasHtmlBackground && !formEmbedded;
-  const isThanksPage = window.location.pathname.replace(/\/+$/, "").endsWith("/thanks");
-
-  useEffect(() => {
-    if (!isThanksPage) return;
-    setJoinUrl(window.sessionStorage.getItem(`lp:${params.slug}:joinUrl`));
-  }, [isThanksPage, params.slug]);
 
   useEffect(() => {
     if (!enabledFields.includes("sessionSelect")) {
@@ -393,36 +382,6 @@ export default function PublicLandingPage() {
         <div className="text-center text-white">
           <h1 className="text-3xl font-bold" style={{ fontFamily: "Raleway, sans-serif" }}>Page Not Found</h1>
           <p className="text-white/60 mt-2">This landing page does not exist or has been deactivated.</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── Success Screen ───
-  if (submitted || isThanksPage) {
-    return (
-      <div className="min-h-screen bg-[#F8F4EC] flex items-center justify-center px-4 py-12">
-        <div className="max-w-md w-full">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 text-center border border-[#E5E1D8]">
-            {foregroundLogos.length > 0 && (
-              <div className="flex items-center justify-center gap-3 mb-5">
-                {foregroundLogos.map((item) => (
-                  <img key={item.mediaId} src={item.media!.fileUrl} alt={item.media!.label || ""} style={{ height: `${logoSize}px` }} className="object-contain" />
-                ))}
-              </div>
-            )}
-            <div className="h-16 w-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: `${accentColor}20` }}>
-              <CheckCircle className="h-8 w-8" style={{ color: accentColor }} />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2" style={{ fontFamily: "Raleway, sans-serif" }}>You're Registered!</h2>
-            <p className="text-gray-600 mb-4">Thank you for signing up. You'll receive a confirmation email shortly with all the details.</p>
-            {joinUrl && (
-              <div className="mt-4 p-4 rounded-lg border" style={{ backgroundColor: `${accentColor}10`, borderColor: `${accentColor}30` }}>
-                <p className="text-sm font-medium mb-2" style={{ color: accentColor }}>Your webinar join link:</p>
-                <a href={joinUrl} target="_blank" rel="noopener noreferrer" className="text-sm underline break-all" style={{ color: accentColor }}>{joinUrl}</a>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     );
