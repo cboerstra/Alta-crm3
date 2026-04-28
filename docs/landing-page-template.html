@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>First-Time Home Buyer Webinar</title>
+
+  <!--
+    Alta CRM landing page template.
+
+    Two placeholders are replaced at render time on /lp/<slug>:
+      {{alta_form}}  -> the lead-capture form (fields toggled in the CRM editor)
+      {{alta_logo}}  -> logo image(s) from the media library
+
+    Rules:
+      - Single self-contained HTML file. Inline CSS/JS only,
+        or absolute https:// links to external assets.
+      - Relative paths (./img/foo.png) WILL NOT WORK.
+      - Max upload size: 10 MB.
+  -->
+
+  <style>
+    :root {
+      --accent: #0b6efd;
+      --text: #1a1a1a;
+      --muted: #555;
+      --bg: #f7f9fc;
+      --card: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                   Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.5;
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 20px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    header .logo img { max-height: 56px; width: auto; display: block; }
+    .hero {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 48px;
+      align-items: center;
+      padding: 56px 0;
+    }
+    .hero h1 {
+      font-size: clamp(28px, 4vw, 44px);
+      line-height: 1.15;
+      margin: 0 0 16px;
+    }
+    .hero p.lead { font-size: 18px; color: var(--muted); margin: 0 0 24px; }
+    .hero ul { padding-left: 18px; margin: 0 0 24px; }
+    .hero ul li { margin-bottom: 8px; }
+    .form-card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.08);
+    }
+    .form-card h2 {
+      margin: 0 0 6px;
+      font-size: 22px;
+    }
+    .form-card p {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    footer {
+      border-top: 1px solid #e6e9ef;
+      padding: 24px 0 32px;
+      color: var(--muted);
+      font-size: 13px;
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 800px) {
+      .hero { grid-template-columns: 1fr; padding: 32px 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">
+        {{alta_logo}}
+      </div>
+      <div style="font-size: 14px; color: var(--muted);">
+        Free Live Webinar
+      </div>
+    </header>
+
+    <section class="hero">
+      <div>
+        <h1>Buy your first home with confidence.</h1>
+        <p class="lead">
+          A 30-minute live webinar that walks you through the mortgage process,
+          how much house you can afford, and the exact steps to get pre-approved.
+        </p>
+        <ul>
+          <li>What lenders actually look at (and what doesn&rsquo;t matter)</li>
+          <li>How much down payment you really need</li>
+          <li>The 5 documents to gather before you apply</li>
+          <li>Live Q&amp;A with a licensed mortgage specialist</li>
+        </ul>
+        <p style="font-size: 14px; color: var(--muted);">
+          Save your seat &mdash; spots are limited.
+        </p>
+      </div>
+
+      <aside class="form-card">
+        <h2>Reserve your seat</h2>
+        <p>Enter your details and we&rsquo;ll email the webinar link.</p>
+        {{alta_form}}
+      </aside>
+    </section>
+
+    <footer>
+      <div>&copy; <span id="y"></span> Alta Mortgage. All rights reserved.</div>
+      <div>By registering you agree to receive event-related emails.</div>
+    </footer>
+  </div>
+
+  <script>
+    document.getElementById("y").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>

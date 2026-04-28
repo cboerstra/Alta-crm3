@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5 Ways to Boost Your Credit Score FAST — Alta Mortgage Group</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,700&family=Inter:wght@300;400;500;600;700;800&display=swap">
+<style>
+  :root {
+    --green: #1E4A36; --green-dark: #0D1F15; --green-mid: #2C5C44;
+    --green-light: #EAF2EE; --gold: #B8924A; --gold-light: #F5EDD8;
+    --cream: #F8F4EC; --white: #FFFFFF;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: var(--cream); color: #374151; -webkit-font-smoothing: antialiased; }
+
+  /* ── NAV ── */
+  nav {
+    background: var(--green-dark);
+    padding: 14px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+  }
+  nav img { height: 48px; width: auto; }
+  nav .phone { font-size: 14px; font-weight: 600; color: var(--gold-light); letter-spacing: 0.04em; }
+
+  /* ── HERO ── */
+  .hero {
+    background: var(--green);
+    padding: 80px 40px 72px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 6px;
+    background: var(--gold);
+  }
+  .hero .mountain-deco {
+    position: absolute;
+    right: -40px; bottom: 0;
+    width: 420px; height: 300px;
+    opacity: 0.05;
+    pointer-events: none;
+  }
+  .hero .overline {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin-bottom: 20px;
+  }
+  .hero h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(36px, 5.5vw, 72px);
+    font-weight: 700;
+    color: white;
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    margin-bottom: 24px;
+    max-width: 860px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .hero h1 em { color: var(--gold); font-style: italic; }
+  .hero .subhead {
+    font-size: clamp(16px, 2vw, 22px);
+    font-weight: 400;
+    color: rgba(255,255,255,0.72);
+    line-height: 1.6;
+    max-width: 620px;
+    margin: 0 auto 40px;
+  }
+  .cta-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--gold);
+    color: white;
+    font-size: 18px;
+    font-weight: 700;
+    padding: 18px 36px;
+    border-radius: 6px;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: background 150ms;
+    box-shadow: 0 4px 16px rgba(184,146,74,0.4);
+  }
+  .cta-btn:hover { background: #C9A85C; }
+  .hero .trust-line {
+    margin-top: 20px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.4);
+    font-style: italic;
+  }
+
+  /* ── PAIN SECTION ── */
+  .pain {
+    background: white;
+    padding: 72px 40px;
+    text-align: center;
+  }
+  .pain .section-label { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin-bottom: 14px; }
+  .pain h2 { font-family: 'Playfair Display', serif; font-size: clamp(28px, 4vw, 48px); font-weight: 700; color: var(--green-dark); margin-bottom: 20px; line-height: 1.2; }
+  .pain p { font-size: 18px; color: #6B7280; max-width: 600px; margin: 0 auto 36px; line-height: 1.65; }
+  .pain-items {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  .pain-item {
+    flex: 1;
+    min-width: 200px;
+    max-width: 260px;
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    border-radius: 10px;
+    padding: 24px 20px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #DC2626;
+    line-height: 1.4;
+  }
+  .pain-item .pain-icon { font-size: 28px; margin-bottom: 10px; display: block; }
+
+  /* ── AUTHORITY ── */
+  .authority {
+    background: var(--cream);
+    padding: 72px 40px;
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .authority .section-label { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin-bottom: 14px; }
+  .authority h2 { font-family: 'Playfair Display', serif; font-size: clamp(26px, 3.5vw, 44px); font-weight: 700; color: var(--green); line-height: 1.2; margin-bottom: 20px; }
+  .authority p { font-size: 18px; color: #4B5563; line-height: 1.7; }
+  .authority .stat-row { display: flex; gap: 16px; justify-content: center; margin-top: 40px; flex-wrap: wrap; }
+  .authority .stat { background: white; border-radius: 10px; padding: 20px 28px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); border-top: 4px solid var(--gold); min-width: 150px; }
+  .authority .stat-val { font-family: 'Playfair Display', serif; font-size: 40px; font-weight: 700; color: var(--green); }
+  .authority .stat-label { font-size: 13px; color: #9CA3AF; font-weight: 500; margin-top: 4px; }
+
+  /* ── BENEFITS ── */
+  .benefits {
+    background: var(--green);
+    padding: 80px 40px;
+  }
+  .benefits-inner { max-width: 860px; margin: 0 auto; }
+  .benefits .section-label { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin-bottom: 14px; text-align: center; }
+  .benefits h2 { font-family: 'Playfair Display', serif; font-size: clamp(28px, 4vw, 50px); font-weight: 700; color: white; text-align: center; margin-bottom: 48px; line-height: 1.15; }
+  .benefits h2 em { color: var(--gold); font-style: italic; }
+  .benefit-list { display: flex; flex-direction: column; gap: 16px; }
+  .benefit-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(184,146,74,0.25);
+    border-radius: 10px;
+    padding: 24px 28px;
+  }
+  .benefit-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 44px;
+    font-weight: 700;
+    color: var(--gold);
+    opacity: 0.5;
+    line-height: 1;
+    flex-shrink: 0;
+    min-width: 40px;
+  }
+  .benefit-content strong {
+    display: block;
+    font-size: 20px;
+    font-weight: 700;
+    color: white;
+    font-family: 'Playfair Display', serif;
+    margin-bottom: 6px;
+  }
+  .benefit-content span { font-size: 16px; color: rgba(255,255,255,0.6); line-height: 1.55; }
+
+  /* ── CTA SECTION ── */
+  .cta-section {
+    background: var(--cream);
+    padding: 80px 40px;
+    text-align: center;
+  }
+  .cta-section .section-label { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold); margin-bottom: 14px; }
+  .cta-section h2 { font-family: 'Playfair Display', serif; font-size: clamp(28px, 4vw, 54px); font-weight: 700; color: var(--green-dark); line-height: 1.15; margin-bottom: 16px; }
+  .cta-section h2 em { color: var(--gold); font-style: italic; }
+  .cta-section p { font-size: 18px; color: #6B7280; margin-bottom: 36px; line-height: 1.6; max-width: 560px; margin-left: auto; margin-right: auto; }
+
+  /* ── FORM ── */
+  .form-box {
+    background: white;
+    border-radius: 14px;
+    padding: 40px;
+    max-width: 520px;
+    margin: 0 auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    border-top: 6px solid var(--gold);
+  }
+  .form-box h3 { font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 700; color: var(--green); margin-bottom: 24px; text-align: center; }
+  .form-row { display: flex; gap: 12px; margin-bottom: 14px; }
+  .form-field { flex: 1; }
+  .form-field label { display: block; font-size: 12px; font-weight: 600; color: #6B7280; margin-bottom: 5px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .form-field input, .form-field select {
+    width: 100%; padding: 11px 14px;
+    border: 1px solid #E5E7EB;
+    border-radius: 6px;
+    font-size: 15px;
+    font-family: 'Inter', sans-serif;
+    color: #1F2937;
+    outline: none;
+    transition: border 150ms, box-shadow 150ms;
+  }
+  .form-field input:focus, .form-field select:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(30,74,54,0.12); }
+  .form-submit { width: 100%; margin-top: 8px; font-size: 18px; padding: 16px; }
+  .form-disclaimer { font-size: 11px; color: #9CA3AF; text-align: center; margin-top: 12px; line-height: 1.5; }
+
+  /* ── ALTA CRM EMBEDDED FORM ISOLATION ── */
+  .alta-crm-form-shell {
+    max-width: 520px;
+    margin: 0 auto;
+    text-align: left;
+  }
+  .alta-crm-form-shell *,
+  .alta-crm-form-shell *::before,
+  .alta-crm-form-shell *::after {
+    box-sizing: border-box;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount,
+  .alta-crm-form-shell #alta-crm-form-mount * {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    letter-spacing: normal !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount > div {
+    padding: 0 !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount > div > div {
+    width: 100% !important;
+    max-width: 520px !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount > div > div > div,
+  .alta-crm-form-shell .alta-crm-embedded-form-card {
+    width: 100% !important;
+    max-width: 520px !important;
+    margin: 0 auto !important;
+    padding: 42px 44px !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E5E7EB !important;
+    border-top: 6px solid var(--gold) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08) !important;
+    text-align: left !important;
+    overflow: hidden !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount h2 {
+    display: none !important;
+    font-size: 24px !important;
+    line-height: 1.2 !important;
+    font-weight: 800 !important;
+    color: var(--green-dark) !important;
+    text-align: center !important;
+    margin: 0 0 18px !important;
+    max-width: none !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount label {
+    display: block !important;
+    color: #6B7280 !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    line-height: 1.25 !important;
+    letter-spacing: 0.08em !important;
+    margin: 0 0 6px !important;
+    text-align: left !important;
+    text-transform: uppercase !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount .space-y-4 > * + * {
+    margin-top: 18px !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount .grid {
+    display: grid !important;
+    gap: 16px !important;
+    width: 100% !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount .grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount input:not([type="checkbox"]) {
+    width: 100% !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    padding: 12px 14px !important;
+    margin: 0 !important;
+    border: 1px solid #D6D9DE !important;
+    border-radius: 8px !important;
+    background: #FFFFFF !important;
+    color: #111827 !important;
+    font-size: 16px !important;
+    line-height: 24px !important;
+    text-align: left !important;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.03) !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount input:not([type="checkbox"]):focus {
+    border-color: var(--green) !important;
+    box-shadow: 0 0 0 3px rgba(30,74,54,0.12) !important;
+    outline: none !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount [role="checkbox"],
+  .alta-crm-form-shell #alta-crm-form-mount input[type="checkbox"] {
+    align-items: center !important;
+    width: 16px !important;
+    height: 16px !important;
+    min-width: 16px !important;
+    min-height: 16px !important;
+    margin: 2px 10px 0 0 !important;
+    padding: 0 !important;
+    border: 1px solid #D1D5DB !important;
+    border-radius: 4px !important;
+    background: #FFFFFF !important;
+    color: #FFFFFF !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    flex: 0 0 16px !important;
+    justify-content: center !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount [role="checkbox"][data-state="checked"],
+  .alta-crm-form-shell #alta-crm-form-mount input[type="checkbox"]:checked {
+    background: var(--green) !important;
+    border-color: var(--green) !important;
+    color: #FFFFFF !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount [role="checkbox"] svg {
+    display: block !important;
+    width: 14px !important;
+    height: 14px !important;
+    stroke-width: 3 !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount p,
+  .alta-crm-form-shell #alta-crm-form-mount label[for="sms-consent"],
+  .alta-crm-form-shell #alta-crm-form-mount label[for="contact-optin"] {
+    color: #6B7280 !important;
+    font-size: 11px !important;
+    font-weight: 400 !important;
+    line-height: 1.45 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    text-align: left !important;
+    text-transform: none !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount p {
+    padding-left: 26px !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount .font-semibold,
+  .alta-crm-form-shell #alta-crm-form-mount strong {
+    font-weight: 700 !important;
+  }
+  .alta-crm-form-shell #alta-crm-form-mount button:not([role="checkbox"]) {
+    width: 100% !important;
+    min-height: 48px !important;
+    padding: 12px 18px !important;
+    border: 0 !important;
+    border-radius: 10px !important;
+    color: #FFFFFF !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    line-height: 1.25 !important;
+    text-align: center !important;
+    text-transform: none !important;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    background: var(--green-dark);
+    padding: 36px 40px;
+    text-align: center;
+  }
+  footer img { height: 56px; width: auto; margin-bottom: 14px; }
+  footer p { font-size: 12px; color: rgba(255,255,255,0.35); line-height: 1.7; max-width: 600px; margin: 0 auto; }
+
+  @media (max-width: 600px) {
+    .form-row { flex-direction: column; }
+    .pain-items { flex-direction: column; align-items: center; }
+    .authority .stat-row { flex-direction: column; align-items: center; }
+    .alta-crm-form-shell #alta-crm-form-mount > div > div {
+      padding: 0 !important;
+    }
+    .alta-crm-form-shell #alta-crm-form-mount > div > div > div,
+    .alta-crm-form-shell .alta-crm-embedded-form-card {
+      padding: 30px 24px !important;
+    }
+    .alta-crm-form-shell #alta-crm-form-mount .grid-cols-2 {
+      grid-template-columns: 1fr !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  {{alta_logo}}
+  <span class="phone">📞 801-628-9400</span>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <svg class="mountain-deco" viewBox="0 0 420 300" xmlns="http://www.w3.org/2000/svg">
+    <polygon points="210,10 410,290 10,290" fill="white"/>
+    <polygon points="210,10 300,180 120,180" fill="rgba(255,255,255,0.6)"/>
+  </svg>
+  <div class="overline">Free Webinar + Instant Bonus Tips</div>
+  <h1>5 Ways to Boost Your Credit Score <em>Fast</em><br>— Even If You've Been Denied Before</h1>
+  <p class="subhead">Learn how buyers are qualifying in today's market — even with less-than-perfect credit.</p>
+  <a href="#register" class="cta-btn">👉 Get the 5 Credit Hacks + Register for Free Class</a>
+  <div class="trust-line">100% free. No purchase necessary. Instant access to bonus tips upon registration.</div>
+</section>
+
+<!-- PAIN -->
+<section class="pain">
+  <div class="section-label">Sound Familiar?</div>
+  <h2>Denied Before? High Rates? Frustrated?</h2>
+  <p>You're not alone. Millions of buyers hit these same walls every year — and most don't realize how fast things can change.</p>
+  <div class="pain-items">
+    <div class="pain-item"><span class="pain-icon">🚫</span>Denied for a mortgage — again</div>
+    <div class="pain-item"><span class="pain-icon">📈</span>Stuck with sky-high interest rates</div>
+    <div class="pain-item"><span class="pain-icon">⏳</span>Told to "wait a few years"</div>
+  </div>
+</section>
+
+<!-- AUTHORITY -->
+<section class="authority">
+  <div class="section-label">Why Listen to Us</div>
+  <h2>Loan Officers Since 1997 — We've Seen It All</h2>
+  <p>Our team has helped thousands of Utah buyers navigate credit challenges and get into homes sooner than they thought possible. We know what lenders actually look for — and we'll show you exactly how to use that knowledge.</p>
+  <div class="stat-row">
+    <div class="stat"><div class="stat-val">27+</div><div class="stat-label">Years Experience</div></div>
+    <div class="stat"><div class="stat-val">1000s</div><div class="stat-label">Loans Closed</div></div>
+    <div class="stat"><div class="stat-val">41</div><div class="stat-label">States We Serve</div></div>
+  </div>
+</section>
+
+<!-- BENEFITS -->
+<section class="benefits">
+  <div class="benefits-inner">
+    <div class="section-label">What You'll Learn</div>
+    <h2>3 Strategies You Can Start <em>Today</em><br>+ 2 Secrets Lenders Won't Tell You</h2>
+    <div class="benefit-list">
+      <div class="benefit-item">
+        <div class="benefit-num">01</div>
+        <div class="benefit-content">
+          <strong>Pay Down Below 30%</strong>
+          <span>Slash your credit utilization ratio — the single biggest lever for fast score improvement. Learn exactly which cards to target first.</span>
+        </div>
+      </div>
+      <div class="benefit-item">
+        <div class="benefit-num">02</div>
+        <div class="benefit-content">
+          <strong>Don't Close Old Accounts</strong>
+          <span>Keeping aged accounts open protects your credit history length — a factor most people unknowingly destroy.</span>
+        </div>
+      </div>
+      <div class="benefit-item">
+        <div class="benefit-num">03</div>
+        <div class="benefit-content">
+          <strong>Become an Authorized User</strong>
+          <span>Leverage someone else's good credit standing. Their history can appear on your report — legally and immediately.</span>
+        </div>
+      </div>
+      <div class="benefit-item" style="border-color: rgba(184,146,74,0.5);">
+        <div class="benefit-num" style="opacity:1;">04</div>
+        <div class="benefit-content">
+          <strong>🔒 Advanced Strategy — Revealed in Webinar</strong>
+          <span>Register to unlock this powerful tactic lenders rarely share with clients.</span>
+        </div>
+      </div>
+      <div class="benefit-item" style="border-color: rgba(184,146,74,0.5);">
+        <div class="benefit-num" style="opacity:1;">05</div>
+        <div class="benefit-content">
+          <strong>🔒 The Insider Secret — Register to Unlock</strong>
+          <span>The final strategy is the one that's helped our clients qualify months ahead of schedule.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA + FORM -->
+<section class="cta-section" id="register">
+  <div class="section-label">Free Webinar</div>
+  <h2>Get the 5 Credit Hacks +<br><em>Register for Free Class</em></h2>
+  <p>Enter your info below. We'll send your 5 bonus tips instantly — plus your free webinar access link.</p>
+  <div class="alta-crm-form-shell">
+    {{alta_form}}
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>Alta Mortgage Group, INC. &nbsp;|&nbsp; NMLS: 565137 &nbsp;|&nbsp; 4824 S 6150 W, Hooper, UT 84315 &nbsp;|&nbsp; 801-628-9400<br>
+  Equal Housing Opportunity. This is not a commitment to lend. All loans subject to credit approval.<br>
+  &copy; 2026 Alta Mortgage Group, INC. All rights reserved.</p>
+</footer>
+
+</body>
+</html>
