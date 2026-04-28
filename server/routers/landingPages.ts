@@ -3,10 +3,30 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import {
   createLandingPage, getLandingPages, getLandingPagesWithLeadCount, getLandingPageBySlug,
   getLandingPageById, updateLandingPage, deleteLandingPage,
-  getWebinarSessions,
+  getWebinarById, getWebinarSessions,
 } from "../db";
 import { storagePut } from "../storage";
 import { nanoid } from "nanoid";
+
+async function getLandingPageSessions(webinarId: number) {
+  const sessions = await getWebinarSessions(webinarId);
+  if (sessions.length > 0) return sessions;
+
+  const webinar = await getWebinarById(webinarId);
+  if (!webinar) return [];
+
+  return [{
+    id: `webinar-${webinar.id}`,
+    webinarId: webinar.id,
+    sessionDate: webinar.scheduledAt,
+    durationMinutes: webinar.durationMinutes,
+    zoomWebinarId: webinar.zoomWebinarId,
+    zoomJoinUrl: webinar.zoomJoinUrl,
+    replayUrl: webinar.replayUrl,
+    label: webinar.title,
+    isWebinarDefaultSession: true,
+  }];
+}
 
 export const landingPagesRouter = router({
   list: protectedProcedure.query(() => getLandingPagesWithLeadCount()),
@@ -19,7 +39,7 @@ export const landingPagesRouter = router({
       // Also fetch webinar sessions if linked
       let sessions: any[] = [];
       if (page.webinarId) {
-        sessions = await getWebinarSessions(page.webinarId);
+        sessions = await getLandingPageSessions(page.webinarId);
       }
       return { ...page, sessions };
     }),
@@ -31,7 +51,7 @@ export const landingPagesRouter = router({
       if (!page) return null;
       let sessions: any[] = [];
       if (page.webinarId) {
-        sessions = await getWebinarSessions(page.webinarId);
+        sessions = await getLandingPageSessions(page.webinarId);
       }
       return { ...page, sessions };
     }),

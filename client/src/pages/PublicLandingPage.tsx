@@ -269,6 +269,7 @@ export default function PublicLandingPage() {
     mediaItems?.filter(m => m.placement === "foreground_image" && m.media && m.media.fileUrl !== page?.artworkUrl) || [], [mediaItems, page?.artworkUrl]);
 
   const showField = (key: string) => enabledFields.includes(key);
+  const getSessionValue = (session: any) => String(session.id);
   const accentColor = page?.accentColor || "#C9A84C";
   const hasHtmlBackground = !!(page as any)?.backgroundHtmlUrl;
   const hasImageBackground = !!page?.artworkUrl && !hasHtmlBackground;
@@ -279,6 +280,23 @@ export default function PublicLandingPage() {
   const formEmbedded = !!(page as any)?.formEmbedded && hasHtmlBackground;
   // logoOnBackground only applies in non-embedded mode (embedded mode has the logo inside the form card in the HTML)
   const logoOnBackground = !!(page as any)?.logoOnHtmlBackground && hasHtmlBackground && !formEmbedded;
+
+  useEffect(() => {
+    if (!enabledFields.includes("sessionSelect")) {
+      if (selectedSessionId) setSelectedSessionId("");
+      return;
+    }
+
+    const sessionValues = sessions.map(getSessionValue);
+    if (selectedSessionId && !sessionValues.includes(selectedSessionId)) {
+      setSelectedSessionId("");
+      return;
+    }
+
+    if (!selectedSessionId && sessionValues.length === 1) {
+      setSelectedSessionId(sessionValues[0]);
+    }
+  }, [enabledFields, sessions, selectedSessionId]);
 
   // ─── Fetch HTML for embedded mode ───
   useEffect(() => {
@@ -411,6 +429,7 @@ export default function PublicLandingPage() {
   }
 
   const handleSubmit = () => {
+    const webinarSessionId = /^\d+$/.test(selectedSessionId) ? Number(selectedSessionId) : undefined;
     submitLead.mutate({
       slug: params.slug,
       firstName: form.firstName,
@@ -419,7 +438,7 @@ export default function PublicLandingPage() {
       phone: form.phone || undefined,
       smsConsent,
       contactOptIn,
-      webinarSessionId: selectedSessionId ? Number(selectedSessionId) : undefined,
+      webinarSessionId,
     });
   };
 
@@ -538,7 +557,7 @@ export default function PublicLandingPage() {
               </SelectTrigger>
               <SelectContent>
                 {sessions.map((s: any) => (
-                  <SelectItem key={s.id} value={String(s.id)}>
+                  <SelectItem key={getSessionValue(s)} value={getSessionValue(s)}>
                     <div className="flex items-center gap-2">
                       <Calendar className="h-3.5 w-3.5" />
                       <span>
@@ -716,7 +735,7 @@ export default function PublicLandingPage() {
                             <SelectTrigger className="mt-1 bg-gray-50/80 border-gray-200 text-gray-900"><SelectValue placeholder="Choose a date..." /></SelectTrigger>
                             <SelectContent>
                               {sessions.map((s: any) => (
-                                <SelectItem key={s.id} value={String(s.id)}>
+                                <SelectItem key={getSessionValue(s)} value={getSessionValue(s)}>
                                   <div className="flex items-center gap-2">
                                     <Calendar className="h-3.5 w-3.5" />
                                     <span>{new Date(s.sessionDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}{" at "}{new Date(s.sessionDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
