@@ -38,7 +38,12 @@ async function startServer() {
   // ── Startup environment validation ──────────────────────────────────────────
   const missingEnvVars: string[] = [];
   if (!process.env.JWT_SECRET) missingEnvVars.push("JWT_SECRET");
-  if (!process.env.DATABASE_URL) missingEnvVars.push("DATABASE_URL");
+  // DB can be configured via either DATABASE_URL or the discrete DB_* vars.
+  const hasDiscreteDbVars =
+    !!process.env.DB_HOST && !!process.env.DB_USER && !!process.env.DB_NAME;
+  if (!process.env.DATABASE_URL && !hasDiscreteDbVars) {
+    missingEnvVars.push("DATABASE_URL or DB_HOST/DB_USER/DB_NAME");
+  }
   if (missingEnvVars.length > 0) {
     console.error(
       `[Startup] CRITICAL: Missing required environment variables: ${missingEnvVars.join(", ")}. ` +
@@ -54,6 +59,18 @@ async function startServer() {
         "Sessions will be invalidated on every restart until you set JWT_SECRET permanently."
       );
     }
+  }
+
+  // Warm up the DB connection at startup so [Database] log lines appear in
+  // the boot log (and misconfiguration is caught immediately, not on the
+  // first user action). Failure here is non-fatal — getDb() will retry and
+  // surface the same error to whichever endpoint is hit first.
+  try {
+    const { getDb } = await import("../db");
+    await getDb();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[Startup] DB warm-up failed (server will still start): ${msg}`);
   }
 
   const app = express();
