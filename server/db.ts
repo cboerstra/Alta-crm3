@@ -40,31 +40,77 @@ export async function getPool(): Promise<mysql2.Pool> {
   return _pool;
 }
 
+type PoolOptions = mysql2.PoolOptions;
+
+/**
+ * Build a mysql2 PoolOptions object from environment variables.
+ *
+ * Supports two configuration styles, in this order of preference:
+ *   1) Discrete vars: DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT.
+ *      Password is passed raw — no URL-encoding required. Recommended on
+ *      Hostinger where auto-generated passwords frequently contain '#', '@',
+ *      '/', '+', '%' which break URI parsing.
+ *   2) DATABASE_URL: classic mysql://USER:PASS@HOST:PORT/DBNAME. Special
+ *      characters in the password MUST be percent-encoded.
+ *
+ * SSL: enabled by default with rejectUnauthorized=false (works with
+ * Hostinger's shared-host self-signed certs). Set DB_SSL=false to disable.
+ */
+function buildPoolOptions(): { options: PoolOptions; describe: string } {
+  const sslEnabled = (process.env.DB_SSL ?? "true").toLowerCase() !== "false";
+  const ssl = sslEnabled ? { rejectUnauthorized: false } : undefined;
+
+  const host = process.env.DB_HOST;
+  const user = process.env.DB_USER;
+  const password = process.env.DB_PASSWORD;
+  const database = process.env.DB_NAME;
+
+  if (host && user && database) {
+    const port = process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306;
+    if (Number.isNaN(port)) {
+      throw new Error(`DB_PORT must be a number, got "${process.env.DB_PORT}"`);
+    }
+    return {
+      options: { host, port, user, password: password ?? "", database, ssl },
+      describe: `host=${host} port=${port} user=${user} db=${database} ssl=${sslEnabled}`,
+    };
+  }
+
+  const url = process.env.DATABASE_URL;
+  if (url) {
+    const hasExplicitSsl = url.includes("ssl=") || url.includes("sslmode=");
+    return {
+      options: hasExplicitSsl ? { uri: url } : { uri: url, ssl },
+      describe: `uri=DATABASE_URL ssl=${sslEnabled}`,
+    };
+  }
+
+  throw new Error(
+    "Database is not configured. Set discrete vars (recommended on Hostinger): " +
+      "DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME — or set DATABASE_URL " +
+      "as mysql://USER:PASS@HOST:3306/DBNAME (password must be URL-encoded)."
+  );
+}
+
 export async function getDb() {
   if (_db) return _db;
   if (_dbInitError) throw new Error(_dbInitError);
 
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    const msg = "DATABASE_URL environment variable is not set. " +
-      "Add it in Hostinger → Node.js → Environment Variables as: " +
-      "mysql://USER:PASS@HOST:3306/DBNAME";
+  let opts: PoolOptions;
+  let describe: string;
+  try {
+    ({ options: opts, describe } = buildPoolOptions());
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
     _dbInitError = msg;
+    console.error("[Database]", msg);
     throw new Error(msg);
   }
 
+  console.log(`[Database] Connecting: ${describe}`);
+
   try {
-    // Parse the URL to decide whether to add SSL.
-    // Hostinger remote MySQL (and most cloud MySQL) requires SSL.
-    // If the URL already contains ssl= params, respect them.
-    // Otherwise add ssl: { rejectUnauthorized: false } as a safe default
-    // that works with self-signed certs common on shared hosting.
-    const hasExplicitSsl = url.includes("ssl=") || url.includes("sslmode=");
-    const pool = mysql2.createPool(
-      hasExplicitSsl
-        ? { uri: url }
-        : { uri: url, ssl: { rejectUnauthorized: false } }
-    );
+    const pool = mysql2.createPool(opts);
 
     // Test the connection immediately so we get a clear error at startup
     // rather than a cryptic failure on the first user action.
@@ -77,7 +123,7 @@ export async function getDb() {
     return _db;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    _dbInitError = `Database connection failed: ${msg}. Check DATABASE_URL and ensure the MySQL server is reachable.`;
+    _dbInitError = `Database connection failed: ${msg}. Verify DB_HOST/DB_USER/DB_PASSWORD/DB_NAME (or DATABASE_URL) and that the MySQL server is reachable from this host.`;
     console.error("[Database]", _dbInitError);
     throw new Error(_dbInitError);
   }
