@@ -106,6 +106,12 @@ function serializeHtmlDocument(doc: Document, originalHtml: string) {
   return /^\s*<!doctype/i.test(originalHtml) ? `<!DOCTYPE html>\n${serialized}` : serialized;
 }
 
+function normalizeCopyrightYear(html: string) {
+  return html
+    .replace(/(&copy;|©)\s*(?:20\d{2})/gi, "$1 2026")
+    .replace(/\bCopyright\s+(?:20\d{2})/gi, "Copyright 2026");
+}
+
 function replaceElementWithAltaForm(element: Element) {
   element.insertAdjacentHTML("beforebegin", ALTA_FORM_BLOCK);
   element.remove();
@@ -150,36 +156,39 @@ function findFormLikeContainer(doc: Document) {
 }
 
 function smartPrepareLandingPageHtml(html: string) {
-  if (html.includes("{{alta_form}}")) {
-    if (html.includes("alta-crm-form-shell")) return { html, changed: false };
+  const yearNormalizedHtml = normalizeCopyrightYear(html);
+  const yearChanged = yearNormalizedHtml !== html;
+
+  if (yearNormalizedHtml.includes("{{alta_form}}")) {
+    if (yearNormalizedHtml.includes("alta-crm-form-shell")) return { html: yearNormalizedHtml, changed: yearChanged };
     return {
-      html: html.replace(/\{\{alta_form\}\}/g, ALTA_FORM_BLOCK),
+      html: yearNormalizedHtml.replace(/\{\{alta_form\}\}/g, ALTA_FORM_BLOCK),
       changed: true,
     };
   }
 
   const fallbackInsert = () => ({
-    html: /<\/body>/i.test(html)
-      ? html.replace(/<\/body>/i, `${ALTA_FORM_BLOCK}\n</body>`)
-      : `${html}\n${ALTA_FORM_BLOCK}`,
+    html: /<\/body>/i.test(yearNormalizedHtml)
+      ? yearNormalizedHtml.replace(/<\/body>/i, `${ALTA_FORM_BLOCK}\n</body>`)
+      : `${yearNormalizedHtml}\n${ALTA_FORM_BLOCK}`,
     changed: true,
   });
 
   if (typeof DOMParser === "undefined") return fallbackInsert();
 
-  const doc = new DOMParser().parseFromString(html, "text/html");
+  const doc = new DOMParser().parseFromString(yearNormalizedHtml, "text/html");
   if (!doc.body) return fallbackInsert();
 
   const existingForm = doc.querySelector("form");
   if (existingForm) {
     replaceElementWithAltaForm(existingForm);
-    return { html: serializeHtmlDocument(doc, html), changed: true };
+    return { html: serializeHtmlDocument(doc, yearNormalizedHtml), changed: true };
   }
 
   const formLikeContainer = findFormLikeContainer(doc);
   if (formLikeContainer) {
     replaceElementWithAltaForm(formLikeContainer);
-    return { html: serializeHtmlDocument(doc, html), changed: true };
+    return { html: serializeHtmlDocument(doc, yearNormalizedHtml), changed: true };
   }
 
   const target = doc.querySelector(
@@ -187,17 +196,17 @@ function smartPrepareLandingPageHtml(html: string) {
   );
   if (target) {
     target.insertAdjacentHTML("beforeend", ALTA_FORM_BLOCK);
-    return { html: serializeHtmlDocument(doc, html), changed: true };
+    return { html: serializeHtmlDocument(doc, yearNormalizedHtml), changed: true };
   }
 
   const footer = doc.querySelector("footer");
   if (footer) {
     footer.insertAdjacentHTML("beforebegin", ALTA_FORM_BLOCK);
-    return { html: serializeHtmlDocument(doc, html), changed: true };
+    return { html: serializeHtmlDocument(doc, yearNormalizedHtml), changed: true };
   }
 
   doc.body.insertAdjacentHTML("beforeend", ALTA_FORM_BLOCK);
-  return { html: serializeHtmlDocument(doc, html), changed: true };
+  return { html: serializeHtmlDocument(doc, yearNormalizedHtml), changed: true };
 }
 
 async function prepareHtmlFileForLandingPage(file: File) {
