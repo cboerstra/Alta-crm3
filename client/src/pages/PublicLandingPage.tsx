@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useParams } from "wouter";
+import { useLocation, useParams } from "wouter";
 import { CheckCircle, Loader2, Calendar, Clock } from "lucide-react";
 
 const TEMPLATE_HEAD_ATTR = "data-alta-template-head";
@@ -227,6 +227,7 @@ function runScripts(container: HTMLElement, baseUrl: string) {
 
 export default function PublicLandingPage() {
   const params = useParams<{ slug: string }>();
+  const [, navigate] = useLocation();
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "" });
   const [smsConsent, setSmsConsent] = useState(false);
   const [contactOptIn, setContactOptIn] = useState(false);
@@ -248,7 +249,13 @@ export default function PublicLandingPage() {
   const submitLead = trpc.leads.captureFromLandingPage.useMutation({
     onSuccess: (data) => {
       setSubmitted(true);
-      if (data.joinUrl) setJoinUrl(data.joinUrl);
+      if (data.joinUrl) {
+        setJoinUrl(data.joinUrl);
+        window.sessionStorage.setItem(`lp:${params.slug}:joinUrl`, data.joinUrl);
+      } else {
+        window.sessionStorage.removeItem(`lp:${params.slug}:joinUrl`);
+      }
+      navigate(`/lp/${params.slug}/thanks`);
     },
     onError: () => setSubmitted(true),
   });
@@ -270,6 +277,12 @@ export default function PublicLandingPage() {
 
   const showField = (key: string) => enabledFields.includes(key);
   const getSessionValue = (session: any) => String(session.id);
+  const formatSessionLabel = (session: any) => {
+    const date = new Date(session.sessionDate);
+    const datePart = date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    const timePart = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    return `${datePart} at ${timePart}${session.label ? ` - ${session.label}` : ""}`;
+  };
   const accentColor = page?.accentColor || "#C9A84C";
   const hasHtmlBackground = !!(page as any)?.backgroundHtmlUrl;
   const hasImageBackground = !!page?.artworkUrl && !hasHtmlBackground;
@@ -280,6 +293,12 @@ export default function PublicLandingPage() {
   const formEmbedded = !!(page as any)?.formEmbedded && hasHtmlBackground;
   // logoOnBackground only applies in non-embedded mode (embedded mode has the logo inside the form card in the HTML)
   const logoOnBackground = !!(page as any)?.logoOnHtmlBackground && hasHtmlBackground && !formEmbedded;
+  const isThanksPage = window.location.pathname.replace(/\/+$/, "").endsWith("/thanks");
+
+  useEffect(() => {
+    if (!isThanksPage) return;
+    setJoinUrl(window.sessionStorage.getItem(`lp:${params.slug}:joinUrl`));
+  }, [isThanksPage, params.slug]);
 
   useEffect(() => {
     if (!enabledFields.includes("sessionSelect")) {
@@ -379,7 +398,7 @@ export default function PublicLandingPage() {
   }
 
   // ─── Success Screen ───
-  if (submitted) {
+  if (submitted || isThanksPage) {
     return (
       <div className="min-h-screen relative flex items-center justify-center">
         {hasHtmlBackground && (
@@ -557,13 +576,11 @@ export default function PublicLandingPage() {
               </SelectTrigger>
               <SelectContent>
                 {sessions.map((s: any) => (
-                  <SelectItem key={getSessionValue(s)} value={getSessionValue(s)}>
+                  <SelectItem key={getSessionValue(s)} value={getSessionValue(s)} textValue={formatSessionLabel(s)}>
                     <div className="flex items-center gap-2">
                       <Calendar className="h-3.5 w-3.5" />
                       <span>
-                        {new Date(s.sessionDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                        {" at "}
-                        {new Date(s.sessionDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                        {formatSessionLabel(s).replace(/ - .+$/, "")}
                       </span>
                       {s.label && <span className="text-muted-foreground">— {s.label}</span>}
                     </div>
@@ -735,10 +752,10 @@ export default function PublicLandingPage() {
                             <SelectTrigger className="mt-1 bg-gray-50/80 border-gray-200 text-gray-900"><SelectValue placeholder="Choose a date..." /></SelectTrigger>
                             <SelectContent>
                               {sessions.map((s: any) => (
-                                <SelectItem key={getSessionValue(s)} value={getSessionValue(s)}>
+                                <SelectItem key={getSessionValue(s)} value={getSessionValue(s)} textValue={formatSessionLabel(s)}>
                                   <div className="flex items-center gap-2">
                                     <Calendar className="h-3.5 w-3.5" />
-                                    <span>{new Date(s.sessionDate).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}{" at "}{new Date(s.sessionDate).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
+                                    <span>{formatSessionLabel(s).replace(/ - .+$/, "")}</span>
                                     {s.label && <span className="text-muted-foreground">— {s.label}</span>}
                                   </div>
                                 </SelectItem>

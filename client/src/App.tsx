@@ -93,6 +93,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/setup" component={Setup} />
       {/* Public routes */}
+      <Route path="/lp/:slug/thanks" component={PublicLandingPage} />
       <Route path="/lp/:slug" component={PublicLandingPage} />
       <Route path="/schedule/:slug" component={PublicBooking} />
       <Route path="/privacy" component={PrivacyPolicy} />
