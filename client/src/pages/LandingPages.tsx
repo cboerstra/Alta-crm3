@@ -97,6 +97,73 @@ const defaultForm: FormState = {
   confirmationEmailBody: DEFAULT_EMAIL_BODY,
 };
 
+const ALTA_FORM_BLOCK = `<div class="alta-crm-form-shell">
+  {{alta_form}}
+</div>`;
+
+function serializeHtmlDocument(doc: Document, originalHtml: string) {
+  const serialized = doc.documentElement.outerHTML;
+  return /^\s*<!doctype/i.test(originalHtml) ? `<!DOCTYPE html>\n${serialized}` : serialized;
+}
+
+function smartPrepareLandingPageHtml(html: string) {
+  if (html.includes("{{alta_form}}")) {
+    if (html.includes("alta-crm-form-shell")) return { html, changed: false };
+    return {
+      html: html.replace(/\{\{alta_form\}\}/g, ALTA_FORM_BLOCK),
+      changed: true,
+    };
+  }
+
+  const fallbackInsert = () => ({
+    html: /<\/body>/i.test(html)
+      ? html.replace(/<\/body>/i, `${ALTA_FORM_BLOCK}\n</body>`)
+      : `${html}\n${ALTA_FORM_BLOCK}`,
+    changed: true,
+  });
+
+  if (typeof DOMParser === "undefined") return fallbackInsert();
+
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  if (!doc.body) return fallbackInsert();
+
+  const existingForm = doc.querySelector("form");
+  if (existingForm) {
+    existingForm.insertAdjacentHTML("beforebegin", ALTA_FORM_BLOCK);
+    existingForm.remove();
+    return { html: serializeHtmlDocument(doc, html), changed: true };
+  }
+
+  const target = doc.querySelector(
+    '#register, #signup, #sign-up, #contact, [id*="register" i], [id*="signup" i], [class*="register" i], [class*="signup" i], [class*="cta" i]'
+  );
+  if (target) {
+    target.insertAdjacentHTML("beforeend", ALTA_FORM_BLOCK);
+    return { html: serializeHtmlDocument(doc, html), changed: true };
+  }
+
+  const footer = doc.querySelector("footer");
+  if (footer) {
+    footer.insertAdjacentHTML("beforebegin", ALTA_FORM_BLOCK);
+    return { html: serializeHtmlDocument(doc, html), changed: true };
+  }
+
+  doc.body.insertAdjacentHTML("beforeend", ALTA_FORM_BLOCK);
+  return { html: serializeHtmlDocument(doc, html), changed: true };
+}
+
+async function prepareHtmlFileForLandingPage(file: File) {
+  const html = await file.text();
+  const prepared = smartPrepareLandingPageHtml(html);
+  if (!prepared.changed) return { file, changed: false };
+
+  const preparedName = file.name.replace(/\.html?$/i, "") + "-alta-ready.html";
+  return {
+    file: new File([prepared.html], preparedName, { type: "text/html" }),
+    changed: true,
+  };
+}
+
 function RequiredStar() {
   return <span className="text-red-500 ml-0.5 font-bold">*</span>;
 }
@@ -306,7 +373,7 @@ export default function LandingPages() {
     if (pendingHtmlFile) {
       try {
         const url = await uploadFileAndGetUrl("/api/upload-html", pendingHtmlFile);
-        updateMutation.mutate({ id: pageId, backgroundHtmlUrl: url });
+        updateMutation.mutate({ id: pageId, backgroundHtmlUrl: url, formEmbedded });
       } catch (err: any) {
         toast.error("Failed to upload HTML background: " + err.message);
       }
@@ -401,14 +468,19 @@ export default function LandingPages() {
     if (!isHtmlFile) { toast.error("Please upload an HTML file"); return; }
     if (file.size > 10 * 1024 * 1024) { toast.error("HTML file must be under 10MB"); return; }
 
-    const previewUrl = URL.createObjectURL(file);
+    const { file: preparedFile, changed } = await prepareHtmlFileForLandingPage(file);
+    const previewUrl = URL.createObjectURL(preparedFile);
     setBackgroundHtmlPreview(previewUrl);
+    setFormEmbedded(true);
+    if (changed) {
+      toast.success("Smart HTML Import added the CRM form placeholder and enabled embedded mode.");
+    }
 
     if (editId) {
       setUploading(true);
       try {
-        const url = await uploadFileAndGetUrl("/api/upload-html", file);
-        updateArtworkMutation.mutate({ id: editId, backgroundHtmlUrl: url });
+        const url = await uploadFileAndGetUrl("/api/upload-html", preparedFile);
+        updateArtworkMutation.mutate({ id: editId, backgroundHtmlUrl: url, formEmbedded: true });
         setBackgroundHtmlPreview(url);
       } catch (err: any) {
         toast.error("Failed to upload HTML background: " + err.message);
@@ -417,7 +489,7 @@ export default function LandingPages() {
         setUploading(false);
       }
     } else {
-      setPendingHtmlFile(file);
+      setPendingHtmlFile(preparedFile);
     }
 
     if (htmlRef.current) htmlRef.current.value = "";
@@ -1208,7 +1280,7 @@ export default function LandingPages() {
                 <div>
                   <Label className="mb-2 block font-semibold">HTML Background Template</Label>
                   <p className="text-xs text-muted-foreground mb-3">
-                    Upload an HTML file to use as the landing page background behind the form. This is useful for custom animated or designed backgrounds.
+                    Upload an HTML file and Smart HTML Import will prepare it for the CRM form automatically. If the file does not include <code className="bg-muted px-1 rounded text-[11px]">{"{{alta_form}}"}</code>, the importer inserts it near the best registration area and enables embedded mode.
                   </p>
 
                   {backgroundHtmlPreview ? (
@@ -1263,8 +1335,8 @@ export default function LandingPages() {
                       className="w-full h-44 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-brand-green/50 hover:text-brand-green transition-colors cursor-pointer bg-muted/20"
                     >
                       <FileCode2 className="h-8 w-8" />
-                      <span className="text-sm font-medium">Drag and drop HTML background</span>
-                      <span className="text-xs">or click to browse `.html` files up to 10MB</span>
+                      <span className="text-sm font-medium">Drag and drop HTML landing page</span>
+                      <span className="text-xs">Smart HTML Import prepares `.html` files up to 10MB</span>
                     </div>
                   )}
                   <input
