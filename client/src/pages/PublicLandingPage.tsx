@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { useLocation, useParams } from "wouter";
 import { CheckCircle, Loader2, Calendar, Clock } from "lucide-react";
 
@@ -277,6 +277,7 @@ export default function PublicLandingPage() {
 
   const showField = (key: string) => enabledFields.includes(key);
   const getSessionValue = (session: any) => String(session.id);
+  const selectedSession = sessions.find((session: any) => getSessionValue(session) === selectedSessionId);
   const formatSessionLabel = (session: any) => {
     const date = new Date(session.sessionDate);
     const datePart = date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
@@ -572,7 +573,9 @@ export default function PublicLandingPage() {
             <Label className="text-xs font-semibold uppercase tracking-wider text-gray-500" style={embeddedLabelStyle}>Select Seminar Date *</Label>
             <Select value={selectedSessionId} onValueChange={setSelectedSessionId}>
               <SelectTrigger className="mt-1 bg-gray-50/80 border-gray-200 text-gray-900">
-                <SelectValue placeholder="Choose a date..." />
+                <span className="flex-1 truncate text-left text-gray-900" style={{ color: "#111827" }}>
+                  {selectedSession ? formatSessionLabel(selectedSession) : "Choose a date..."}
+                </span>
               </SelectTrigger>
               <SelectContent>
                 {sessions.map((s: any) => (
@@ -749,7 +752,11 @@ export default function PublicLandingPage() {
                         <div>
                           <Label className="text-xs font-semibold uppercase tracking-wider text-gray-500">Select Seminar Date *</Label>
                           <Select value={selectedSessionId} onValueChange={setSelectedSessionId}>
-                            <SelectTrigger className="mt-1 bg-gray-50/80 border-gray-200 text-gray-900"><SelectValue placeholder="Choose a date..." /></SelectTrigger>
+                            <SelectTrigger className="mt-1 bg-gray-50/80 border-gray-200 text-gray-900">
+                              <span className="flex-1 truncate text-left text-gray-900" style={{ color: "#111827" }}>
+                                {selectedSession ? formatSessionLabel(selectedSession) : "Choose a date..."}
+                              </span>
+                            </SelectTrigger>
                             <SelectContent>
                               {sessions.map((s: any) => (
                                 <SelectItem key={getSessionValue(s)} value={getSessionValue(s)} textValue={formatSessionLabel(s)}>
