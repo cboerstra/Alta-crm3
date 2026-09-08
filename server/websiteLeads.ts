@@ -30,20 +30,62 @@ import { createLead, logActivity, notifyAdminsBySms } from "./db";
 import { notifyOwner } from "./_core/notification";
 import { sendSmsOptInConfirmation } from "./smsReminderService";
 
-export function registerWebsiteLeadRoute(app: Router) {
-  // Allow preflight OPTIONS requests from altamortgagegroup.net
-  app.options("/api/website-lead", (req, res) => {
+/**
+ * Origins allowed to call this endpoint from a browser.
+ *
+ * WEBSITE_ORIGIN is a comma-separated list, e.g.
+ *   WEBSITE_ORIGIN=https://altamortgagegroup.net,https://www.altamortgagegroup.net
+ *
+ * Note this only constrains BROWSER callers. The website's own server-side
+ * forward sends no Origin header and is not subject to CORS at all, so
+ * tightening this does not affect it — the API key remains the real guard.
+ */
+function allowedOrigins(): string[] {
+  return (process.env.WEBSITE_ORIGIN ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+}
+
+let warnedAboutWildcard = false;
+
+function applyCorsHeaders(req: { headers: Record<string, unknown> }, res: {
+  setHeader: (name: string, value: string) => void;
+}) {
+  const allowed = allowedOrigins();
+  const origin = typeof req.headers.origin === "string" ? req.headers.origin : undefined;
+
+  if (allowed.length === 0) {
+    // Unconfigured. Keep the previous permissive behaviour rather than break a
+    // live deployment on upgrade, but say so loudly once per process.
+    if (!warnedAboutWildcard) {
+      console.warn(
+        "[WebsiteLead] WEBSITE_ORIGIN is not set — allowing any browser origin. " +
+          "Set it to the site origin(s) to restrict this endpoint."
+      );
+      warnedAboutWildcard = true;
+    }
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  } else if (origin && allowed.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
+  // An origin that is set but not allowed gets no CORS header, so the browser
+  // blocks the response.
+
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
+export function registerWebsiteLeadRoute(app: Router) {
+  // Allow preflight OPTIONS requests from the configured website origin(s)
+  app.options("/api/website-lead", (req, res) => {
+    applyCorsHeaders(req, res);
     res.status(204).end();
   });
 
   app.post("/api/website-lead", async (req, res) => {
-    // CORS headers — allow requests from the mortgage website
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    applyCorsHeaders(req, res);
     try {
       const {
         apiKey,
