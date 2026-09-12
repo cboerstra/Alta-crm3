@@ -274,6 +274,16 @@ pm2 start dist/index.js --name clarke-crm
 
 The server will start on the port defined by the `PORT` environment variable (defaults to 3000). In production, place a reverse proxy (Nginx or Caddy) in front to handle SSL termination.
 
+### 6.6a Updating a Running Install (Hostinger)
+
+Once the app is installed and running under PM2, every later update is one command from the app directory:
+
+```bash
+bash scripts/deploy-hostinger.sh
+```
+
+It pulls `main`, installs from the lockfile, builds, and restarts the PM2 process (default name `clarke-crm`; set `PM2_NAME` if yours differs — check with `pm2 list`). It stops at the first failure so a broken build never replaces the running one, and warns about `.env` entries it expects but does not edit `.env`.
+
 ### 6.7 Reverse Proxy Configuration (Nginx Example)
 
 ```nginx
