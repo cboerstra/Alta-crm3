@@ -19,6 +19,7 @@ import { integrationsRouter } from "./routers/integrations";
 import { mediaRouter } from "./routers/media";
 import { userManagementRouter } from "./routers/userManagement";
 import { smsTemplatesRouter } from "./routers/smsTemplates";
+import { applicationsRouter } from "./routers/applications";
 
 export const appRouter = router({
   system: systemRouter,
@@ -113,6 +114,7 @@ export const appRouter = router({
   media: mediaRouter,
   userManagement: userManagementRouter,
   smsTemplates: smsTemplatesRouter,
+  applications: applicationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

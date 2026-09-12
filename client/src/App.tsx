@@ -8,6 +8,8 @@ import DashboardLayout from "./components/DashboardLayout";
 import Home from "./pages/Home";
 import Leads from "./pages/Leads";
 import LeadProfile from "./pages/LeadProfile";
+import Applications from "./pages/Applications";
+import ApplicationDetail from "./pages/ApplicationDetail";
 import Pipeline from "./pages/Pipeline";
 import Webinars from "./pages/Webinars";
 import WebinarDetail from "./pages/WebinarDetail";
@@ -66,6 +68,8 @@ function CRMRoutes() {
         <Route path="/" component={Home} />
         <Route path="/leads" component={Leads} />
         <Route path="/leads/:id" component={LeadProfile} />
+        <Route path="/applications" component={Applications} />
+        <Route path="/applications/:ref" component={ApplicationDetail} />
         <Route path="/pipeline" component={Pipeline} />
         <Route path="/webinars" component={Webinars} />
         <Route path="/webinars/:id" component={WebinarDetail} />

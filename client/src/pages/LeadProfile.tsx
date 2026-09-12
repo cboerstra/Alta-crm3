@@ -9,10 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { useLocation, useParams } from "wouter";
+import { Link as RouteLink, useLocation, useParams } from "wouter";
 import {
   ArrowLeft, Mail, Phone, MapPin, Calendar, MessageSquare, Send,
   Sparkles, Clock, User, FileText, Zap, ChevronRight, Link, CheckCircle, XCircle, AlertCircle,
+  ClipboardList,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -52,6 +53,15 @@ export default function LeadProfile() {
   const [includeWebinarLink, setIncludeWebinarLink] = useState(false);
 
   const { data: lead, refetch } = trpc.leads.getById.useQuery({ id: leadId });
+  // The website's staff API matches by exact email. Silent on any failure:
+  // this link is a convenience, not something the profile depends on.
+  const { data: websiteApps } = trpc.applications.list.useQuery(
+    { q: lead?.email ?? "" },
+    { enabled: Boolean(lead?.email), retry: false }
+  );
+  const websiteApplication = websiteApps?.items.find(
+    (a) => a.email.toLowerCase() === (lead?.email ?? "").toLowerCase()
+  );
   const { data: activity, refetch: refetchActivity } = trpc.leads.getActivity.useQuery({ leadId });
   const { data: smsMessages, refetch: refetchSms } = trpc.sms.getByLead.useQuery({ leadId });
   const { data: communications } = trpc.leads.getCommunications.useQuery({ leadId });
@@ -130,6 +140,14 @@ export default function LeadProfile() {
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Mail className="h-4 w-4" /> {lead.email}
                 </div>
+                {websiteApplication && (
+                  <div className="flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                    <RouteLink href={`/applications/${websiteApplication.refNumber}`} className="text-primary hover:underline">
+                      View application {websiteApplication.refNumber}
+                    </RouteLink>
+                  </div>
+                )}
                 {lead.phone && (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Phone className="h-4 w-4" /> {lead.phone}

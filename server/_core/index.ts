@@ -13,6 +13,7 @@ import { serveStatic, setupVite } from "./vite";
 import { processPendingReminders } from "../emailService";
 import { processPendingSmsReminders } from "../smsReminderService";
 import { registerWebsiteLeadRoute } from "../websiteLeads";
+import { registerMismoDownloadRoute } from "../websiteStaffApi";
 import { getIntegration, createSmsMessage, logActivity, getLeads, updateLead, migrateDefaultSmsTemplates, runAutoMigrations } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -83,6 +84,9 @@ async function startServer() {
 
   // ── Website Lead Capture (from altamortgagegroup.net) ───────────────────────
   registerWebsiteLeadRoute(app);
+
+  // ── Mortgage application documents (read from altamortgagegroup.net) ───────
+  registerMismoDownloadRoute(app);
 
   // ── Telnyx SMS Webhooks ──────────────────────────────────────────────────────
   // Primary webhook: receives inbound SMS from Telnyx

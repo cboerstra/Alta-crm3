@@ -165,7 +165,20 @@ The following environment variables must be configured for the application to fu
 | `VITE_FRONTEND_FORGE_API_KEY` | Bearer token for frontend Manus API access |
 | `VITE_FRONTEND_FORGE_API_URL` | Manus API URL for frontend |
 
-### 5.5 Optional Integration Variables
+### 5.5 Website Link (altamortgagegroup.net)
+
+Two shared secrets connect the CRM and the public website. They point in opposite directions and must be different values.
+
+| Variable | Direction | Description |
+|---|---|---|
+| `WEBSITE_API_KEY` | Website → CRM | The website posts new leads and applications to `/api/website-lead` with this key. Must match `CRM_API_KEY` on the website. |
+| `WEBSITE_ORIGIN` | Website → CRM | Comma-separated origins allowed to call `/api/website-lead`, e.g. `https://altamortgagegroup.net`. |
+| `WEBSITE_STAFF_API_URL` | CRM → Website | Base URL of the website's staff API: `https://altamortgagegroup.net/api/staff`. Powers the **Applications** page and MISMO downloads. |
+| `WEBSITE_STAFF_API_KEY` | CRM → Website | Must match `STAFF_API_KEY` on the website. Held only by the CRM server; never sent to the browser. |
+
+If the two `WEBSITE_STAFF_*` variables are unset, the Applications page shows "Website not connected" and nothing else is affected. After editing `.env` on the server, run `pm2 restart clarke-crm`.
+
+### 5.6 Optional Integration Variables
 
 These are configured through the CRM Settings page at runtime, not as environment variables.
 

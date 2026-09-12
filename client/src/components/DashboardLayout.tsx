@@ -40,6 +40,7 @@ import {
   ShieldCheck,
   Shield,
   MessageSquare,
+  ClipboardList,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -58,6 +59,7 @@ type MenuItem = {
 const menuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/", section: "main" },
   { icon: Users, label: "Leads", path: "/leads", section: "main" },
+  { icon: ClipboardList, label: "Applications", path: "/applications", section: "main" },
   { icon: Columns3, label: "Pipeline", path: "/pipeline", section: "main" },
   { icon: Video, label: "Webinars", path: "/webinars", section: "main" },
   { icon: FileText, label: "Landing Pages", path: "/landing-pages", section: "main" },
