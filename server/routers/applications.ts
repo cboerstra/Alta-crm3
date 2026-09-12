@@ -12,6 +12,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import {
   getApplication,
   isWebsiteStaffApiConfigured,
+  listApplicationDocuments,
   listApplications,
   listDrafts,
   WebsiteApiError,
@@ -61,6 +62,17 @@ export const applicationsRouter = router({
     .query(async ({ input }) => {
       try {
         return await getApplication(input.refNumber);
+      } catch (err) {
+        throw toTrpcError(err);
+      }
+    }),
+
+  /** Documents the borrower uploaded through the website portal. */
+  documents: protectedProcedure
+    .input(z.object({ refNumber: z.string().trim().min(1).max(20) }))
+    .query(async ({ input }) => {
+      try {
+        return await listApplicationDocuments(input.refNumber);
       } catch (err) {
         throw toTrpcError(err);
       }

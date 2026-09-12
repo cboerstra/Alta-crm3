@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ApplicationDocuments } from "@/components/ApplicationDocuments";
 import { AlertCircle, ArrowLeft, Download, FileText } from "lucide-react";
 
 function when(iso: string): string {
@@ -105,6 +106,8 @@ export default function ApplicationDetail() {
                 </CardContent>
               </Card>
             )}
+
+            <ApplicationDocuments refNumber={app.refNumber} />
           </div>
 
           <div className="space-y-6">

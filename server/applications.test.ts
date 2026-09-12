@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Express, Request, Response } from "express";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
-import { registerMismoDownloadRoute } from "./websiteStaffApi";
+import { registerDocumentDownloadRoute, registerMismoDownloadRoute } from "./websiteStaffApi";
 
 vi.mock("./_core/sdk", () => ({
   sdk: { authenticateRequest: vi.fn() },
@@ -74,6 +74,7 @@ function configure() {
 describe("applications router", () => {
   it("refuses every procedure without a session", async () => {
     const caller = appRouter.createCaller(ctx(null));
+    await expect(caller.applications.documents({ refNumber: "ALT-AAAAA" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.applications.status()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.applications.list({})).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.applications.get({ refNumber: "ALT-AAAAA" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
@@ -210,5 +211,75 @@ describe("GET /api/applications/:ref/mismo", () => {
     await handler({ params: { ref: "ALT-AAAAA" } } as unknown as Request, res);
     expect(res.statusCode).toBe(409);
     expect((res.body as { error: string }).error).toContain("No MISMO document");
+  });
+});
+
+describe("GET /api/applications/documents/:id", () => {
+  type Handler = (req: Request, res: Response) => Promise<void>;
+  let handler: Handler;
+
+  beforeEach(() => {
+    const app = { get: vi.fn((_path: string, h: Handler) => { handler = h; }) } as unknown as Express;
+    registerDocumentDownloadRoute(app);
+  });
+
+  function fakeRes() {
+    const res = {
+      statusCode: 200,
+      headers: {} as Record<string, string>,
+      body: undefined as unknown,
+      status(code: number) { this.statusCode = code; return this; },
+      set(h: Record<string, string>) { Object.assign(this.headers, h); return this; },
+      json(b: unknown) { this.body = b; return this; },
+      send(b: unknown) { this.body = b; return this; },
+    };
+    return res as typeof res & Response;
+  }
+
+  it("requires a signed-in CRM user", async () => {
+    vi.mocked(sdk.authenticateRequest).mockResolvedValue(null as never);
+    const res = fakeRes();
+    await handler({ params: { id: "12" } } as unknown as Request, res);
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("rejects a non-numeric id before calling the website", async () => {
+    configure();
+    vi.mocked(sdk.authenticateRequest).mockResolvedValue(mockUser());
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const res = fakeRes();
+    await handler({ params: { id: "../etc" } } as unknown as Request, res);
+    expect(res.statusCode).toBe(404);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("passes the website's content type and filename through as a download", async () => {
+    configure();
+    vi.mocked(sdk.authenticateRequest).mockResolvedValue(mockUser());
+    const pdf = "%PDF-1.7 fake";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(pdf, {
+          status: 200,
+          headers: {
+            "content-type": "application/pdf",
+            "content-disposition": "attachment; filename=\"statement.pdf\"; filename*=UTF-8''statement.pdf",
+          },
+        })
+      )
+    );
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const res = fakeRes();
+    await handler({ params: { id: "12" } } as unknown as Request, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["Content-Type"]).toBe("application/pdf");
+    expect(res.headers["Content-Disposition"]).toContain("statement.pdf");
+    expect(res.headers["X-Content-Type-Options"]).toBe("nosniff");
+    expect(Buffer.isBuffer(res.body) && res.body.toString("utf8")).toBe(pdf);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("officer@alta.test downloaded document-12"));
   });
 });

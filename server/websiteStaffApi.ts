@@ -98,6 +98,34 @@ export interface DraftPage {
   page: number;
 }
 
+export type DocumentSlot = "bank_statement" | "w2" | "paystub" | "tax_return" | "other";
+
+export interface DocumentSlotSpec {
+  id: DocumentSlot;
+  label: string;
+  required: number;
+  hint: string;
+}
+
+export interface BorrowerDocumentItem {
+  id: number;
+  slot: DocumentSlot;
+  filename: string;
+  mimeType: string;
+  byteSize: number;
+  sha256: string | null;
+  uploadedAt: string;
+  /** Always false today: the website runs no malware scanner. */
+  scanned: boolean;
+}
+
+export interface ApplicationDocuments {
+  refNumber: string;
+  email: string;
+  slots: DocumentSlotSpec[];
+  documents: BorrowerDocumentItem[];
+}
+
 const REF_PATTERN = /^ALT-[A-Z2-9]{5}$/;
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -167,66 +195,114 @@ export function listDrafts(input: { page?: number }): Promise<DraftPage> {
   return requestJson<DraftPage>("/drafts", { page: input.page });
 }
 
+/** The documents a borrower has uploaded for an application (matched by email). */
+export function listApplicationDocuments(refNumber: string): Promise<ApplicationDocuments> {
+  const ref = refNumber.toUpperCase();
+  if (!REF_PATTERN.test(ref)) throw new WebsiteApiError(404, "Not found");
+  return requestJson<ApplicationDocuments>(`/applications/${ref}/documents`);
+}
+
+type SessionUser = NonNullable<Awaited<ReturnType<typeof sdk.authenticateRequest>>>;
+
+async function userFromRequest(req: Request): Promise<SessionUser | null> {
+  try {
+    return await sdk.authenticateRequest(req);
+  } catch {
+    return null;
+  }
+}
+
 /**
- * GET /api/applications/:ref/mismo — stream the MISMO document to a signed-in
- * CRM user. Authenticated with the same session cookie tRPC uses; the
- * website key never leaves the server. Each download is logged with who took
- * it, because these are complete mortgage applications.
+ * Fetch a file from the website staff API and stream it to the browser as an
+ * attachment. Used for MISMO documents and uploaded borrower documents alike:
+ * both are sensitive, both are downloads, both are logged with the user who
+ * took them. Content-Type and Content-Disposition come from the website,
+ * which knows what the file is.
+ */
+async function proxyDownload(
+  res: Response,
+  user: SessionUser,
+  pathname: string,
+  fallbackName: string,
+  logLabel: string
+): Promise<void> {
+  let upstream: globalThis.Response;
+  try {
+    upstream = await request(pathname);
+  } catch (err) {
+    const status = err instanceof WebsiteApiError ? err.status : 502;
+    res.status(status).json({ error: err instanceof Error ? err.message : "Download failed" });
+    return;
+  }
+
+  if (!upstream.ok) {
+    let detail = `Website answered ${upstream.status}`;
+    try {
+      const body = (await upstream.json()) as { error?: unknown };
+      if (typeof body?.error === "string") detail = body.error;
+    } catch {
+      // keep the default
+    }
+    res.status(upstream.status).json({ error: detail });
+    return;
+  }
+
+  const body = Buffer.from(await upstream.arrayBuffer());
+  const disposition = upstream.headers.get("content-disposition") ?? `attachment; filename="${fallbackName}"`;
+  const contentType = upstream.headers.get("content-type") ?? "application/octet-stream";
+
+  console.log(`[${logLabel}] ${user.email ?? user.openId} downloaded ${fallbackName} (${body.byteLength} bytes)`);
+
+  res
+    .status(200)
+    .set({
+      "Content-Type": contentType,
+      "Content-Length": String(body.byteLength),
+      "Content-Disposition": disposition,
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+    })
+    .send(body);
+}
+
+/**
+ * GET /api/applications/:ref/mismo — the MISMO document for a signed-in CRM
+ * user. Authenticated with the same session cookie tRPC uses; the website
+ * key never leaves the server.
  */
 export function registerMismoDownloadRoute(app: Express): void {
   app.get("/api/applications/:ref/mismo", async (req: Request, res: Response) => {
-    let user: Awaited<ReturnType<typeof sdk.authenticateRequest>> | null = null;
-    try {
-      user = await sdk.authenticateRequest(req);
-    } catch {
-      user = null;
-    }
+    const user = await userFromRequest(req);
     if (!user) {
       res.status(401).json({ error: "Sign in to download applications" });
       return;
     }
-
     const ref = String(req.params.ref ?? "").toUpperCase();
     if (!REF_PATTERN.test(ref)) {
       res.status(404).json({ error: "Not found" });
       return;
     }
+    await proxyDownload(res, user, `/applications/${ref}/mismo`, `${ref}.xml`, "MISMO download");
+  });
+}
 
-    let upstream: globalThis.Response;
-    try {
-      upstream = await request(`/applications/${ref}/mismo`);
-    } catch (err) {
-      const status = err instanceof WebsiteApiError ? err.status : 502;
-      res.status(status).json({ error: err instanceof Error ? err.message : "Download failed" });
+/**
+ * GET /api/applications/documents/:id — a borrower-uploaded document (bank
+ * statement, W-2, ...) for a signed-in CRM user. Decrypted by the website;
+ * never cached here.
+ */
+export function registerDocumentDownloadRoute(app: Express): void {
+  app.get("/api/applications/documents/:id", async (req: Request, res: Response) => {
+    const user = await userFromRequest(req);
+    if (!user) {
+      res.status(401).json({ error: "Sign in to download documents" });
       return;
     }
-
-    if (!upstream.ok) {
-      let detail = `Website answered ${upstream.status}`;
-      try {
-        const body = (await upstream.json()) as { error?: unknown };
-        if (typeof body?.error === "string") detail = body.error;
-      } catch {
-        // keep the default
-      }
-      res.status(upstream.status).json({ error: detail });
+    const id = Number.parseInt(String(req.params.id ?? ""), 10);
+    if (!Number.isInteger(id) || id <= 0) {
+      res.status(404).json({ error: "Not found" });
       return;
     }
-
-    const body = Buffer.from(await upstream.arrayBuffer());
-    const disposition = upstream.headers.get("content-disposition") ?? `attachment; filename="${ref}.xml"`;
-
-    console.log(`[MISMO download] ${user.email ?? user.openId} downloaded ${ref} (${body.byteLength} bytes)`);
-
-    res
-      .status(200)
-      .set({
-        "Content-Type": "application/xml; charset=utf-8",
-        "Content-Length": String(body.byteLength),
-        "Content-Disposition": disposition,
-        "Cache-Control": "no-store",
-        "X-Content-Type-Options": "nosniff",
-      })
-      .send(body);
+    await proxyDownload(res, user, `/documents/${id}`, `document-${id}`, "Document download");
   });
 }
