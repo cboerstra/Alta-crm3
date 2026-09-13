@@ -101,7 +101,7 @@ export default function PublicBooking() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#003087] to-[#00A86B]">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#2A5B3F] to-[#1F7B47]">
         <Loader2 className="h-8 w-8 text-white animate-spin" />
       </div>
     );
@@ -109,7 +109,7 @@ export default function PublicBooking() {
 
   if (!availData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#003087] to-[#00A86B]">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#2A5B3F] to-[#1F7B47]">
         <div className="text-center text-white">
           <h1 className="text-3xl font-bold" style={{ fontFamily: "Raleway, sans-serif" }}>Agent Not Found</h1>
           <p className="text-white/70 mt-2">This scheduling page does not exist.</p>
@@ -120,7 +120,7 @@ export default function PublicBooking() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#003087] to-[#00A86B]">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#2A5B3F] to-[#1F7B47]">
         <Card className="max-w-md w-full mx-4 border-0 shadow-2xl">
           <CardContent className="p-8 text-center">
             <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
@@ -147,12 +147,12 @@ export default function PublicBooking() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#003087] via-[#00A86B] to-[#001f5c] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#2A5B3F] via-[#1F7B47] to-[#165E2E] flex items-center justify-center p-4">
       <div className="max-w-2xl w-full">
         {/* Header */}
         <div className="text-center mb-6">
           <div className="flex items-center justify-center gap-2 mb-3">
-            <Building2 className="h-7 w-7 text-[#C89B3C]" />
+            <Building2 className="h-7 w-7 text-[#C9A84C]" />
             <span className="text-white/80 text-sm font-medium tracking-widest uppercase" style={{ fontFamily: "Raleway, sans-serif" }}>
               Clarke & Associates
             </span>
@@ -276,7 +276,7 @@ export default function PublicBooking() {
                   </div>
                   <Button
                     className="w-full h-12 text-base font-semibold text-white"
-                    style={{ backgroundColor: "#003087" }}
+                    style={{ backgroundColor: "#2A5B3F" }}
                     disabled={!form.name || !form.email || bookMutation.isPending}
                     onClick={() => {
                       const [h, m] = selectedTime!.split(":").map(Number);

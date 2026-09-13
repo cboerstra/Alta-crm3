@@ -8,10 +8,10 @@ import { toast } from "sonner";
 
 const STAGES = [
   { key: "new_lead", label: "New Lead", color: "#3B82F6" },
-  { key: "registered", label: "Registered", color: "#003087" },
+  { key: "registered", label: "Registered", color: "#2A5B3F" },
   { key: "attended", label: "Attended", color: "#10B981" },
   { key: "no_show", label: "No Show", color: "#EF4444" },
-  { key: "consultation_booked", label: "Consultation Booked", color: "#C89B3C" },
+  { key: "consultation_booked", label: "Consultation Booked", color: "#C9A84C" },
   { key: "under_contract", label: "Under Contract", color: "#8B5CF6" },
   { key: "closed", label: "Closed", color: "#6B7280" },
 ];

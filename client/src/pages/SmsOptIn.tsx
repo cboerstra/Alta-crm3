@@ -48,7 +48,7 @@ export default function SmsOptIn() {
       <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full">
         {/* Header */}
         <div className="text-center mb-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-[#00A86B] mb-1">
+          <p className="text-xs font-semibold uppercase tracking-widest text-[#1F7B47] mb-1">
             Alta Mortgage Group
           </p>
           <h1 className="text-2xl font-bold text-gray-900">SMS Updates Opt-In</h1>
@@ -127,7 +127,7 @@ export default function SmsOptIn() {
                 required
                 checked={smsConsent}
                 onChange={(e) => setSmsConsent(e.target.checked)}
-                className="mt-0.5 flex-shrink-0 h-4 w-4 rounded border-gray-300 accent-[#00A86B]"
+                className="mt-0.5 flex-shrink-0 h-4 w-4 rounded border-gray-300 accent-[#1F7B47]"
               />
               <label htmlFor="sms-consent" className="text-xs text-gray-600 leading-relaxed cursor-pointer">
                 By checking this box, I consent to receive recurring automated and non-automated SMS
@@ -143,11 +143,11 @@ export default function SmsOptIn() {
               Mobile carriers are not liable for delayed or undelivered messages.
               No mobile information will be shared with third parties for marketing purposes.
               View our{" "}
-              <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline text-[#00A86B]">
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline text-[#1F7B47]">
                 Privacy Policy
               </a>
               {" "}and{" "}
-              <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline text-[#00A86B]">
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline text-[#1F7B47]">
                 Terms of Service
               </a>.
             </p>
@@ -156,7 +156,7 @@ export default function SmsOptIn() {
           <button
             type="submit"
             disabled={!isValid}
-            className="w-full h-11 rounded-xl text-white text-sm font-semibold bg-[#00A86B] hover:bg-[#185f38] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="w-full h-11 rounded-xl text-white text-sm font-semibold bg-[#1F7B47] hover:bg-[#185f38] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             Opt In to SMS Updates
           </button>

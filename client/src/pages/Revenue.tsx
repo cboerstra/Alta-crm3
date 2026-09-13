@@ -2,7 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 
-const COLORS = ["#003087", "#C89B3C", "#00A86B", "#8B5CF6", "#3B82F6", "#EF4444"];
+const COLORS = ["#2A5B3F", "#C9A84C", "#1F7B47", "#8B5CF6", "#3B82F6", "#EF4444"];
 
 export default function Revenue() {
   const { data: metrics, isLoading } = trpc.deals.revenueMetrics.useQuery();
@@ -119,7 +119,7 @@ export default function Revenue() {
                 <PieChart>
                   <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3} dataKey="value">
                     {pieData.map((_, i) => (
-                      <Cell key={i} fill={["#003087", "#C89B3C", "#EF4444"][i]} />
+                      <Cell key={i} fill={["#2A5B3F", "#C9A84C", "#EF4444"][i]} />
                     ))}
                   </Pie>
                   <Tooltip contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }} />
