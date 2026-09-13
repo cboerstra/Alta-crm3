@@ -129,7 +129,6 @@
       "@tailwindcss/oxide",
       "bcrypt",
       "better-sqlite3",
-      "esbuild",
       "sharp"
     ]
   },
