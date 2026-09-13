@@ -40,96 +40,102 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  /* Custom brand colors */
-  --color-brand-green: oklch(0.45 0.14 155);
-  --color-brand-green-dark: oklch(0.35 0.12 155);
-  --color-brand-green-light: oklch(0.55 0.14 155);
-  --color-brand-gold: oklch(0.72 0.12 85);
-  --color-brand-gold-light: oklch(0.82 0.1 85);
+  /* Custom brand colors — shared with altamortgagegroup.net */
+  --color-brand-green: #00a86b;        /* emerald: primary action */
+  --color-brand-green-dark: #007a4e;
+  --color-brand-green-light: #00c77b;
+  --color-brand-gold: #c89b3c;         /* gold: accent */
+  --color-brand-gold-light: #e4c87e;
+  --color-brand-navy: #003087;         /* navy: brand */
+  --color-brand-navy-light: #1a4a9e;
+  --color-brand-navy-dark: #001f5c;
   --font-sans: "Montserrat", ui-sans-serif, system-ui, sans-serif;
   --font-heading: "Raleway", ui-sans-serif, system-ui, sans-serif;
 }
 
-/* 
- * Alta Mortgage Group Branding:
- * Primary Green: rgb(31, 123, 71) → #1F7B47 → oklch(0.50 0.14 155)
- * Dark Green:    rgb(42, 91, 63)  → #2A5B3F → oklch(0.40 0.10 155)
- * Gold Accent:   #C9A84C          → oklch(0.72 0.12 85)
+/*
+ * Alta Mortgage Group branding — the same palette as altamortgagegroup.net,
+ * so the CRM and the public site read as one company:
+ *   Navy     #003087  brand, headings, primary buttons, sidebar
+ *   Emerald  #00A86B  calls to action, success, "brand-green" utilities
+ *   Gold     #C89B3C  accents, highlights
+ *   Surface  #F8F7F4  warm off-white background
  * Fonts: Raleway (headings), Montserrat (body)
  */
 
 :root {
-  /* Primary: Alta green */
-  --primary: oklch(0.45 0.14 155);
+  /* Primary: navy */
+  --primary: #003087;
   --primary-foreground: oklch(0.99 0 0);
-  /* Sidebar: Dark green */
-  --sidebar-primary: oklch(0.50 0.14 155);
+  /* Sidebar highlight: emerald on navy */
+  --sidebar-primary: #00a86b;
   --sidebar-primary-foreground: oklch(0.99 0 0);
-  /* Charts: Green spectrum + gold */
-  --chart-1: oklch(0.50 0.14 155);
-  --chart-2: oklch(0.72 0.12 85);
-  --chart-3: oklch(0.40 0.10 155);
-  --chart-4: oklch(0.60 0.14 155);
-  --chart-5: oklch(0.82 0.10 85);
+  /* Charts: navy, emerald, gold, and their lighter partners */
+  --chart-1: #003087;
+  --chart-2: #00a86b;
+  --chart-3: #c89b3c;
+  --chart-4: #1a4a9e;
+  --chart-5: #e4c87e;
   --radius: 0.625rem;
-  --background: oklch(0.985 0.002 100);
+  --background: #f8f7f4;
   --foreground: oklch(0.20 0.02 260);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.20 0.02 260);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.20 0.02 260);
-  --secondary: oklch(0.965 0.005 155);
-  --secondary-foreground: oklch(0.35 0.10 155);
-  --muted: oklch(0.955 0.005 155);
+  --secondary: oklch(0.965 0.008 265);
+  --secondary-foreground: #003087;
+  --muted: oklch(0.955 0.005 265);
   --muted-foreground: oklch(0.50 0.02 260);
-  --accent: oklch(0.955 0.01 155);
-  --accent-foreground: oklch(0.20 0.02 260);
+  --accent: oklch(0.95 0.02 265);
+  --accent-foreground: #001f5c;
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.915 0.01 155);
-  --input: oklch(0.915 0.01 155);
-  --ring: oklch(0.50 0.14 155);
-  --sidebar: oklch(0.22 0.06 155);
-  --sidebar-foreground: oklch(0.92 0.01 155);
-  --sidebar-accent: oklch(0.28 0.06 155);
-  --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(0.30 0.05 155);
-  --sidebar-ring: oklch(0.50 0.14 155);
+  --border: oklch(0.915 0.01 265);
+  --input: oklch(0.915 0.01 265);
+  --ring: #003087;
+  --sidebar: #001f5c;
+  --sidebar-foreground: oklch(0.92 0.02 265);
+  --sidebar-accent: #003087;
+  --sidebar-accent-foreground: oklch(0.99 0 0);
+  --sidebar-border: oklch(0.34 0.10 265);
+  --sidebar-ring: #00a86b;
 }
 
 .dark {
-  --primary: oklch(0.55 0.14 155);
+  /* Navy is too dark to be a button on a dark surface; lift it. */
+  --primary: oklch(0.62 0.15 265);
   --primary-foreground: oklch(0.99 0 0);
-  --sidebar-primary: oklch(0.50 0.14 155);
+  --sidebar-primary: #00a86b;
   --sidebar-primary-foreground: oklch(0.99 0 0);
   --background: oklch(0.15 0.02 260);
-  --foreground: oklch(0.92 0.01 155);
+  --foreground: oklch(0.92 0.01 265);
   --card: oklch(0.19 0.02 260);
-  --card-foreground: oklch(0.92 0.01 155);
+  --card-foreground: oklch(0.92 0.01 265);
   --popover: oklch(0.19 0.02 260);
-  --popover-foreground: oklch(0.92 0.01 155);
-  --secondary: oklch(0.24 0.03 155);
-  --secondary-foreground: oklch(0.80 0.05 155);
+  --popover-foreground: oklch(0.92 0.01 265);
+  --secondary: oklch(0.24 0.03 265);
+  --secondary-foreground: oklch(0.85 0.05 265);
   --muted: oklch(0.25 0.02 260);
   --muted-foreground: oklch(0.65 0.02 260);
-  --accent: oklch(0.25 0.03 155);
+  --accent: oklch(0.25 0.03 265);
   --accent-foreground: oklch(0.95 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.30 0.02 260);
   --input: oklch(0.30 0.02 260);
-  --ring: oklch(0.55 0.14 155);
-  --chart-1: oklch(0.55 0.14 155);
-  --chart-2: oklch(0.72 0.12 85);
-  --chart-3: oklch(0.45 0.10 155);
-  --chart-4: oklch(0.65 0.14 155);
-  --chart-5: oklch(0.82 0.10 85);
-  --sidebar: oklch(0.18 0.03 260);
-  --sidebar-foreground: oklch(0.90 0.01 155);
-  --sidebar-accent: oklch(0.25 0.03 155);
+  --ring: oklch(0.62 0.15 265);
+  --chart-1: oklch(0.62 0.15 265);
+  --chart-2: #00c77b;
+  --chart-3: #e4c87e;
+  --chart-4: oklch(0.72 0.12 265);
+  --chart-5: #c89b3c;
+  --sidebar: oklch(0.17 0.04 265);
+  --sidebar-foreground: oklch(0.90 0.01 265);
+  --sidebar-accent: oklch(0.25 0.06 265);
   --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(0.30 0.02 260);
-  --sidebar-ring: oklch(0.55 0.14 155);
+  --sidebar-border: oklch(0.30 0.03 265);
+  --sidebar-ring: #00a86b;
 }
 
 @layer base {

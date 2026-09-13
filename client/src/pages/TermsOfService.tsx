@@ -6,7 +6,7 @@ export default function TermsOfService() {
       <div className="max-w-3xl mx-auto px-6 py-12">
         {/* Header */}
         <div className="mb-10 border-b pb-6">
-          <p className="text-sm font-semibold uppercase tracking-widest text-[#1F7B47] mb-1">Clarke &amp; Associates</p>
+          <p className="text-sm font-semibold uppercase tracking-widest text-[#00A86B] mb-1">Clarke &amp; Associates</p>
           <h1 className="text-3xl font-bold text-gray-900">Terms of Service</h1>
           <p className="text-sm text-gray-500 mt-2">Effective Date: January 1, 2025 &nbsp;|&nbsp; Last Updated: {year}</p>
         </div>
@@ -68,7 +68,7 @@ export default function TermsOfService() {
 
             <h3 className="font-semibold text-gray-800 mt-4 mb-1">No Sharing of Mobile Information</h3>
             <p>
-              Your mobile phone number and SMS consent information will not be shared with third parties or affiliates for marketing or promotional purposes. All information collected is governed by our <a href="/privacy" className="text-[#1F7B47] underline">Privacy Policy</a>.
+              Your mobile phone number and SMS consent information will not be shared with third parties or affiliates for marketing or promotional purposes. All information collected is governed by our <a href="/privacy" className="text-[#00A86B] underline">Privacy Policy</a>.
             </p>
           </section>
 
@@ -119,8 +119,8 @@ export default function TermsOfService() {
             <p>If you have questions about these Terms of Service, please contact us:</p>
             <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
               <p className="font-semibold text-gray-900">Clarke &amp; Associates</p>
-              <p className="mt-1">Email: <a href="mailto:info@altamortgagecrm.net" className="text-[#1F7B47] underline">info@altamortgagecrm.net</a></p>
-              <p>Website: <a href="https://altamortgagecrm.net" className="text-[#1F7B47] underline">altamortgagecrm.net</a></p>
+              <p className="mt-1">Email: <a href="mailto:info@altamortgagecrm.net" className="text-[#00A86B] underline">info@altamortgagecrm.net</a></p>
+              <p>Website: <a href="https://altamortgagecrm.net" className="text-[#00A86B] underline">altamortgagecrm.net</a></p>
             </div>
           </section>
 
@@ -129,7 +129,7 @@ export default function TermsOfService() {
         <div className="mt-12 pt-6 border-t text-center text-xs text-gray-400">
           &copy; {year} Clarke &amp; Associates. All rights reserved.
           &nbsp;|&nbsp;
-          <a href="/privacy" className="text-[#1F7B47] underline hover:text-[#165E2E]">Privacy Policy</a>
+          <a href="/privacy" className="text-[#00A86B] underline hover:text-[#001f5c]">Privacy Policy</a>
         </div>
       </div>
     </div>

@@ -89,7 +89,7 @@ P.S. Add this event to your calendar now so you don't miss it. Your join link is
 const defaultForm: FormState = {
   title: "", slug: "", headline: "", subheadline: "", bodyText: "",
   ctaText: "Register Now", campaignTag: "", sourceTag: "",
-  webinarId: undefined, isActive: true, accentColor: "#C9A84C", textColor: "#FFFFFF",
+  webinarId: undefined, isActive: true, accentColor: "#C89B3C", textColor: "#FFFFFF",
   enabledFields: ["firstName", "lastName", "email", "phone"],
   optInLabel: "I agree to receive communications about this event and future opportunities",
   showOptIn: true,
@@ -471,7 +471,7 @@ export default function LandingPages() {
       bodyText: page.bodyText || "", ctaText: page.ctaText || "Register Now",
       campaignTag: page.campaignTag || "", sourceTag: page.sourceTag || "",
       webinarId: page.webinarId || undefined, isActive: page.isActive,
-      accentColor: page.accentColor || "#C9A84C",
+      accentColor: page.accentColor || "#C89B3C",
       textColor: page.textColor || "#FFFFFF",
       enabledFields: (page.enabledFields as string[]) || ["firstName", "lastName", "email", "phone"],
       optInLabel: page.optInLabel || "I agree to receive communications about this event and future opportunities",
@@ -999,7 +999,7 @@ export default function LandingPages() {
                           {form.ctaText && (
                             <div
                               className="mt-3 px-4 py-1.5 rounded text-sm font-semibold text-white shadow"
-                              style={{ backgroundColor: form.accentColor || "#C9A84C" }}
+                              style={{ backgroundColor: form.accentColor || "#C89B3C" }}
                             >
                               {form.ctaText}
                             </div>

@@ -279,7 +279,7 @@ export default function PublicLandingPage() {
     const timePart = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
     return `${datePart} at ${timePart}${session.label ? ` - ${session.label}` : ""}`;
   };
-  const accentColor = page?.accentColor || "#C9A84C";
+  const accentColor = page?.accentColor || "#C89B3C";
   const hasHtmlBackground = !!(page as any)?.backgroundHtmlUrl;
   const hasImageBackground = !!page?.artworkUrl && !hasHtmlBackground;
   const hasBackground = hasHtmlBackground || hasImageBackground;
@@ -607,7 +607,7 @@ export default function PublicLandingPage() {
         </div>
       )}
       {!hasBackground && (
-        <div className="fixed inset-0 z-0 bg-gradient-to-br from-[#2A5B3F] via-[#1F7B47] to-[#165E2E]" />
+        <div className="fixed inset-0 z-0 bg-gradient-to-br from-[#003087] via-[#00A86B] to-[#001f5c]" />
       )}
 
       {/* ─── Logo overlaid on HTML background (top of page) ─── */}

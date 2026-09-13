@@ -13,7 +13,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area
 } from "recharts";
 
-const BRAND_COLORS = ["#2A5B3F", "#C9A84C", "#1F7B47", "#3D9B63", "#E8D48B", "#165E2E", "#8B7332"];
+const BRAND_COLORS = ["#003087", "#C89B3C", "#00A86B", "#1a4a9e", "#E4C87E", "#001f5c", "#8a6a22"];
 
 const stageLabels: Record<string, string> = {
   new_lead: "New Lead", registered: "Registered", attended: "Attended",
@@ -26,7 +26,7 @@ function StatCard({ title, value, icon: Icon, subtitle, color, trend }: {
 }) {
   return (
     <Card className="relative overflow-hidden border-0 shadow-sm hover:shadow-md transition-all duration-200 group">
-      <div className="absolute top-0 left-0 w-1 h-full rounded-l" style={{ backgroundColor: color || "#2A5B3F" }} />
+      <div className="absolute top-0 left-0 w-1 h-full rounded-l" style={{ backgroundColor: color || "#003087" }} />
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -34,13 +34,13 @@ function StatCard({ title, value, icon: Icon, subtitle, color, trend }: {
             <p className="text-3xl font-bold mt-2 text-foreground" style={{ fontFamily: "Raleway, sans-serif" }}>{value}</p>
             {subtitle && <p className="text-xs text-muted-foreground mt-1.5">{subtitle}</p>}
             {trend && (
-              <p className="text-xs mt-1.5 flex items-center gap-1" style={{ color: color || "#2A5B3F" }}>
+              <p className="text-xs mt-1.5 flex items-center gap-1" style={{ color: color || "#003087" }}>
                 <TrendingUp className="h-3 w-3" /> {trend}
               </p>
             )}
           </div>
-          <div className="h-12 w-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110" style={{ backgroundColor: `${color || "#2A5B3F"}18` }}>
-            <Icon className="h-6 w-6" style={{ color: color || "#2A5B3F" }} />
+          <div className="h-12 w-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110" style={{ backgroundColor: `${color || "#003087"}18` }}>
+            <Icon className="h-6 w-6" style={{ color: color || "#003087" }} />
           </div>
         </div>
       </CardContent>
@@ -135,14 +135,14 @@ export default function Home() {
           title="Total Leads"
           value={(metrics?.totalLeads ?? 0).toLocaleString()}
           icon={Users}
-          color="#2A5B3F"
+          color="#003087"
           subtitle="All time"
         />
         <StatCard
           title="Attendance Rate"
           value={`${attendanceRate}%`}
           icon={UserCheck}
-          color="#1F7B47"
+          color="#00A86B"
           subtitle="Webinar attendance"
           trend={attendanceRate >= 50 ? "Above average" : undefined}
         />
@@ -150,14 +150,14 @@ export default function Home() {
           title="Consultations"
           value={Number(consultationBooked).toLocaleString()}
           icon={Calendar}
-          color="#C9A84C"
+          color="#C89B3C"
           subtitle="Booked"
         />
         <StatCard
           title="Closed Revenue"
           value={`$${(revenue?.closedRevenue ?? 0).toLocaleString()}`}
           icon={DollarSign}
-          color="#3D9B63"
+          color="#1a4a9e"
           subtitle={`${metrics?.closedDeals ?? 0} closed deals`}
         />
       </div>
