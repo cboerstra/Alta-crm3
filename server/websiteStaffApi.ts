@@ -1,10 +1,13 @@
 /**
- * Read-only client for the website's staff API.
+ * Client for the website's staff API.
  *
  * The public site (altamortgagegroup.net) stores every submitted mortgage
  * application, the MISMO v3.4 document generated for it, and any in-progress
  * drafts. It exposes them at /api/staff/* behind a shared key. This module is
  * the only place in the CRM that holds that key or talks to those routes.
+ *
+ * Reads everything; writes only the loan officer's review (status + notes)
+ * and deletions. Borrower-entered data is never edited from here.
  *
  * Direction matters: the website already calls INTO this CRM with
  * WEBSITE_API_KEY (see websiteLeads.ts). This is the reverse path, and the
@@ -35,6 +38,9 @@ export class WebsiteApiError extends Error {
 export type DeliveryStatus = "pending" | "sent" | "failed" | "skipped";
 export type MismoStatus = "pending" | "written" | "failed" | "skipped";
 
+export const REVIEW_STATUSES = ["new", "in_review", "approved", "declined", "closed"] as const;
+export type ReviewStatus = (typeof REVIEW_STATUSES)[number];
+
 export interface ApplicationListItem {
   refNumber: string;
   firstName: string;
@@ -47,6 +53,18 @@ export interface ApplicationListItem {
   mismoStatus: MismoStatus;
   crmStatus: DeliveryStatus;
   emailStatus: DeliveryStatus;
+  reviewStatus: ReviewStatus;
+  staffNotes: string | null;
+  reviewedAt: string | null;
+}
+
+export interface DeleteResult {
+  deleted: true;
+  refNumber: string;
+  documentsRemoved: number;
+  draftsRemoved: number;
+  borrowerPurged: boolean;
+  warnings: string[];
 }
 
 export interface ApplicationListPage {
@@ -140,14 +158,20 @@ export function isWebsiteStaffApiConfigured(): boolean {
   return config() !== null;
 }
 
-async function request(pathname: string, query?: Record<string, string | number | undefined>): Promise<globalThis.Response> {
+interface RequestOptions {
+  query?: Record<string, string | number | undefined>;
+  method?: "GET" | "PATCH" | "DELETE";
+  body?: unknown;
+}
+
+async function request(pathname: string, options: RequestOptions = {}): Promise<globalThis.Response> {
   const cfg = config();
   if (!cfg) {
     throw new WebsiteApiError(503, "Website connection is not configured (WEBSITE_STAFF_API_URL / WEBSITE_STAFF_API_KEY)");
   }
 
   const url = new URL(`${cfg.baseUrl}${pathname}`);
-  for (const [k, v] of Object.entries(query ?? {})) {
+  for (const [k, v] of Object.entries(options.query ?? {})) {
     if (v !== undefined && v !== "") url.searchParams.set(k, String(v));
   }
 
@@ -155,7 +179,13 @@ async function request(pathname: string, query?: Record<string, string | number 
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     return await fetch(url, {
-      headers: { Authorization: `Bearer ${cfg.key}`, Accept: "application/json" },
+      method: options.method ?? "GET",
+      headers: {
+        Authorization: `Bearer ${cfg.key}`,
+        Accept: "application/json",
+        ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
+      },
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       signal: controller.signal,
     });
   } catch (err) {
@@ -166,8 +196,8 @@ async function request(pathname: string, query?: Record<string, string | number 
   }
 }
 
-async function requestJson<T>(pathname: string, query?: Record<string, string | number | undefined>): Promise<T> {
-  const res = await request(pathname, query);
+async function requestJson<T>(pathname: string, options: RequestOptions = {}): Promise<T> {
+  const res = await request(pathname, options);
   if (!res.ok) {
     let detail = "";
     try {
@@ -182,7 +212,7 @@ async function requestJson<T>(pathname: string, query?: Record<string, string | 
 }
 
 export function listApplications(input: { q?: string; page?: number }): Promise<ApplicationListPage> {
-  return requestJson<ApplicationListPage>("/applications", { q: input.q, page: input.page });
+  return requestJson<ApplicationListPage>("/applications", { query: { q: input.q, page: input.page } });
 }
 
 export function getApplication(refNumber: string): Promise<ApplicationDetail> {
@@ -191,8 +221,25 @@ export function getApplication(refNumber: string): Promise<ApplicationDetail> {
   return requestJson<ApplicationDetail>(`/applications/${ref}`);
 }
 
+/** The loan officer's review. Both fields optional; omit to leave unchanged. */
+export function updateApplicationReview(
+  refNumber: string,
+  input: { reviewStatus?: ReviewStatus; staffNotes?: string | null }
+): Promise<ApplicationDetail> {
+  const ref = refNumber.toUpperCase();
+  if (!REF_PATTERN.test(ref)) throw new WebsiteApiError(404, "Not found");
+  return requestJson<ApplicationDetail>(`/applications/${ref}`, { method: "PATCH", body: input });
+}
+
+/** Deletes the application, its MISMO document, and the borrower's uploads and drafts if this was their last. */
+export function deleteApplication(refNumber: string): Promise<DeleteResult> {
+  const ref = refNumber.toUpperCase();
+  if (!REF_PATTERN.test(ref)) throw new WebsiteApiError(404, "Not found");
+  return requestJson<DeleteResult>(`/applications/${ref}`, { method: "DELETE" });
+}
+
 export function listDrafts(input: { page?: number }): Promise<DraftPage> {
-  return requestJson<DraftPage>("/drafts", { page: input.page });
+  return requestJson<DraftPage>("/drafts", { query: { page: input.page } });
 }
 
 /** The documents a borrower has uploaded for an application (matched by email). */

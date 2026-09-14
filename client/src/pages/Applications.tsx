@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { ReviewStatusBadge } from "@/components/ReviewStatus";
 import { AlertCircle, ChevronLeft, ChevronRight, FileText, Search } from "lucide-react";
 
 const STEP_LABELS = [
@@ -136,7 +137,7 @@ function SubmittedTab() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/30">
-                    {["Reference", "Applicant", "Purpose", "Loan amount", "Submitted", "MISMO", "CRM", "Email"].map((h) => (
+                    {["Reference", "Applicant", "Status", "Purpose", "Loan amount", "Submitted", "MISMO", "CRM", "Email"].map((h) => (
                       <th key={h} className="p-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         {h}
                       </th>
@@ -145,10 +146,10 @@ function SubmittedTab() {
                 </thead>
                 <tbody>
                   {isLoading && (
-                    <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">Loading…</td></tr>
+                    <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">Loading…</td></tr>
                   )}
                   {!isLoading && data?.items.length === 0 && (
-                    <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">No applications yet.</td></tr>
+                    <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">No applications yet.</td></tr>
                   )}
                   {data?.items.map((a) => (
                     <tr
@@ -161,6 +162,7 @@ function SubmittedTab() {
                         <div className="font-medium">{a.firstName} {a.lastName}</div>
                         <div className="text-xs text-muted-foreground">{a.email}</div>
                       </td>
+                      <td className="p-3"><ReviewStatusBadge value={a.reviewStatus} /></td>
                       <td className="p-3">{purposeLabel[a.loanPurpose] ?? a.loanPurpose}</td>
                       <td className="p-3">{money(a.loanAmount)}</td>
                       <td className="p-3 whitespace-nowrap">{when(a.createdAt)}</td>

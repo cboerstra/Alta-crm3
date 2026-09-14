@@ -79,6 +79,61 @@ describe("applications router", () => {
     await expect(caller.applications.list({})).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.applications.get({ refNumber: "ALT-AAAAA" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(caller.applications.drafts({})).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.applications.updateReview({ refNumber: "ALT-AAAAA", reviewStatus: "closed" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caller.applications.delete({ refNumber: "ALT-AAAAA" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("sends a review update as a PATCH with only the two staff fields", async () => {
+    configure();
+    const updated = { refNumber: "ALT-K7M2Q", reviewStatus: "in_review", staffNotes: "Left voicemail", reviewedAt: "2026-09-13T20:00:00.000Z" };
+    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(200, updated));
+    vi.stubGlobal("fetch", fetchSpy);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const caller = appRouter.createCaller(ctx(mockUser()));
+    expect(await caller.applications.updateReview({ refNumber: "alt-k7m2q", reviewStatus: "in_review", staffNotes: "Left voicemail" })).toEqual(updated);
+
+    const [url, init] = fetchSpy.mock.calls[0] as [URL, RequestInit];
+    expect(url.toString()).toBe("https://site.test/api/staff/applications/ALT-K7M2Q");
+    expect(init.method).toBe("PATCH");
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBe("application/json");
+    expect(JSON.parse(String(init.body))).toEqual({ reviewStatus: "in_review", staffNotes: "Left voicemail" });
+  });
+
+  it("refuses a review update that changes nothing or uses an unknown status", async () => {
+    configure();
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const caller = appRouter.createCaller(ctx(mockUser()));
+    await expect(caller.applications.updateReview({ refNumber: "ALT-K7M2Q" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(
+      caller.applications.updateReview({ refNumber: "ALT-K7M2Q", reviewStatus: "funded" as never })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("deletes with a DELETE call and returns the website's cleanup summary", async () => {
+    configure();
+    const summary = { deleted: true, refNumber: "ALT-K7M2Q", documentsRemoved: 2, draftsRemoved: 1, borrowerPurged: true, warnings: [] };
+    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(200, summary));
+    vi.stubGlobal("fetch", fetchSpy);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const caller = appRouter.createCaller(ctx(mockUser()));
+    expect(await caller.applications.delete({ refNumber: "ALT-K7M2Q" })).toEqual(summary);
+
+    const [url, init] = fetchSpy.mock.calls[0] as [URL, RequestInit];
+    expect(url.toString()).toBe("https://site.test/api/staff/applications/ALT-K7M2Q");
+    expect(init.method).toBe("DELETE");
+    expect(init.body).toBeUndefined();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("officer@alta.test deleted ALT-K7M2Q"));
+  });
+
+  it("maps a delete of a missing application to NOT_FOUND", async () => {
+    configure();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(404, { error: "Not found" })));
+    const caller = appRouter.createCaller(ctx(mockUser()));
+    await expect(caller.applications.delete({ refNumber: "ALT-ZZZZZ" })).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("reports not configured without calling the website", async () => {

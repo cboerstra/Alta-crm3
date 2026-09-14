@@ -10,11 +10,14 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import {
+  deleteApplication,
   getApplication,
   isWebsiteStaffApiConfigured,
   listApplicationDocuments,
   listApplications,
   listDrafts,
+  REVIEW_STATUSES,
+  updateApplicationReview,
   WebsiteApiError,
 } from "../websiteStaffApi";
 
@@ -62,6 +65,49 @@ export const applicationsRouter = router({
     .query(async ({ input }) => {
       try {
         return await getApplication(input.refNumber);
+      } catch (err) {
+        throw toTrpcError(err);
+      }
+    }),
+
+  /** Status and notes are the only fields the CRM may change on an application. */
+  updateReview: protectedProcedure
+    .input(
+      z
+        .object({
+          refNumber: z.string().trim().min(1).max(20),
+          reviewStatus: z.enum(REVIEW_STATUSES).optional(),
+          staffNotes: z.string().max(10_000).nullable().optional(),
+        })
+        .refine((v) => v.reviewStatus !== undefined || v.staffNotes !== undefined, {
+          message: "Nothing to update",
+        })
+    )
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const updated = await updateApplicationReview(input.refNumber, {
+          reviewStatus: input.reviewStatus,
+          staffNotes: input.staffNotes,
+        });
+        console.log(
+          `[Applications] ${ctx.user.email ?? ctx.user.openId} set ${updated.refNumber} to ${updated.reviewStatus}`
+        );
+        return updated;
+      } catch (err) {
+        throw toTrpcError(err);
+      }
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ refNumber: z.string().trim().min(1).max(20) }))
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const result = await deleteApplication(input.refNumber);
+        console.log(
+          `[Applications] ${ctx.user.email ?? ctx.user.openId} deleted ${result.refNumber}` +
+            ` (documents: ${result.documentsRemoved}, drafts: ${result.draftsRemoved})`
+        );
+        return result;
       } catch (err) {
         throw toTrpcError(err);
       }
