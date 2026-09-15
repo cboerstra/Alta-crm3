@@ -141,6 +141,13 @@
       "when": 1774484580923,
       "tag": "0019_misty_kabuki",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1789438565626,
+      "tag": "0020_little_white_tiger",
+      "breakpoints": true
     }
   ]
 }

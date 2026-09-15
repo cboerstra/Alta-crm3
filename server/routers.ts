@@ -20,6 +20,10 @@ import { mediaRouter } from "./routers/media";
 import { userManagementRouter } from "./routers/userManagement";
 import { smsTemplatesRouter } from "./routers/smsTemplates";
 import { applicationsRouter } from "./routers/applications";
+import { campaignsRouter } from "./routers/campaigns";
+import { templatesRouter } from "./routers/templates";
+import { automationsRouter } from "./routers/automations";
+import { marketingRouter } from "./routers/marketing";
 
 export const appRouter = router({
   system: systemRouter,
@@ -115,6 +119,10 @@ export const appRouter = router({
   userManagement: userManagementRouter,
   smsTemplates: smsTemplatesRouter,
   applications: applicationsRouter,
+  campaigns: campaignsRouter,
+  templates: templatesRouter,
+  automations: automationsRouter,
+  marketing: marketingRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -8,6 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { useLocation, useParams } from "wouter";
 import { Loader2, Calendar, Clock } from "lucide-react";
+import { captureAttribution, toSubmitPayload, type Attribution } from "@/lib/attribution";
+import { initPixel, trackPageView, trackConversion } from "@/lib/metaPixel";
 
 const TEMPLATE_HEAD_ATTR = "data-alta-template-head";
 const EMBEDDED_FORM_CLASS = "alta-crm-embedded-form";
@@ -244,8 +246,47 @@ export default function PublicLandingPage() {
     { enabled: !!params.slug }
   );
 
+  // ─── Attribution + Meta Pixel ───
+  // Click parameters are captured on mount, before anything can navigate away,
+  // and travel with the form submission so the lead record knows which ad
+  // produced it.
+  const attributionRef = useRef<Attribution>({});
+  const [attributionReady, setAttributionReady] = useState(false);
+  useEffect(() => {
+    attributionRef.current = captureAttribution();
+    setAttributionReady(true);
+  }, []);
+
+  const { data: pixelConfig } = trpc.marketing.publicPixelConfig.useQuery(
+    { slug: params.slug },
+    { enabled: !!params.slug, staleTime: 5 * 60_000 }
+  );
+  const serverPageView = trpc.marketing.trackPageView.useMutation();
+
+  useEffect(() => {
+    if (!pixelConfig?.enabled || !pixelConfig.pixelId || !attributionReady) return;
+    initPixel(pixelConfig.pixelId);
+    trackPageView();
+    // Mirror the view server-side so a blocked pixel doesn't lose the visit.
+    serverPageView.mutate({
+      slug: params.slug,
+      attribution: toSubmitPayload(attributionRef.current),
+    });
+    // Runs once per page once the pixel config and attribution are both ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pixelConfig?.enabled, pixelConfig?.pixelId, attributionReady, params.slug]);
+
   const submitLead = trpc.leads.captureFromLandingPage.useMutation({
     onSuccess: (data) => {
+      // Browser-side conversion, sharing its event id with the server event so
+      // Meta counts one conversion rather than two.
+      const eventId = attributionRef.current.eventId;
+      if (eventId && pixelConfig?.enabled) {
+        trackConversion(pixelConfig.eventName || "Lead", eventId, {
+          content_name: page?.title,
+          content_category: "mortgage_lead",
+        });
+      }
       if (data.joinUrl) {
         window.sessionStorage.setItem(`lp:${params.slug}:joinUrl`, data.joinUrl);
       } else {
@@ -398,6 +439,7 @@ export default function PublicLandingPage() {
       smsConsent,
       contactOptIn,
       webinarSessionId,
+      attribution: toSubmitPayload(attributionRef.current),
     });
   };
 

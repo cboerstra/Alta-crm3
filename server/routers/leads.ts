@@ -10,6 +10,9 @@ import {
 import { invokeLLM } from "../_core/llm";
 import { notifyOwner } from "../_core/notification";
 import { sendSmsOptInConfirmation } from "../smsReminderService";
+import { attributionInputSchema, clientIpFromRequest, normalizeAttribution } from "../meta/attribution";
+import { trackCapturedLead, reportLeadConversion } from "../meta/leadTracking";
+import { runTrigger } from "../automations/engine";
 
 const stageEnum = z.enum([
   "new_lead", "registered", "attended", "no_show",
@@ -99,6 +102,24 @@ export const leadsRouter = router({
       if (triggerKey) {
         sendLeadNotifications(input.id, triggerKey, ctx.user.id).catch(() => {});
       }
+
+      // Feed downstream outcomes back to Meta so its optimizer chases booked
+      // consultations and closed loans, not just form fills.
+      const stageToMetaEvent: Record<string, { event: string; useDealValue?: boolean }> = {
+        consultation_booked: { event: "Schedule" },
+        under_contract: { event: "SubmitApplication" },
+        closed: { event: "Purchase", useDealValue: true },
+      };
+      const metaEvent = stageToMetaEvent[input.stage];
+      if (metaEvent) {
+        const lead = await getLeadById(input.id);
+        const value = metaEvent.useDealValue && lead?.dealValue ? Number(lead.dealValue) : undefined;
+        reportLeadConversion(input.id, metaEvent.event, { value }).catch(() => {});
+      }
+
+      // Sequences triggered by this stage.
+      runTrigger("stage_change", input.id, input.stage).catch(() => {});
+
       return { success: true };
     }),
 
@@ -206,8 +227,10 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
       smsConsent: z.boolean().optional(),
       contactOptIn: z.boolean().optional(),
       webinarSessionId: z.number().optional(),
+      // Click parameters and Meta browser cookies gathered by the landing page.
+      attribution: attributionInputSchema.optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const page = await getLandingPageBySlug(input.slug);
       if (!page || !page.isActive) throw new Error("Landing page not found");
 
@@ -234,6 +257,26 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
         title: "Lead captured from landing page",
         content: `Captured via landing page: ${page.title}`,
       });
+
+      // ── Attribution, Conversions API and nurture enrollment ─────────────────
+      // Stamped onto the lead before anything else runs, so the campaign is known
+      // by the time reminders and notifications fire. Failures here are logged
+      // inside trackCapturedLead — the lead itself is already saved.
+      const attribution = normalizeAttribution(input.attribution, {
+        ip: clientIpFromRequest(ctx.req as any),
+        userAgent: ctx.req.headers["user-agent"] ?? null,
+      });
+      await trackCapturedLead({
+        leadId: id,
+        page: page as any,
+        attribution,
+        eventId: input.attribution?.eventId,
+      }).catch((err) => {
+        console.error("[Leads] Attribution tracking failed:", err);
+      });
+
+      // Sequences that fire on any new lead, regardless of campaign.
+      runTrigger("lead_created", id).catch(() => {});
 
       // 10DLC: send opt-in confirmation SMS immediately when consent is given
       if (input.smsConsent && input.phone) {

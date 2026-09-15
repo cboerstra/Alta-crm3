@@ -459,6 +459,14 @@ async function startServer() {
     console.error("[Startup] SMS template migration error:", err)
   );
 
+  // Seed the built-in landing page templates the campaign builder stamps pages from.
+  // Runs after auto-migration so the table exists on a first boot.
+  setTimeout(() => {
+    import("../marketingTemplates")
+      .then(({ seedSystemTemplates }) => seedSystemTemplates())
+      .catch((err) => console.error("[Startup] Template seed error:", err));
+  }, 5_000);
+
   // Email reminder scheduler: process pending reminders every 60 seconds
   setInterval(async () => {
     try {
@@ -476,6 +484,37 @@ async function startServer() {
       console.error("[SMS Reminder Scheduler] Error:", err);
     }
   }, 60_000);
+
+  // Automation scheduler: advance nurture sequences whose next step is due.
+  setInterval(async () => {
+    try {
+      const { processDueEnrollments } = await import("../automations/engine");
+      const executed = await processDueEnrollments();
+      if (executed > 0) console.log(`[Automation Scheduler] Ran ${executed} step(s)`);
+    } catch (err) {
+      console.error("[Automation Scheduler] Error:", err);
+    }
+  }, 60_000);
+
+  // Meta insights sync: refresh campaign spend/impressions hourly. Meta's
+  // reporting lags by a few hours anyway, so polling faster buys nothing and
+  // just burns API quota.
+  const syncMetaMetrics = async () => {
+    try {
+      const { getMetaSettings } = await import("../marketingDb");
+      const settings = await getMetaSettings();
+      if (!settings?.adAccountId || !settings.accessToken) return; // not connected yet
+      const { syncAllCampaignMetrics } = await import("../meta/publisher");
+      const result = await syncAllCampaignMetrics();
+      if (result.rows > 0) {
+        console.log(`[Meta Insights] Synced ${result.rows} day(s) across ${result.campaigns} campaign(s)`);
+      }
+    } catch (err) {
+      console.error("[Meta Insights] Sync error:", err);
+    }
+  };
+  setInterval(syncMetaMetrics, 60 * 60_000);
+  setTimeout(syncMetaMetrics, 30_000);
 }
 
 startServer().catch(console.error);

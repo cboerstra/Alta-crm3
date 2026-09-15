@@ -14,8 +14,10 @@ import {
   Settings, Video, Calendar, CheckCircle, AlertCircle,
   Upload, Image, Trash2, Edit, ImageIcon, FileImage,
   LayoutGrid, Tag, Loader2, X, MessageSquare, Phone, Eye, EyeOff, Send, Mail, Plus,
+  Megaphone,
 } from "lucide-react";
 import { toast } from "sonner";
+import MetaSettingsPanel from "@/components/settings/MetaSettingsPanel";
 
 type MediaItem = {
   id: number;
@@ -380,8 +382,14 @@ export default function SettingsPage() {
             )}
           </TabsTrigger>
           <TabsTrigger value="sms-templates" className="gap-1"><MessageSquare className="h-3.5 w-3.5" /> SMS &amp; Email Templates</TabsTrigger>
+          <TabsTrigger value="meta-ads" className="gap-1"><Megaphone className="h-3.5 w-3.5" /> Meta Ads</TabsTrigger>
           <TabsTrigger value="general" className="gap-1"><Settings className="h-3.5 w-3.5" /> General</TabsTrigger>
         </TabsList>
+
+        {/* ─── Meta Ads Tab ─── */}
+        <TabsContent value="meta-ads">
+          <MetaSettingsPanel />
+        </TabsContent>
 
         {/* ─── Media Library Tab ─── */}
         <TabsContent value="media">
