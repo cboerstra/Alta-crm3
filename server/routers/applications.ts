@@ -16,10 +16,13 @@ import {
   listApplicationDocuments,
   listApplications,
   listDrafts,
+  regenerateMismo,
   REVIEW_STATUSES,
+  updateApplicationData,
   updateApplicationReview,
   WebsiteApiError,
 } from "../websiteStaffApi";
+import { applicationEditSchema } from "../applicationEdit";
 
 function toTrpcError(err: unknown): TRPCError {
   if (err instanceof WebsiteApiError) {
@@ -93,6 +96,36 @@ export const applicationsRouter = router({
           `[Applications] ${ctx.user.email ?? ctx.user.openId} set ${updated.refNumber} to ${updated.reviewStatus}`
         );
         return updated;
+      } catch (err) {
+        throw toTrpcError(err);
+      }
+    }),
+
+  /** Correct borrower-entered fields; the website re-validates and regenerates the MISMO document. */
+  updateData: protectedProcedure
+    .input(z.object({ refNumber: z.string().trim().min(1).max(20), edit: applicationEditSchema }))
+    .mutation(async ({ input, ctx }) => {
+      const fields = Object.keys(input.edit);
+      if (fields.length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Nothing to update" });
+      }
+      try {
+        const result = await updateApplicationData(input.refNumber, input.edit);
+        console.log(`[Applications] ${ctx.user.email ?? ctx.user.openId} edited ${result.refNumber}: ${result.fields.join(", ")}`);
+        return result;
+      } catch (err) {
+        throw toTrpcError(err);
+      }
+    }),
+
+  /** Rebuild the MISMO document with the website's current generator. */
+  regenerateMismo: protectedProcedure
+    .input(z.object({ refNumber: z.string().trim().min(1).max(20) }))
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const result = await regenerateMismo(input.refNumber);
+        console.log(`[Applications] ${ctx.user.email ?? ctx.user.openId} regenerated MISMO for ${result.refNumber}`);
+        return result;
       } catch (err) {
         throw toTrpcError(err);
       }

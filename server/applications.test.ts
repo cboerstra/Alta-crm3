@@ -129,6 +129,41 @@ describe("applications router", () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining("officer@alta.test deleted ALT-K7M2Q"));
   });
 
+  it("sends a field correction as a PUT to the data route and refuses an empty or locked edit", async () => {
+    configure();
+    const result = { updated: true, refNumber: "ALT-K7M2Q", fields: ["phone", "currentAddress"], mismo: { status: "written", filename: "ALT-K7M2Q-x.xml" } };
+    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(200, result));
+    vi.stubGlobal("fetch", fetchSpy);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const caller = appRouter.createCaller(ctx(mockUser()));
+    expect(await caller.applications.updateData({ refNumber: "alt-k7m2q", edit: { phone: "8015550000", currentAddress: { zip: "84403" } } })).toEqual(result);
+    const [url, init] = fetchSpy.mock.calls[0] as [URL, RequestInit];
+    expect(url.toString()).toBe("https://site.test/api/staff/applications/ALT-K7M2Q/data");
+    expect(init.method).toBe("PUT");
+    expect(JSON.parse(String(init.body))).toEqual({ phone: "8015550000", currentAddress: { zip: "84403" } });
+
+    await expect(caller.applications.updateData({ refNumber: "ALT-K7M2Q", edit: {} })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(
+      caller.applications.updateData({ refNumber: "ALT-K7M2Q", edit: { eSignatureName: "x" } as never })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("regenerates the MISMO document with a POST", async () => {
+    configure();
+    const result = { regenerated: true, refNumber: "ALT-K7M2Q", mismoFilename: "ALT-K7M2Q-20260917T000000Z.xml", mismoSha256: "abc", bytes: 1234 };
+    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(200, result));
+    vi.stubGlobal("fetch", fetchSpy);
+    vi.spyOn(console, "log").mockImplementation(() => {});
+
+    const caller = appRouter.createCaller(ctx(mockUser()));
+    expect(await caller.applications.regenerateMismo({ refNumber: "ALT-K7M2Q" })).toEqual(result);
+    const [url, init] = fetchSpy.mock.calls[0] as [URL, RequestInit];
+    expect(url.toString()).toBe("https://site.test/api/staff/applications/ALT-K7M2Q/mismo");
+    expect(init.method).toBe("POST");
+  });
+
   it("maps a delete of a missing application to NOT_FOUND", async () => {
     configure();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(404, { error: "Not found" })));
