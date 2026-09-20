@@ -149,14 +149,14 @@ async function startServer() {
             });
           }
           // 10DLC-required STOP auto-response — must include brand name
-          await sendAutoReply(fromPhone, "Alta Mortgage Group: You have been unsubscribed and will receive no further messages. No action is needed. For help, reply HELP or contact us at info@altamortgagegroup.net.");
+          await sendAutoReply(fromPhone, "Alta Mortgage Group & Equity Real Estate: You have been unsubscribed and will receive no further messages. No action is needed. For help, reply HELP or contact us at info@altamortgagegroup.net.");
         } else if (keyword === "HELP" || keyword === "INFO") {
           // 10DLC-required HELP auto-response
           if (lead) {
             await createSmsMessage({ leadId: lead.id, direction: "inbound", body, status: "received" });
             await logActivity({ leadId: lead.id, type: "sms_received", title: "SMS HELP request received", content: body });
           }
-          await sendAutoReply(fromPhone, "Alta Mortgage Group: For help, contact us at info@altamortgagegroup.net or call (801) 888-1234. Msg & data rates may apply. Reply STOP to unsubscribe.");
+          await sendAutoReply(fromPhone, "Alta Mortgage Group & Equity Real Estate: For help, contact us at info@altamortgagegroup.net or call (801) 888-1234. Msg & data rates may apply. Reply STOP to unsubscribe.");
         } else if (lead) {
           await createSmsMessage({
             leadId: lead.id,

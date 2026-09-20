@@ -537,7 +537,7 @@ export default function PublicLandingPage() {
             <div className="flex items-start gap-2.5">
               <Checkbox id="sms-consent" checked={smsConsent} onCheckedChange={(v) => setSmsConsent(v === true)} className="mt-0.5 flex-shrink-0" />
               <label htmlFor="sms-consent" className="text-xs font-normal text-gray-500 leading-relaxed cursor-pointer" style={embeddedConsentLabelStyle}>
-                By checking this box, I consent to receive recurring automated and non-automated SMS text messages from Alta Mortgage Group at the mobile number provided above. Messages may include event reminders, follow-up information, mortgage updates, and appointment confirmations. Consent is not a condition of any purchase.
+                By checking this box, I consent to receive recurring automated and non-automated SMS text messages from Alta Mortgage Group and Equity Real Estate at the mobile number provided above. Messages may include event reminders, follow-up information, mortgage and real estate updates, and appointment confirmations. Consent is not a condition of any purchase.
               </label>
             </div>
             <p className="text-xs font-normal text-gray-500 leading-relaxed pl-7" style={embeddedSmallCopyStyle ? { ...embeddedSmallCopyStyle, paddingLeft: "1.75rem" } : undefined}>
@@ -715,7 +715,7 @@ export default function PublicLandingPage() {
                           <div className="flex items-start gap-2.5">
                             <Checkbox id="sms-consent" checked={smsConsent} onCheckedChange={(v) => setSmsConsent(v === true)} className="mt-0.5 flex-shrink-0" />
                             <label htmlFor="sms-consent" className="text-xs text-gray-500 leading-relaxed cursor-pointer">
-                              By checking this box, I consent to receive recurring automated and non-automated SMS text messages from Alta Mortgage Group at the mobile number provided above. Messages may include event reminders, follow-up information, mortgage updates, and appointment confirmations. Consent is not a condition of any purchase.
+                              By checking this box, I consent to receive recurring automated and non-automated SMS text messages from Alta Mortgage Group and Equity Real Estate at the mobile number provided above. Messages may include event reminders, follow-up information, mortgage and real estate updates, and appointment confirmations. Consent is not a condition of any purchase.
                             </label>
                           </div>
                           <p className="text-[10px] text-gray-400 leading-relaxed pl-7">
@@ -752,7 +752,7 @@ export default function PublicLandingPage() {
 
         {/* Footer */}
         <div className="text-center text-white/40 text-xs mt-8 space-y-1" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>
-          <p>&copy; {new Date().getFullYear()} Alta Mortgage Group. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Alta Mortgage Group &amp; Equity Real Estate. All rights reserved.</p>
           <p>
             <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/70 transition-colors">Privacy Policy</a>
             {" · "}
