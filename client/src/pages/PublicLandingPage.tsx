@@ -313,6 +313,20 @@ export default function PublicLandingPage() {
     }
   }, [enabledFields, sessions, selectedSessionId]);
 
+  // ─── Per-page tracking snippets (Meta pixel, Google tag, ...) ───
+  // Parsed the same way as an uploaded page's <head>, so inline and external
+  // scripts both execute. <noscript> fallbacks are dropped: the page needs JS anyway.
+  const headScripts = ((page as any)?.headScripts as string | null | undefined)?.trim() || "";
+  useEffect(() => {
+    if (!headScripts) return;
+    const markup = headScripts.replace(/<noscript\b[\s\S]*?<\/noscript>/gi, "");
+    const doc = new DOMParser().parseFromString(`<html><head>${markup}</head><body></body></html>`, "text/html");
+    const nodes = [...Array.from(doc.head.children), ...Array.from(doc.body.children)]
+      .map((node) => cloneHeadAsset(node, window.location.href));
+    nodes.forEach((node) => document.head.appendChild(node));
+    return () => nodes.forEach((node) => node.remove());
+  }, [headScripts]);
+
   // ─── Fetch HTML for embedded mode ───
   useEffect(() => {
     if (!renderHtmlInline) { setFetchedHtml(null); setFormMountPoint(null); return; }

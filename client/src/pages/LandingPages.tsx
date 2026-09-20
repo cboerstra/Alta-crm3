@@ -47,6 +47,7 @@ type FormState = {
   confirmationEmailBody: string;
   formEnabled: boolean;
   smsConsentEnabled: boolean;
+  headScripts: string;
 };
 
 type MediaSelection = {
@@ -99,6 +100,7 @@ const defaultForm: FormState = {
   confirmationEmailBody: DEFAULT_EMAIL_BODY,
   formEnabled: true,
   smsConsentEnabled: true,
+  headScripts: "",
 };
 
 const ALTA_FORM_BLOCK = `<div class="alta-crm-form-shell">
@@ -480,6 +482,7 @@ export default function LandingPages() {
       enabledFields: (page.enabledFields as string[]) || ["firstName", "lastName", "email", "phone"],
       formEnabled: page.formEnabled ?? true,
       smsConsentEnabled: page.smsConsentEnabled ?? true,
+      headScripts: page.headScripts || "",
       optInLabel: page.optInLabel || "I agree to receive communications about this event and future opportunities",
       showOptIn: page.showOptIn ?? true,
       confirmationEmailSubject: page.confirmationEmailSubject || DEFAULT_EMAIL_SUBJECT,
@@ -655,6 +658,7 @@ export default function LandingPages() {
         confirmationEmailSubject: form.confirmationEmailSubject || undefined,
         confirmationEmailBody: form.confirmationEmailBody || undefined,
         formEnabled: form.formEnabled, smsConsentEnabled: form.smsConsentEnabled,
+        headScripts: form.headScripts.trim() || null,
       });
     } else {
       createMutation.mutate({
@@ -668,6 +672,7 @@ export default function LandingPages() {
         confirmationEmailSubject: form.confirmationEmailSubject || undefined,
         confirmationEmailBody: form.confirmationEmailBody || undefined,
         formEnabled: form.formEnabled, smsConsentEnabled: form.smsConsentEnabled,
+        headScripts: form.headScripts.trim() || undefined,
       });
     }
   };
@@ -1509,6 +1514,24 @@ export default function LandingPages() {
                     </div>
                   </div>
                 )}
+
+                {/* ─── Tracking code (pixels, tags) ─── */}
+                <div className="space-y-2 border-t pt-4 mt-2">
+                  <Label htmlFor="lp-head-scripts" className="text-sm font-semibold">Tracking code</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Paste a Meta Pixel, Google tag, or any other snippet exactly as the provider gives it, <code className="bg-muted px-1 rounded text-[11px]">&lt;script&gt;</code> tags included.
+                    It is added to the <code className="bg-muted px-1 rounded text-[11px]">&lt;head&gt;</code> of this page's public URL only — never to the CRM itself. Applies on Save.
+                  </p>
+                  <Textarea
+                    id="lp-head-scripts"
+                    value={form.headScripts}
+                    onChange={(e) => setForm({ ...form, headScripts: e.target.value })}
+                    placeholder={"<!-- Meta Pixel Code -->\n<script>\n  !function(f,b,e,v,n,t,s)...\n  fbq('init', '1234567890');\n  fbq('track', 'PageView');\n</script>"}
+                    rows={8}
+                    spellCheck={false}
+                    className="font-mono text-xs"
+                  />
+                </div>
               </TabsContent>
 
 

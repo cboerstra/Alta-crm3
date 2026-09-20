@@ -139,6 +139,9 @@ export const landingPages = mysqlTable("landing_pages", {
   // Whether the 10DLC SMS-consent checkbox accompanies the phone field. Off =
   // phone is still collected but no consent is asked and no opt-in text is sent.
   smsConsentEnabled: boolean("smsConsentEnabled").default(true).notNull(),
+  // Tracking snippets (Meta pixel, Google tag, ...) injected into <head> on
+  // the public page only. Staff-entered, so treated as trusted markup.
+  headScripts: text("headScripts"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

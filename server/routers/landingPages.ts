@@ -79,6 +79,7 @@ export const landingPagesRouter = router({
       confirmationEmailBody: z.string().optional(),
       formEnabled: z.boolean().optional(),
       smsConsentEnabled: z.boolean().optional(),
+      headScripts: z.string().max(20000).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const existing = await getLandingPageBySlug(input.slug);
@@ -120,6 +121,7 @@ export const landingPagesRouter = router({
       formEmbedded: z.boolean().optional(),
       formEnabled: z.boolean().optional(),
       smsConsentEnabled: z.boolean().optional(),
+      headScripts: z.string().max(20000).nullable().optional(),
     }))
     .mutation(async ({ input }) => {
       const { id, ...data } = input;

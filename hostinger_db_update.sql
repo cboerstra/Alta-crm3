@@ -108,8 +108,23 @@ SET @sql7 = IF(@col7_exists = 0,
 );
 PREPARE stmt7 FROM @sql7; EXECUTE stmt7; DEALLOCATE PREPARE stmt7;
 
+-- 8. Add headScripts column to landing_pages (auto-migration 0033)
+--    Tracking pixels / tags injected into the public page's <head>.
+--    The app also adds this itself on startup; here for completeness.
+SET @col8_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = 'u833783884_AltaCRM'
+    AND TABLE_NAME   = 'landing_pages'
+    AND COLUMN_NAME  = 'headScripts'
+);
+SET @sql8 = IF(@col8_exists = 0,
+  'ALTER TABLE `u833783884_AltaCRM`.`landing_pages` ADD COLUMN `headScripts` text DEFAULT NULL',
+  'SELECT ''headScripts column already exists'' AS info'
+);
+PREPARE stmt8 FROM @sql8; EXECUTE stmt8; DEALLOCATE PREPARE stmt8;
+
 -- ============================================================
--- Verification — should show all 7 items as OK
+-- Verification — should show all 8 items as OK
 -- ============================================================
 SELECT
   'passwordHash column'   AS check_item,
@@ -163,4 +178,12 @@ SELECT
   'smsConsentEnabled column',
   IF(COUNT(*) > 0, 'OK', 'MISSING')
 FROM information_schema.COLUMNS
-WHERE TABLE_SCHEMA = 'u833783884_AltaCRM' AND TABLE_NAME = 'landing_pages' AND COLUMN_NAME = 'smsConsentEnabled';
+WHERE TABLE_SCHEMA = 'u833783884_AltaCRM' AND TABLE_NAME = 'landing_pages' AND COLUMN_NAME = 'smsConsentEnabled'
+
+UNION ALL
+
+SELECT
+  'headScripts column',
+  IF(COUNT(*) > 0, 'OK', 'MISSING')
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = 'u833783884_AltaCRM' AND TABLE_NAME = 'landing_pages' AND COLUMN_NAME = 'headScripts';
