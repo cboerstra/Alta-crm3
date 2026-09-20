@@ -156,7 +156,7 @@ async function startServer() {
             await createSmsMessage({ leadId: lead.id, direction: "inbound", body, status: "received" });
             await logActivity({ leadId: lead.id, type: "sms_received", title: "SMS HELP request received", content: body });
           }
-          await sendAutoReply(fromPhone, "Alta Mortgage Group & Equity Real Estate: For help, contact us at info@altamortgagegroup.net or call (801) 888-1234. Msg & data rates may apply. Reply STOP to unsubscribe.");
+          await sendAutoReply(fromPhone, "Alta Mortgage Group & Equity Real Estate: For help, contact us at info@altamortgagegroup.net or call (801) 628-9400. Msg & data rates may apply. Reply STOP to unsubscribe.");
         } else if (lead) {
           await createSmsMessage({
             leadId: lead.id,
