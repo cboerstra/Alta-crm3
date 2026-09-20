@@ -8,6 +8,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { useLocation, useParams } from "wouter";
 import { Loader2, Calendar, Clock } from "lucide-react";
+import { captureAttribution, toSubmitPayload, type Attribution } from "@/lib/attribution";
+import {
+  initPixel, trackPageView, trackConversion,
+  detectPixelInMarkup, adoptExternalPixel, pageViewEventId,
+} from "@/lib/metaPixel";
 
 const TEMPLATE_HEAD_ATTR = "data-alta-template-head";
 const EMBEDDED_FORM_CLASS = "alta-crm-embedded-form";
@@ -244,8 +249,65 @@ export default function PublicLandingPage() {
     { enabled: !!params.slug }
   );
 
+  // ─── Attribution + Meta Pixel ───
+  // Click parameters are captured on mount, before anything can navigate away,
+  // and travel with the form submission so the lead record knows which ad
+  // produced it.
+  const attributionRef = useRef<Attribution>({});
+  const [attributionReady, setAttributionReady] = useState(false);
+  useEffect(() => {
+    attributionRef.current = captureAttribution();
+    setAttributionReady(true);
+  }, []);
+
+  const { data: pixelConfig } = trpc.marketing.publicPixelConfig.useQuery(
+    { slug: params.slug },
+    { enabled: !!params.slug, staleTime: 5 * 60_000 }
+  );
+  const serverPageView = trpc.marketing.trackPageView.useMutation();
+
+  // A pixel pasted into the page's own Tracking code box owns the pixel: it
+  // initialises and sends PageView itself. Detected from the markup rather than
+  // from window.fbq, because this effect runs before that markup is injected.
+  const pastedPixelId = detectPixelInMarkup((page as any)?.headScripts);
+
+  useEffect(() => {
+    if (!attributionReady) return;
+
+    const baseEventId = attributionRef.current.eventId;
+
+    if (pastedPixelId) {
+      // Hand over ownership. Conversions still go through the pasted snippet's
+      // fbq with our eventID, so Lead de-duplication against the Conversions
+      // API keeps working — only PageView is left entirely to the snippet,
+      // since we cannot attach an eventID to one we did not fire.
+      adoptExternalPixel(pastedPixelId);
+      return;
+    }
+
+    if (!pixelConfig?.enabled || !pixelConfig.pixelId) return;
+    initPixel(pixelConfig.pixelId);
+    trackPageView(baseEventId ? pageViewEventId(baseEventId) : undefined);
+    // Mirror the view server-side so a blocked pixel doesn't lose the visit.
+    serverPageView.mutate({
+      slug: params.slug,
+      attribution: toSubmitPayload(attributionRef.current),
+    });
+    // Runs once per page once the pixel config and attribution are both ready.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pixelConfig?.enabled, pixelConfig?.pixelId, attributionReady, params.slug, pastedPixelId]);
+
   const submitLead = trpc.leads.captureFromLandingPage.useMutation({
     onSuccess: (data) => {
+      // Browser-side conversion, sharing its event id with the server event so
+      // Meta counts one conversion rather than two.
+      const eventId = attributionRef.current.eventId;
+      if (eventId && (pixelConfig?.enabled || pastedPixelId)) {
+        trackConversion(pixelConfig?.eventName || "Lead", eventId, {
+          content_name: page?.title,
+          content_category: "mortgage_lead",
+        });
+      }
       if (data.joinUrl) {
         window.sessionStorage.setItem(`lp:${params.slug}:joinUrl`, data.joinUrl);
       } else {
@@ -424,6 +486,7 @@ export default function PublicLandingPage() {
       smsConsent: askSmsConsent && smsConsent,
       contactOptIn,
       webinarSessionId,
+      attribution: toSubmitPayload(attributionRef.current),
     });
   };
 

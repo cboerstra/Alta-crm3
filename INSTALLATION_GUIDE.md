@@ -188,6 +188,19 @@ These are configured through the CRM Settings page at runtime, not as environmen
 | **Google Calendar** | OAuth tokens stored in `integrations` table via Settings UI |
 | **SMS (Twilio)** | Add `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` as env vars |
 | **Email (SendGrid)** | Add `SENDGRID_API_KEY` as env var and update `server/emailService.ts` |
+| **Meta Ads (Facebook/Instagram)** | Ad account, Page, token and pixel are stored in the `meta_settings` table via Settings → Meta Ads. One env var is still required — see below. |
+
+#### `PUBLIC_BASE_URL` (required to publish ad campaigns)
+
+The public origin of this CRM, with no trailing slash:
+
+```bash
+PUBLIC_BASE_URL=https://crm.altamortgagegroup.net
+```
+
+Ads link to landing pages on this domain, so every generated destination URL is built from it. It is deliberately an environment variable rather than a Settings field: a wrong value would send live ad spend to a dead link, and that is not a mistake worth making editable in a web form.
+
+Without it, landing pages, tracking and nurture sequences all work normally — only **Publish to Meta** is blocked, with an explicit error naming this variable.
 
 ---
 

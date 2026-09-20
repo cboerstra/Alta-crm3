@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Copy, Trash2, Edit, Upload, Image, FileIcon, X, Eye, Calendar, Clock, AlertCircle, Link as LinkIcon, Check, ImagePlus, Users, FileCode2, Wand2 } from "lucide-react";
+import { Plus, FileText, Copy, Trash2, Edit, Upload, Image, FileIcon, X, Eye, Calendar, Clock, AlertCircle, Link as LinkIcon, Check, ImagePlus, Users, FileCode2, Wand2, Info } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { IntegrateCodeDialog } from "@/components/IntegrateCodeDialog";
@@ -1531,6 +1531,7 @@ export default function LandingPages() {
                     spellCheck={false}
                     className="font-mono text-xs"
                   />
+                  <PastedPixelNotice headScripts={form.headScripts} />
                 </div>
               </TabsContent>
 
@@ -1705,6 +1706,56 @@ export default function LandingPages() {
           }
         }}
       />
+    </div>
+  );
+}
+
+/**
+ * Explains what happens when a Meta Pixel is pasted into the Tracking code box
+ * while one is also configured centrally in Settings -> Meta Ads.
+ *
+ * Both would initialise and both would send PageView, and Meta does not
+ * de-duplicate PageView — it carries no event id. Rather than silently letting
+ * the traffic numbers double, the public page hands ownership to the pasted
+ * snippet. This says so, at the moment someone pastes it, because the symptom
+ * otherwise shows up weeks later as numbers nobody can account for.
+ */
+function PastedPixelNotice({ headScripts }: { headScripts: string }) {
+  const { data: pixelSettings } = trpc.campaigns.connectionStatus.useQuery();
+
+  const pastedPixelId = useMemo(() => {
+    if (!headScripts) return null;
+    const init = headScripts.match(/fbq\s*\(\s*['"`]init['"`]\s*,\s*['"`]([^'"`]+)['"`]/i);
+    if (init) return init[1].trim();
+    return /fbq\s*\(\s*['"`]init['"`]/i.test(headScripts) ? "unknown" : null;
+  }, [headScripts]);
+
+  if (!pastedPixelId) return null;
+
+  const centralPixelConfigured = !!pixelSettings?.pixelConfigured;
+
+  return (
+    <div className="rounded-md border border-blue-200 bg-blue-50 p-3 flex gap-2">
+      <Info className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+      <div className="text-xs text-blue-900 space-y-1">
+        <p className="font-medium">
+          Meta Pixel detected{pastedPixelId !== "unknown" ? ` (${pastedPixelId})` : ""} — this page will use it.
+        </p>
+        {centralPixelConfigured ? (
+          <p>
+            A pixel is also configured in Settings &rarr; Meta Ads. To avoid counting every
+            visit twice, the CRM will not load its own pixel on this page; the snippet above
+            takes over. Conversions are still reported to the Conversions API with a matching
+            event ID, so lead attribution is unaffected.
+          </p>
+        ) : (
+          <p>
+            No pixel is configured in Settings &rarr; Meta Ads yet. Setting one there instead
+            lets the CRM pair each browser conversion with a server-side event, which keeps
+            attribution working when a visitor blocks the pixel.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

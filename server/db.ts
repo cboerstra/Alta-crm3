@@ -1635,7 +1635,274 @@ export async function runAutoMigrations(): Promise<void> {
       column: "headScripts",
       sql: "ALTER TABLE `landing_pages` ADD COLUMN `headScripts` text DEFAULT NULL",
     },
+    // ── Marketing engine: lead attribution ────────────────────────────────
+    // Every column below is first-touch attribution captured at lead capture.
+    { table: "leads", column: "campaignId", sql: "ALTER TABLE `leads` ADD COLUMN `campaignId` int DEFAULT NULL" },
+    { table: "leads", column: "utmSource", sql: "ALTER TABLE `leads` ADD COLUMN `utmSource` varchar(128) DEFAULT NULL" },
+    { table: "leads", column: "utmMedium", sql: "ALTER TABLE `leads` ADD COLUMN `utmMedium` varchar(128) DEFAULT NULL" },
+    { table: "leads", column: "utmCampaign", sql: "ALTER TABLE `leads` ADD COLUMN `utmCampaign` varchar(128) DEFAULT NULL" },
+    { table: "leads", column: "utmContent", sql: "ALTER TABLE `leads` ADD COLUMN `utmContent` varchar(128) DEFAULT NULL" },
+    { table: "leads", column: "utmTerm", sql: "ALTER TABLE `leads` ADD COLUMN `utmTerm` varchar(128) DEFAULT NULL" },
+    { table: "leads", column: "fbclid", sql: "ALTER TABLE `leads` ADD COLUMN `fbclid` varchar(512) DEFAULT NULL" },
+    { table: "leads", column: "fbc", sql: "ALTER TABLE `leads` ADD COLUMN `fbc` varchar(512) DEFAULT NULL" },
+    { table: "leads", column: "fbp", sql: "ALTER TABLE `leads` ADD COLUMN `fbp` varchar(128) DEFAULT NULL" },
+    { table: "leads", column: "gclid", sql: "ALTER TABLE `leads` ADD COLUMN `gclid` varchar(512) DEFAULT NULL" },
+    { table: "leads", column: "metaCampaignId", sql: "ALTER TABLE `leads` ADD COLUMN `metaCampaignId` varchar(64) DEFAULT NULL" },
+    { table: "leads", column: "metaCampaignName", sql: "ALTER TABLE `leads` ADD COLUMN `metaCampaignName` varchar(256) DEFAULT NULL" },
+    { table: "leads", column: "metaAdsetId", sql: "ALTER TABLE `leads` ADD COLUMN `metaAdsetId` varchar(64) DEFAULT NULL" },
+    { table: "leads", column: "metaAdsetName", sql: "ALTER TABLE `leads` ADD COLUMN `metaAdsetName` varchar(256) DEFAULT NULL" },
+    { table: "leads", column: "metaAdId", sql: "ALTER TABLE `leads` ADD COLUMN `metaAdId` varchar(64) DEFAULT NULL" },
+    { table: "leads", column: "metaAdName", sql: "ALTER TABLE `leads` ADD COLUMN `metaAdName` varchar(256) DEFAULT NULL" },
+    { table: "leads", column: "metaPlacement", sql: "ALTER TABLE `leads` ADD COLUMN `metaPlacement` varchar(128) DEFAULT NULL" },
+    { table: "leads", column: "landingUrl", sql: "ALTER TABLE `leads` ADD COLUMN `landingUrl` text DEFAULT NULL" },
+    { table: "leads", column: "referrerUrl", sql: "ALTER TABLE `leads` ADD COLUMN `referrerUrl` text DEFAULT NULL" },
+    { table: "leads", column: "clientIpAddress", sql: "ALTER TABLE `leads` ADD COLUMN `clientIpAddress` varchar(64) DEFAULT NULL" },
+    { table: "leads", column: "clientUserAgent", sql: "ALTER TABLE `leads` ADD COLUMN `clientUserAgent` text DEFAULT NULL" },
+    { table: "leads", column: "attributionCapturedAt", sql: "ALTER TABLE `leads` ADD COLUMN `attributionCapturedAt` timestamp NULL DEFAULT NULL" },
+
+    // ── Marketing engine: landing page tracking ───────────────────────────
+    { table: "landing_pages", column: "templateId", sql: "ALTER TABLE `landing_pages` ADD COLUMN `templateId` int DEFAULT NULL" },
+    { table: "landing_pages", column: "campaignId", sql: "ALTER TABLE `landing_pages` ADD COLUMN `campaignId` int DEFAULT NULL" },
+    { table: "landing_pages", column: "metaPixelId", sql: "ALTER TABLE `landing_pages` ADD COLUMN `metaPixelId` varchar(64) DEFAULT NULL" },
+    { table: "landing_pages", column: "trackingEnabled", sql: "ALTER TABLE `landing_pages` ADD COLUMN `trackingEnabled` tinyint(1) DEFAULT 1" },
+    { table: "landing_pages", column: "capiEnabled", sql: "ALTER TABLE `landing_pages` ADD COLUMN `capiEnabled` tinyint(1) DEFAULT 1" },
+    { table: "landing_pages", column: "conversionEventName", sql: "ALTER TABLE `landing_pages` ADD COLUMN `conversionEventName` varchar(64) DEFAULT 'Lead'" },
+    { table: "landing_pages", column: "conversionValue", sql: "ALTER TABLE `landing_pages` ADD COLUMN `conversionValue` DECIMAL(12,2) DEFAULT NULL" },
   ];
+
+  // ── Marketing engine tables ──────────────────────────────────────────────
+  // Created idempotently so an existing Hostinger database picks them up on the
+  // next restart without a manual migration step.
+  const marketingTables: { name: string; sql: string }[] = [
+    {
+      name: "meta_settings",
+      sql: `CREATE TABLE IF NOT EXISTS meta_settings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        adAccountId VARCHAR(64) NULL,
+        businessId VARCHAR(64) NULL,
+        pageId VARCHAR(64) NULL,
+        instagramActorId VARCHAR(64) NULL,
+        accessToken TEXT NULL,
+        tokenExpiresAt TIMESTAMP NULL,
+        pixelId VARCHAR(64) NULL,
+        capiAccessToken TEXT NULL,
+        capiTestEventCode VARCHAR(64) NULL,
+        capiEnabled TINYINT(1) NOT NULL DEFAULT 1,
+        pixelEnabled TINYINT(1) NOT NULL DEFAULT 1,
+        publishEnabled TINYINT(1) NOT NULL DEFAULT 0,
+        apiVersion VARCHAR(16) NOT NULL DEFAULT 'v21.0',
+        lastVerifiedAt TIMESTAMP NULL,
+        lastVerifyError TEXT NULL,
+        updatedBy INT NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`,
+    },
+    {
+      name: "landing_page_templates",
+      sql: `CREATE TABLE IF NOT EXISTS landing_page_templates (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        \`key\` VARCHAR(128) NOT NULL UNIQUE,
+        name VARCHAR(256) NOT NULL,
+        description TEXT NULL,
+        category ENUM('home_value','grant','purchase','refinance','webinar','general') NOT NULL DEFAULT 'general',
+        headline TEXT NULL,
+        subheadline TEXT NULL,
+        bodyText TEXT NULL,
+        ctaText VARCHAR(256) NULL,
+        steps JSON NULL,
+        enabledFields JSON NULL,
+        accentColor VARCHAR(16) DEFAULT '#C9A84C',
+        textColor VARCHAR(16) DEFAULT '#FFFFFF',
+        backgroundHtmlUrl TEXT NULL,
+        artworkUrl TEXT NULL,
+        thumbnailUrl TEXT NULL,
+        confirmationEmailSubject VARCHAR(512) NULL,
+        confirmationEmailBody TEXT NULL,
+        conversionEventName VARCHAR(64) DEFAULT 'Lead',
+        isSystem TINYINT(1) NOT NULL DEFAULT 0,
+        isActive TINYINT(1) NOT NULL DEFAULT 1,
+        createdBy INT NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`,
+    },
+    {
+      name: "campaigns",
+      sql: `CREATE TABLE IF NOT EXISTS campaigns (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(256) NOT NULL,
+        description TEXT NULL,
+        platform ENUM('meta','google','other') NOT NULL DEFAULT 'meta',
+        objective ENUM('OUTCOME_LEADS','OUTCOME_TRAFFIC','OUTCOME_AWARENESS','OUTCOME_ENGAGEMENT','OUTCOME_SALES') NOT NULL DEFAULT 'OUTCOME_LEADS',
+        status ENUM('draft','scheduled','active','paused','completed','archived') NOT NULL DEFAULT 'draft',
+        landingPageId INT NULL,
+        sequenceId INT NULL,
+        dailyBudget DECIMAL(12,2) NULL,
+        lifetimeBudget DECIMAL(12,2) NULL,
+        bidStrategy VARCHAR(64) DEFAULT 'LOWEST_COST_WITHOUT_CAP',
+        startDate TIMESTAMP NULL,
+        endDate TIMESTAMP NULL,
+        targeting JSON NULL,
+        creative JSON NULL,
+        utmSource VARCHAR(128) DEFAULT 'facebook',
+        utmMedium VARCHAR(128) DEFAULT 'paid_social',
+        utmCampaign VARCHAR(128) NULL,
+        utmContent VARCHAR(128) NULL,
+        metaCampaignId VARCHAR(64) NULL,
+        metaAdSetId VARCHAR(64) NULL,
+        metaAdId VARCHAR(64) NULL,
+        metaCreativeId VARCHAR(64) NULL,
+        metaAdAccountId VARCHAR(64) NULL,
+        syncStatus ENUM('local','syncing','synced','error') NOT NULL DEFAULT 'local',
+        syncError TEXT NULL,
+        lastSyncedAt TIMESTAMP NULL,
+        aiGenerated TINYINT(1) NOT NULL DEFAULT 0,
+        aiPrompt TEXT NULL,
+        createdBy INT NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_campaigns_meta (metaCampaignId),
+        INDEX idx_campaigns_utm (utmCampaign)
+      )`,
+    },
+    {
+      name: "campaign_metrics",
+      sql: `CREATE TABLE IF NOT EXISTS campaign_metrics (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        campaignId INT NOT NULL,
+        date VARCHAR(10) NOT NULL,
+        impressions INT NOT NULL DEFAULT 0,
+        reach INT NOT NULL DEFAULT 0,
+        clicks INT NOT NULL DEFAULT 0,
+        spend DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+        reportedLeads INT NOT NULL DEFAULT 0,
+        cpc DECIMAL(12,4) NULL,
+        cpm DECIMAL(12,4) NULL,
+        ctr DECIMAL(8,4) NULL,
+        raw JSON NULL,
+        fetchedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_campaign_date (campaignId, date)
+      )`,
+    },
+    {
+      name: "automation_sequences",
+      sql: `CREATE TABLE IF NOT EXISTS automation_sequences (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(256) NOT NULL,
+        description TEXT NULL,
+        triggerType ENUM('campaign_lead','lead_created','stage_change','manual') NOT NULL DEFAULT 'campaign_lead',
+        triggerValue VARCHAR(128) NULL,
+        isActive TINYINT(1) NOT NULL DEFAULT 1,
+        createdBy INT NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`,
+    },
+    {
+      name: "automation_steps",
+      sql: `CREATE TABLE IF NOT EXISTS automation_steps (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        sequenceId INT NOT NULL,
+        stepOrder INT NOT NULL DEFAULT 0,
+        type ENUM('email','sms','call_task','wait','stage_change','notify_owner') NOT NULL,
+        delayMinutes INT NOT NULL DEFAULT 0,
+        subject VARCHAR(512) NULL,
+        body TEXT NULL,
+        taskTitle VARCHAR(512) NULL,
+        taskNotes TEXT NULL,
+        assignTo INT NULL,
+        targetStage VARCHAR(64) NULL,
+        isActive TINYINT(1) NOT NULL DEFAULT 1,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_steps_sequence (sequenceId, stepOrder)
+      )`,
+    },
+    {
+      name: "automation_enrollments",
+      sql: `CREATE TABLE IF NOT EXISTS automation_enrollments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        sequenceId INT NOT NULL,
+        leadId INT NOT NULL,
+        campaignId INT NULL,
+        status ENUM('active','completed','cancelled','failed') NOT NULL DEFAULT 'active',
+        currentStepOrder INT NOT NULL DEFAULT 0,
+        nextRunAt TIMESTAMP NULL,
+        lastError TEXT NULL,
+        startedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        completedAt TIMESTAMP NULL,
+        INDEX idx_enrollments_due (status, nextRunAt),
+        INDEX idx_enrollments_lead (leadId)
+      )`,
+    },
+    {
+      name: "automation_step_runs",
+      sql: `CREATE TABLE IF NOT EXISTS automation_step_runs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        enrollmentId INT NOT NULL,
+        stepId INT NOT NULL,
+        leadId INT NOT NULL,
+        status ENUM('sent','skipped','failed') NOT NULL,
+        detail TEXT NULL,
+        ranAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_runs_enrollment (enrollmentId)
+      )`,
+    },
+    {
+      name: "tasks",
+      sql: `CREATE TABLE IF NOT EXISTS tasks (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        leadId INT NULL,
+        campaignId INT NULL,
+        assignedTo INT NULL,
+        title VARCHAR(512) NOT NULL,
+        notes TEXT NULL,
+        type ENUM('call','email','follow_up','other') NOT NULL DEFAULT 'call',
+        dueAt TIMESTAMP NULL,
+        status ENUM('open','completed','cancelled') NOT NULL DEFAULT 'open',
+        completedAt TIMESTAMP NULL,
+        completedBy INT NULL,
+        createdBy INT NULL,
+        source VARCHAR(64) DEFAULT 'manual',
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_tasks_open (status, dueAt)
+      )`,
+    },
+    {
+      name: "meta_conversion_events",
+      sql: `CREATE TABLE IF NOT EXISTS meta_conversion_events (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        leadId INT NULL,
+        campaignId INT NULL,
+        landingPageId INT NULL,
+        eventName VARCHAR(64) NOT NULL,
+        eventId VARCHAR(128) NOT NULL,
+        eventTime TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        pixelId VARCHAR(64) NULL,
+        actionSource VARCHAR(32) DEFAULT 'website',
+        value DECIMAL(12,2) NULL,
+        currency VARCHAR(8) DEFAULT 'USD',
+        status ENUM('pending','sent','failed','skipped') NOT NULL DEFAULT 'pending',
+        responseCode INT NULL,
+        responseBody TEXT NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_events_lead (leadId)
+      )`,
+    },
+  ];
+
+  for (const t of marketingTables) {
+    try {
+      await (db as any).execute(t.sql);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes("already exists")) {
+        console.error(`[Auto-Migration] ${t.name} table:`, msg);
+      }
+    }
+  }
 
   // Create sms_reminders table if it doesn't exist (Hostinger migration)
   try {

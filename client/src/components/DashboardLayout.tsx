@@ -39,6 +39,9 @@ import {
   Shield,
   MessageSquare,
   ClipboardList,
+  Megaphone,
+  LayoutTemplate,
+  Workflow,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -61,6 +64,10 @@ const menuItems: MenuItem[] = [
   { icon: Columns3, label: "Pipeline", path: "/pipeline", section: "main" },
   { icon: Video, label: "Webinars", path: "/webinars", section: "main" },
   { icon: FileText, label: "Landing Pages", path: "/landing-pages", section: "main" },
+  { icon: Megaphone, label: "Campaigns", path: "/campaigns", section: "main" },
+  { icon: LayoutTemplate, label: "Page Templates", path: "/templates", section: "main" },
+  { icon: Workflow, label: "Automations", path: "/automations", section: "main" },
+  { icon: BarChart3, label: "Marketing", path: "/marketing", section: "main" },
   { icon: Calendar, label: "Scheduling", path: "/scheduling", section: "main" },
   { icon: DollarSign, label: "Deals", path: "/deals", section: "main" },
   { icon: BarChart3, label: "Revenue", path: "/revenue", section: "main" },
