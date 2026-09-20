@@ -233,6 +233,9 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
     .mutation(async ({ input, ctx }) => {
       const page = await getLandingPageBySlug(input.slug);
       if (!page || !page.isActive) throw new Error("Landing page not found");
+      if (!page.formEnabled) throw new Error("This page does not accept form submissions");
+      // Consent can only be given where the page actually asked for it.
+      const smsConsent = page.smsConsentEnabled ? (input.smsConsent ?? false) : false;
 
       // Create the lead
       const id = await createLead({
@@ -245,7 +248,7 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
         landingPageId: page.id,
         webinarId: page.webinarId ?? undefined,
         webinarSessionId: input.webinarSessionId,
-        smsConsent: input.smsConsent ?? false,
+        smsConsent,
         contactOptIn: input.contactOptIn ?? false,
         stage: page.webinarId ? "registered" : "new_lead",
         attendanceStatus: page.webinarId ? "registered" : undefined,
@@ -279,7 +282,7 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
       runTrigger("lead_created", id).catch(() => {});
 
       // 10DLC: send opt-in confirmation SMS immediately when consent is given
-      if (input.smsConsent && input.phone) {
+      if (smsConsent && input.phone) {
         sendSmsOptInConfirmation(id, input.phone).catch(() => {});
       }
 

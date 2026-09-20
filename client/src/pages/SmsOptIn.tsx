@@ -35,7 +35,7 @@ export default function SmsOptIn() {
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">You're opted in!</h2>
           <p className="text-gray-500 text-sm">
-            Thank you. You'll receive a confirmation text from Alta Mortgage Group shortly.
+            Thank you. You'll receive a confirmation text from Alta Mortgage Group &amp; Equity Real Estate shortly.
             Reply <strong>STOP</strong> at any time to unsubscribe.
           </p>
         </div>
@@ -49,11 +49,11 @@ export default function SmsOptIn() {
         {/* Header */}
         <div className="text-center mb-6">
           <p className="text-xs font-semibold uppercase tracking-widest text-[#1F7B47] mb-1">
-            Alta Mortgage Group
+            Alta Mortgage Group &amp; Equity Real Estate
           </p>
           <h1 className="text-2xl font-bold text-gray-900">SMS Updates Opt-In</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Sign up to receive mortgage tips, event reminders, and appointment updates by text.
+            Sign up to receive mortgage tips, home listings, event reminders, and appointment updates by text.
           </p>
         </div>
 
@@ -131,9 +131,9 @@ export default function SmsOptIn() {
               />
               <label htmlFor="sms-consent" className="text-xs text-gray-600 leading-relaxed cursor-pointer">
                 By checking this box, I consent to receive recurring automated and non-automated SMS
-                text messages from <strong>Alta Mortgage Group</strong> at the mobile number provided
-                above. Messages may include event reminders, follow-up information, mortgage updates,
-                and appointment confirmations. Consent is not a condition of any purchase or service.
+                text messages from <strong>Alta Mortgage Group and Equity Real Estate</strong> at the mobile
+                number provided above. Messages may include event reminders, follow-up information, mortgage
+                and real estate updates, and appointment confirmations. Consent is not a condition of any purchase or service.
               </label>
             </div>
             <p className="text-[10px] text-gray-400 leading-relaxed pl-6">
@@ -165,7 +165,7 @@ export default function SmsOptIn() {
 
       {/* Footer */}
       <div className="text-center text-gray-400 text-xs mt-8 space-y-1">
-        <p>&copy; {new Date().getFullYear()} Alta Mortgage Group. All rights reserved.</p>
+        <p>&copy; {new Date().getFullYear()} Alta Mortgage Group &amp; Equity Real Estate. All rights reserved.</p>
         <p>
           <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-600">
             Privacy Policy

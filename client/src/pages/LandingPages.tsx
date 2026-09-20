@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, FileText, Copy, Trash2, Edit, Upload, Image, FileIcon, X, Eye, Calendar, Clock, AlertCircle, Link as LinkIcon, Check, ImagePlus, Users, FileCode2, Wand2 } from "lucide-react";
+import { Plus, FileText, Copy, Trash2, Edit, Upload, Image, FileIcon, X, Eye, Calendar, Clock, AlertCircle, Link as LinkIcon, Check, ImagePlus, Users, FileCode2, Wand2, Info } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { IntegrateCodeDialog } from "@/components/IntegrateCodeDialog";
@@ -45,6 +45,9 @@ type FormState = {
   showOptIn: boolean;
   confirmationEmailSubject: string;
   confirmationEmailBody: string;
+  formEnabled: boolean;
+  smsConsentEnabled: boolean;
+  headScripts: string;
 };
 
 type MediaSelection = {
@@ -95,6 +98,9 @@ const defaultForm: FormState = {
   showOptIn: true,
   confirmationEmailSubject: DEFAULT_EMAIL_SUBJECT,
   confirmationEmailBody: DEFAULT_EMAIL_BODY,
+  formEnabled: true,
+  smsConsentEnabled: true,
+  headScripts: "",
 };
 
 const ALTA_FORM_BLOCK = `<div class="alta-crm-form-shell">
@@ -474,6 +480,9 @@ export default function LandingPages() {
       accentColor: page.accentColor || "#C9A84C",
       textColor: page.textColor || "#FFFFFF",
       enabledFields: (page.enabledFields as string[]) || ["firstName", "lastName", "email", "phone"],
+      formEnabled: page.formEnabled ?? true,
+      smsConsentEnabled: page.smsConsentEnabled ?? true,
+      headScripts: page.headScripts || "",
       optInLabel: page.optInLabel || "I agree to receive communications about this event and future opportunities",
       showOptIn: page.showOptIn ?? true,
       confirmationEmailSubject: page.confirmationEmailSubject || DEFAULT_EMAIL_SUBJECT,
@@ -525,19 +534,25 @@ export default function LandingPages() {
     if (!isHtmlFile) { toast.error("Please upload an HTML file"); return; }
     if (file.size > 10 * 1024 * 1024) { toast.error("HTML file must be under 10MB"); return; }
 
-    const { file: preparedFile, changed } = await prepareHtmlFileForLandingPage(file);
+    // With the lead form switched off the page is uploaded exactly as given:
+    // no placeholder injection and nothing to integrate.
+    const { file: preparedFile, changed } = form.formEnabled
+      ? await prepareHtmlFileForLandingPage(file)
+      : { file, changed: false };
     const previewUrl = URL.createObjectURL(preparedFile);
     setBackgroundHtmlPreview(previewUrl);
     setFormEmbedded(true);
     if (changed) {
       toast.success("Smart HTML Import added the CRM form placeholder and enabled embedded mode.");
+    } else if (!form.formEnabled) {
+      toast.success("HTML imported as-is. The CRM lead form is off for this page.");
     }
 
     if (editId) {
       setUploading(true);
       try {
         const url = await uploadFileAndGetUrl("/api/upload-html", preparedFile);
-        updateArtworkMutation.mutate({ id: editId, backgroundHtmlUrl: url, formEmbedded: true });
+        updateArtworkMutation.mutate({ id: editId, backgroundHtmlUrl: url, formEmbedded: true, formEnabled: form.formEnabled });
         setBackgroundHtmlPreview(url);
       } catch (err: any) {
         toast.error("Failed to upload HTML background: " + err.message);
@@ -642,6 +657,8 @@ export default function LandingPages() {
         optInLabel: form.optInLabel || undefined, showOptIn: form.showOptIn,
         confirmationEmailSubject: form.confirmationEmailSubject || undefined,
         confirmationEmailBody: form.confirmationEmailBody || undefined,
+        formEnabled: form.formEnabled, smsConsentEnabled: form.smsConsentEnabled,
+        headScripts: form.headScripts.trim() || null,
       });
     } else {
       createMutation.mutate({
@@ -654,6 +671,8 @@ export default function LandingPages() {
         optInLabel: form.optInLabel || undefined, showOptIn: form.showOptIn,
         confirmationEmailSubject: form.confirmationEmailSubject || undefined,
         confirmationEmailBody: form.confirmationEmailBody || undefined,
+        formEnabled: form.formEnabled, smsConsentEnabled: form.smsConsentEnabled,
+        headScripts: form.headScripts.trim() || undefined,
       });
     }
   };
@@ -928,6 +947,19 @@ export default function LandingPages() {
 
               {/* ─── Form Fields Tab ─── */}
               <TabsContent value="fields" className="space-y-4 mt-4">
+                <div className="flex items-start justify-between gap-4 p-3 rounded-lg border bg-card">
+                  <div className="space-y-0.5">
+                    <Label>Include CRM lead form</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Turn off for pages that only need to be published, such as an imported listing page with its own call/text buttons.
+                      Imported HTML is then shown exactly as uploaded and submissions are refused.
+                    </p>
+                  </div>
+                  <Switch checked={form.formEnabled} onCheckedChange={(v) => setForm({ ...form, formEnabled: v })} />
+                </div>
+                {!form.formEnabled && (
+                  <p className="text-xs text-muted-foreground">The settings below only apply while the lead form is on.</p>
+                )}
                 <p className="text-sm text-muted-foreground">Select which fields appear on the lead capture form. Required fields cannot be disabled.</p>
                 <div className="space-y-3">
                   {ALL_FORM_FIELDS.map((field) => (
@@ -948,6 +980,15 @@ export default function LandingPages() {
                 </div>
                 <Separator />
                 <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-0.5">
+                      <Label>Ask for SMS consent with the phone number</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Shows the 10DLC consent checkbox and sends the opt-in confirmation text. Turn off when you will not be texting these leads from the CRM.
+                      </p>
+                    </div>
+                    <Switch checked={form.smsConsentEnabled} onCheckedChange={(v) => setForm({ ...form, smsConsentEnabled: v })} />
+                  </div>
                   <div className="flex items-center justify-between">
                     <Label>Show Opt-In Consent Checkbox</Label>
                     <Switch checked={form.showOptIn} onCheckedChange={(v) => setForm({ ...form, showOptIn: v })} />
@@ -1337,7 +1378,11 @@ export default function LandingPages() {
                 <div>
                   <Label className="mb-2 block font-semibold">HTML Background Template</Label>
                   <p className="text-xs text-muted-foreground mb-3">
-                    Upload an HTML file and Smart HTML Import will prepare it for the CRM form automatically. If the file does not include <code className="bg-muted px-1 rounded text-[11px]">{"{{alta_form}}"}</code>, the importer inserts it near the best registration area and enables embedded mode.
+                    {form.formEnabled ? (
+                      <>Upload an HTML file and Smart HTML Import will prepare it for the CRM form automatically. If the file does not include <code className="bg-muted px-1 rounded text-[11px]">{"{{alta_form}}"}</code>, the importer inserts it near the best registration area and enables embedded mode.</>
+                    ) : (
+                      <>The CRM lead form is off (Form Fields tab), so the file is published exactly as uploaded with no form added.</>
+                    )}
                   </p>
 
                   {backgroundHtmlPreview ? (
@@ -1404,7 +1449,7 @@ export default function LandingPages() {
                     onChange={(e) => handleHtmlSelect(e.target.files?.[0])}
                   />
 
-                  {(backgroundHtmlPreview || pendingHtmlFile) && (
+                  {form.formEnabled && (backgroundHtmlPreview || pendingHtmlFile) && (
                     <div className="mt-4 rounded-md border bg-muted/30 p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
@@ -1469,6 +1514,25 @@ export default function LandingPages() {
                     </div>
                   </div>
                 )}
+
+                {/* ─── Tracking code (pixels, tags) ─── */}
+                <div className="space-y-2 border-t pt-4 mt-2">
+                  <Label htmlFor="lp-head-scripts" className="text-sm font-semibold">Tracking code</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Paste a Meta Pixel, Google tag, or any other snippet exactly as the provider gives it, <code className="bg-muted px-1 rounded text-[11px]">&lt;script&gt;</code> tags included.
+                    It is added to the <code className="bg-muted px-1 rounded text-[11px]">&lt;head&gt;</code> of this page's public URL only — never to the CRM itself. Applies on Save.
+                  </p>
+                  <Textarea
+                    id="lp-head-scripts"
+                    value={form.headScripts}
+                    onChange={(e) => setForm({ ...form, headScripts: e.target.value })}
+                    placeholder={"<!-- Meta Pixel Code -->\n<script>\n  !function(f,b,e,v,n,t,s)...\n  fbq('init', '1234567890');\n  fbq('track', 'PageView');\n</script>"}
+                    rows={8}
+                    spellCheck={false}
+                    className="font-mono text-xs"
+                  />
+                  <PastedPixelNotice headScripts={form.headScripts} />
+                </div>
               </TabsContent>
 
 
@@ -1642,6 +1706,56 @@ export default function LandingPages() {
           }
         }}
       />
+    </div>
+  );
+}
+
+/**
+ * Explains what happens when a Meta Pixel is pasted into the Tracking code box
+ * while one is also configured centrally in Settings -> Meta Ads.
+ *
+ * Both would initialise and both would send PageView, and Meta does not
+ * de-duplicate PageView — it carries no event id. Rather than silently letting
+ * the traffic numbers double, the public page hands ownership to the pasted
+ * snippet. This says so, at the moment someone pastes it, because the symptom
+ * otherwise shows up weeks later as numbers nobody can account for.
+ */
+function PastedPixelNotice({ headScripts }: { headScripts: string }) {
+  const { data: pixelSettings } = trpc.campaigns.connectionStatus.useQuery();
+
+  const pastedPixelId = useMemo(() => {
+    if (!headScripts) return null;
+    const init = headScripts.match(/fbq\s*\(\s*['"`]init['"`]\s*,\s*['"`]([^'"`]+)['"`]/i);
+    if (init) return init[1].trim();
+    return /fbq\s*\(\s*['"`]init['"`]/i.test(headScripts) ? "unknown" : null;
+  }, [headScripts]);
+
+  if (!pastedPixelId) return null;
+
+  const centralPixelConfigured = !!pixelSettings?.pixelConfigured;
+
+  return (
+    <div className="rounded-md border border-blue-200 bg-blue-50 p-3 flex gap-2">
+      <Info className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+      <div className="text-xs text-blue-900 space-y-1">
+        <p className="font-medium">
+          Meta Pixel detected{pastedPixelId !== "unknown" ? ` (${pastedPixelId})` : ""} — this page will use it.
+        </p>
+        {centralPixelConfigured ? (
+          <p>
+            A pixel is also configured in Settings &rarr; Meta Ads. To avoid counting every
+            visit twice, the CRM will not load its own pixel on this page; the snippet above
+            takes over. Conversions are still reported to the Conversions API with a matching
+            event ID, so lead attribution is unaffected.
+          </p>
+        ) : (
+          <p>
+            No pixel is configured in Settings &rarr; Meta Ads yet. Setting one there instead
+            lets the CRM pair each browser conversion with a server-side event, which keeps
+            attribution working when a visitor blocks the pixel.
+          </p>
+        )}
+      </div>
     </div>
   );
 }

@@ -9,7 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { useLocation, useParams } from "wouter";
 import { Loader2, Calendar, Clock } from "lucide-react";
 import { captureAttribution, toSubmitPayload, type Attribution } from "@/lib/attribution";
-import { initPixel, trackPageView, trackConversion } from "@/lib/metaPixel";
+import {
+  initPixel, trackPageView, trackConversion,
+  detectPixelInMarkup, adoptExternalPixel, pageViewEventId,
+} from "@/lib/metaPixel";
 
 const TEMPLATE_HEAD_ATTR = "data-alta-template-head";
 const EMBEDDED_FORM_CLASS = "alta-crm-embedded-form";
@@ -263,10 +266,28 @@ export default function PublicLandingPage() {
   );
   const serverPageView = trpc.marketing.trackPageView.useMutation();
 
+  // A pixel pasted into the page's own Tracking code box owns the pixel: it
+  // initialises and sends PageView itself. Detected from the markup rather than
+  // from window.fbq, because this effect runs before that markup is injected.
+  const pastedPixelId = detectPixelInMarkup((page as any)?.headScripts);
+
   useEffect(() => {
-    if (!pixelConfig?.enabled || !pixelConfig.pixelId || !attributionReady) return;
+    if (!attributionReady) return;
+
+    const baseEventId = attributionRef.current.eventId;
+
+    if (pastedPixelId) {
+      // Hand over ownership. Conversions still go through the pasted snippet's
+      // fbq with our eventID, so Lead de-duplication against the Conversions
+      // API keeps working — only PageView is left entirely to the snippet,
+      // since we cannot attach an eventID to one we did not fire.
+      adoptExternalPixel(pastedPixelId);
+      return;
+    }
+
+    if (!pixelConfig?.enabled || !pixelConfig.pixelId) return;
     initPixel(pixelConfig.pixelId);
-    trackPageView();
+    trackPageView(baseEventId ? pageViewEventId(baseEventId) : undefined);
     // Mirror the view server-side so a blocked pixel doesn't lose the visit.
     serverPageView.mutate({
       slug: params.slug,
@@ -274,15 +295,15 @@ export default function PublicLandingPage() {
     });
     // Runs once per page once the pixel config and attribution are both ready.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pixelConfig?.enabled, pixelConfig?.pixelId, attributionReady, params.slug]);
+  }, [pixelConfig?.enabled, pixelConfig?.pixelId, attributionReady, params.slug, pastedPixelId]);
 
   const submitLead = trpc.leads.captureFromLandingPage.useMutation({
     onSuccess: (data) => {
       // Browser-side conversion, sharing its event id with the server event so
       // Meta counts one conversion rather than two.
       const eventId = attributionRef.current.eventId;
-      if (eventId && pixelConfig?.enabled) {
-        trackConversion(pixelConfig.eventName || "Lead", eventId, {
+      if (eventId && (pixelConfig?.enabled || pastedPixelId)) {
+        trackConversion(pixelConfig?.eventName || "Lead", eventId, {
           content_name: page?.title,
           content_category: "mortgage_lead",
         });
@@ -328,6 +349,12 @@ export default function PublicLandingPage() {
 
   // ─── Derived feature flags ───
   const formEmbedded = !!(page as any)?.formEmbedded && hasHtmlBackground;
+  // Pages created before these columns existed read as undefined -> treat as on.
+  const formEnabled = (page as any)?.formEnabled ?? true;
+  const askSmsConsent = ((page as any)?.smsConsentEnabled ?? true) && showField("phone");
+  // An uploaded HTML page with the form switched off is rendered inline, as-is,
+  // rather than as a pointer-events-none iframe behind a floating card.
+  const renderHtmlInline = hasHtmlBackground && (formEmbedded || !formEnabled);
   // logoOnBackground only applies in non-embedded mode (embedded mode has the logo inside the form card in the HTML)
   const logoOnBackground = !!(page as any)?.logoOnHtmlBackground && hasHtmlBackground && !formEmbedded;
 
@@ -348,16 +375,30 @@ export default function PublicLandingPage() {
     }
   }, [enabledFields, sessions, selectedSessionId]);
 
+  // ─── Per-page tracking snippets (Meta pixel, Google tag, ...) ───
+  // Parsed the same way as an uploaded page's <head>, so inline and external
+  // scripts both execute. <noscript> fallbacks are dropped: the page needs JS anyway.
+  const headScripts = ((page as any)?.headScripts as string | null | undefined)?.trim() || "";
+  useEffect(() => {
+    if (!headScripts) return;
+    const markup = headScripts.replace(/<noscript\b[\s\S]*?<\/noscript>/gi, "");
+    const doc = new DOMParser().parseFromString(`<html><head>${markup}</head><body></body></html>`, "text/html");
+    const nodes = [...Array.from(doc.head.children), ...Array.from(doc.body.children)]
+      .map((node) => cloneHeadAsset(node, window.location.href));
+    nodes.forEach((node) => document.head.appendChild(node));
+    return () => nodes.forEach((node) => node.remove());
+  }, [headScripts]);
+
   // ─── Fetch HTML for embedded mode ───
   useEffect(() => {
-    if (!formEmbedded) { setFetchedHtml(null); setFormMountPoint(null); return; }
+    if (!renderHtmlInline) { setFetchedHtml(null); setFormMountPoint(null); return; }
     const url = (page as any)?.backgroundHtmlUrl as string;
     if (!url) return;
     fetch(url)
       .then(r => r.text())
       .then(html => setFetchedHtml(html))
       .catch(() => setFetchedHtml(""));
-  }, [formEmbedded, (page as any)?.backgroundHtmlUrl]);
+  }, [renderHtmlInline, (page as any)?.backgroundHtmlUrl]);
 
   // ─── Render uploaded HTML body and locate form mount point ───
   useEffect(() => {
@@ -365,10 +406,16 @@ export default function PublicLandingPage() {
     const container = htmlContainerRef.current;
     const baseUrl = new URL((page as any)?.backgroundHtmlUrl || window.location.href, window.location.origin).toString();
     const placeholder = '<div id="alta-crm-form-mount"></div>';
-    let modified = fetchedHtml.includes("{{alta_form}}")
-      ? fetchedHtml.replace(/\{\{alta_form\}\}/g, placeholder)
-      : fetchedHtml.replace(/<\/body>/i, `${placeholder}</body>`);
-    if (!modified.includes(placeholder)) modified += placeholder;
+    let modified: string;
+    if (!formEnabled) {
+      // Form is off: publish the HTML as uploaded, dropping any placeholder.
+      modified = fetchedHtml.replace(/\{\{alta_form\}\}/g, "");
+    } else {
+      modified = fetchedHtml.includes("{{alta_form}}")
+        ? fetchedHtml.replace(/\{\{alta_form\}\}/g, placeholder)
+        : fetchedHtml.replace(/<\/body>/i, `${placeholder}</body>`);
+      if (!modified.includes(placeholder)) modified += placeholder;
+    }
 
     // Replace {{alta_logo}} with actual logo img tags from the media library
     const logoHtml = foregroundLogos.map(item =>
@@ -407,7 +454,7 @@ export default function PublicLandingPage() {
       container.innerHTML = "";
       setFormMountPoint(null);
     };
-  }, [fetchedHtml, foregroundLogos, logoSize, (page as any)?.backgroundHtmlUrl]);
+  }, [fetchedHtml, foregroundLogos, logoSize, formEnabled, (page as any)?.backgroundHtmlUrl]);
 
   if (pageLoading) {
     return (
@@ -436,7 +483,7 @@ export default function PublicLandingPage() {
       lastName: form.lastName,
       email: form.email,
       phone: form.phone || undefined,
-      smsConsent,
+      smsConsent: askSmsConsent && smsConsent,
       contactOptIn,
       webinarSessionId,
       attribution: toSubmitPayload(attributionRef.current),
@@ -574,12 +621,12 @@ export default function PublicLandingPage() {
             </Select>
           </div>
         )}
-        {showField("phone") && (
+        {askSmsConsent && (
           <div className="space-y-2 pt-1 font-sans">
             <div className="flex items-start gap-2.5">
               <Checkbox id="sms-consent" checked={smsConsent} onCheckedChange={(v) => setSmsConsent(v === true)} className="mt-0.5 flex-shrink-0" />
               <label htmlFor="sms-consent" className="text-xs font-normal text-gray-500 leading-relaxed cursor-pointer" style={embeddedConsentLabelStyle}>
-                By checking this box, I consent to receive recurring automated and non-automated SMS text messages from Alta Mortgage Group at the mobile number provided above. Messages may include event reminders, follow-up information, mortgage updates, and appointment confirmations. Consent is not a condition of any purchase.
+                By checking this box, I consent to receive recurring automated and non-automated SMS text messages from Alta Mortgage Group and Equity Real Estate at the mobile number provided above. Messages may include event reminders, follow-up information, mortgage and real estate updates, and appointment confirmations. Consent is not a condition of any purchase.
               </label>
             </div>
             <p className="text-xs font-normal text-gray-500 leading-relaxed pl-7" style={embeddedSmallCopyStyle ? { ...embeddedSmallCopyStyle, paddingLeft: "1.75rem" } : undefined}>
@@ -613,13 +660,13 @@ export default function PublicLandingPage() {
   // EMBEDDED MODE — HTML template is rendered as page content,
   // form is portalled into {{alta_form}} placeholder
   // ═══════════════════════════════════════════════════════════
-  if (formEmbedded) {
+  if (renderHtmlInline) {
     return (
       <div className="w-full min-h-screen">
         {/* Full-page HTML rendered via innerHTML */}
         <div ref={htmlContainerRef} className="w-full min-h-screen" />
         {/* Portal form into the #alta-crm-form-mount element */}
-        {formMountPoint && createPortal(
+        {formEnabled && formMountPoint && createPortal(
           <div className={`${EMBEDDED_FORM_CLASS} p-4 flex justify-center`}>
             <div className="w-full max-w-md">
               {formCardContent}
@@ -685,6 +732,7 @@ export default function PublicLandingPage() {
         )}
 
         {/* Registration form card */}
+        {formEnabled && (
         <div className="w-full max-w-md">
           {/* When logo is shown on the background, hide it inside the card to avoid duplication */}
           {logoOnBackground && foregroundLogos.length > 0
@@ -752,12 +800,12 @@ export default function PublicLandingPage() {
                           </Select>
                         </div>
                       )}
-                      {showField("phone") && (
+                      {askSmsConsent && (
                         <div className="space-y-2 pt-1">
                           <div className="flex items-start gap-2.5">
                             <Checkbox id="sms-consent" checked={smsConsent} onCheckedChange={(v) => setSmsConsent(v === true)} className="mt-0.5 flex-shrink-0" />
                             <label htmlFor="sms-consent" className="text-xs text-gray-500 leading-relaxed cursor-pointer">
-                              By checking this box, I consent to receive recurring automated and non-automated SMS text messages from Alta Mortgage Group at the mobile number provided above. Messages may include event reminders, follow-up information, mortgage updates, and appointment confirmations. Consent is not a condition of any purchase.
+                              By checking this box, I consent to receive recurring automated and non-automated SMS text messages from Alta Mortgage Group and Equity Real Estate at the mobile number provided above. Messages may include event reminders, follow-up information, mortgage and real estate updates, and appointment confirmations. Consent is not a condition of any purchase.
                             </label>
                           </div>
                           <p className="text-[10px] text-gray-400 leading-relaxed pl-7">
@@ -791,10 +839,11 @@ export default function PublicLandingPage() {
             : formCardContent
           }
         </div>
+        )}
 
         {/* Footer */}
         <div className="text-center text-white/40 text-xs mt-8 space-y-1" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>
-          <p>&copy; {new Date().getFullYear()} Alta Mortgage Group. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Alta Mortgage Group &amp; Equity Real Estate. All rights reserved.</p>
           <p>
             <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline hover:text-white/70 transition-colors">Privacy Policy</a>
             {" · "}

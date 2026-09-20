@@ -39,7 +39,7 @@ export async function sendSmsOptInConfirmation(leadId: number, phone: string): P
     const toPhone = normalizePhone(phone);
     const fromPhone = normalizePhone(config.accountEmail);
     const body =
-      "Alta Mortgage Group: You're now opted in to SMS updates. Msg frequency varies. Msg & data rates may apply. Reply STOP to unsubscribe anytime, HELP for help.";
+      "Alta Mortgage Group & Equity Real Estate: You're now opted in to SMS updates. Msg frequency varies. Msg & data rates may apply. Reply STOP to unsubscribe anytime, HELP for help.";
     const res = await fetch("https://api.telnyx.com/v2/messages", {
       method: "POST",
       headers: { Authorization: `Bearer ${config.accessToken}`, "Content-Type": "application/json" },

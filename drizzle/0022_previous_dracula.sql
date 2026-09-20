@@ -197,9 +197,6 @@ CREATE TABLE `tasks` (
 	CONSTRAINT `tasks_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-ALTER TABLE `landing_pages` ADD `backgroundHtmlUrl` text;--> statement-breakpoint
-ALTER TABLE `landing_pages` ADD `logoOnHtmlBackground` boolean DEFAULT false;--> statement-breakpoint
-ALTER TABLE `landing_pages` ADD `formEmbedded` boolean DEFAULT false;--> statement-breakpoint
 ALTER TABLE `landing_pages` ADD `templateId` int;--> statement-breakpoint
 ALTER TABLE `landing_pages` ADD `campaignId` int;--> statement-breakpoint
 ALTER TABLE `landing_pages` ADD `metaPixelId` varchar(64);--> statement-breakpoint

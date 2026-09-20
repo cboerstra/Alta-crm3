@@ -1,8 +1,8 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "f1891732-fc61-4bb1-bdca-f60acc777596",
-  "prevId": "9abe979c-84bc-4440-816e-5eeea130b5e4",
+  "id": "75ed77bd-ca0e-4385-a80b-d004a370a3d2",
+  "prevId": "f1891732-fc61-4bb1-bdca-f60acc777596",
   "tables": {
     "activity_log": {
       "name": "activity_log",
@@ -841,6 +841,13 @@
           "notNull": true,
           "autoincrement": false,
           "default": true
+        },
+        "headScripts": {
+          "name": "headScripts",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "createdAt": {
           "name": "createdAt",

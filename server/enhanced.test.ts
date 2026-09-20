@@ -256,6 +256,35 @@ describe("Lead Capture with Enhanced Fields", () => {
       })
     ).rejects.toThrow("Landing page not found");
   });
+
+  it("refuses capture when the page's lead form is switched off", async () => {
+    const caller = appRouter.createCaller(createAuthContext());
+    const slug = `no-form-${Date.now()}`;
+    await caller.landingPages.create({ title: "Listing page, no form", slug, isActive: true, formEnabled: false });
+
+    const publicCaller = appRouter.createCaller(createPublicContext());
+    await expect(
+      publicCaller.leads.captureFromLandingPage({ slug, firstName: "No", lastName: "Form", email: "noform@test.com" })
+    ).rejects.toThrow("does not accept form submissions");
+  });
+
+  it("records no SMS consent when the page does not ask for it", async () => {
+    const caller = appRouter.createCaller(createAuthContext());
+    const slug = `no-sms-consent-${Date.now()}`;
+    await caller.landingPages.create({ title: "No SMS consent", slug, isActive: true, smsConsentEnabled: false });
+
+    const publicCaller = appRouter.createCaller(createPublicContext());
+    const { id } = await publicCaller.leads.captureFromLandingPage({
+      slug,
+      firstName: "Quiet",
+      lastName: "Lead",
+      email: `quiet.${Date.now()}@test.com`,
+      phone: "8015550100",
+      smsConsent: true, // a tampered client cannot grant consent the page never requested
+    });
+    const lead = await caller.leads.getById({ id });
+    expect(lead?.smsConsent).toBe(false);
+  });
 });
 
 describe("Email Template Rendering", () => {

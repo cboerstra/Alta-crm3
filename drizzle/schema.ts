@@ -134,6 +134,17 @@ export const landingPages = mysqlTable("landing_pages", {
   // NEW: Embed the registration form directly into the HTML background template
   formEmbedded: boolean("formEmbedded").default(false),
 
+  // Whether the CRM lead-capture form is rendered at all. Off = an uploaded
+  // HTML page is shown exactly as uploaded and submissions are refused.
+  formEnabled: boolean("formEnabled").default(true).notNull(),
+  // Whether the 10DLC SMS-consent checkbox accompanies the phone field. Off =
+  // phone is still collected but no consent is asked and no opt-in text is sent.
+  smsConsentEnabled: boolean("smsConsentEnabled").default(true).notNull(),
+  // Tracking snippets (Meta pixel, Google tag, ...) injected into <head> on
+  // the public page only. Staff-entered, so treated as trusted markup.
+  headScripts: text("headScripts"),
+
+
   // ─── Tracking / attribution ───────────────────────────────────────────────
   // Template this page was stamped out from (null for hand-built pages)
   templateId: int("templateId"),
@@ -147,7 +158,6 @@ export const landingPages = mysqlTable("landing_pages", {
   conversionEventName: varchar("conversionEventName", { length: 64 }).default("Lead"),
   // Estimated value reported with the conversion event
   conversionValue: decimal("conversionValue", { precision: 12, scale: 2 }),
-
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

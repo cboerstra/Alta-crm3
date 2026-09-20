@@ -6,8 +6,8 @@
  * drafts. It exposes them at /api/staff/* behind a shared key. This module is
  * the only place in the CRM that holds that key or talks to those routes.
  *
- * Reads everything; writes only the loan officer's review (status + notes)
- * and deletions. Borrower-entered data is never edited from here.
+ * Reads everything; writes the loan officer's review (status + notes),
+ * corrections to borrower-entered fields, MISMO regeneration and deletions.
  *
  * Direction matters: the website already calls INTO this CRM with
  * WEBSITE_API_KEY (see websiteLeads.ts). This is the reverse path, and the
@@ -92,6 +92,8 @@ export interface ApplicationDetail extends ApplicationListItem {
   emailError: string | null;
   /** Null when the website could not rebuild it (a row from an older schema). */
   summary: SummarySection[] | null;
+  /** Borrower-entered fields open to correction; null for a row from an older schema. */
+  editable: Record<string, unknown> | null;
   mismoFilename: string | null;
   mismoAvailable: boolean;
 }
@@ -160,7 +162,7 @@ export function isWebsiteStaffApiConfigured(): boolean {
 
 interface RequestOptions {
   query?: Record<string, string | number | undefined>;
-  method?: "GET" | "PATCH" | "DELETE";
+  method?: "GET" | "PATCH" | "PUT" | "POST" | "DELETE";
   body?: unknown;
 }
 
@@ -229,6 +231,39 @@ export function updateApplicationReview(
   const ref = refNumber.toUpperCase();
   if (!REF_PATTERN.test(ref)) throw new WebsiteApiError(404, "Not found");
   return requestJson<ApplicationDetail>(`/applications/${ref}`, { method: "PATCH", body: input });
+}
+
+export interface RegeneratedMismo {
+  regenerated: true;
+  refNumber: string;
+  mismoFilename: string;
+  mismoSha256: string;
+  bytes: number;
+}
+
+/** Rebuild the MISMO document from the stored application with the website's current generator. */
+export function regenerateMismo(refNumber: string): Promise<RegeneratedMismo> {
+  const ref = refNumber.toUpperCase();
+  if (!REF_PATTERN.test(ref)) throw new WebsiteApiError(404, "Not found");
+  return requestJson<RegeneratedMismo>(`/applications/${ref}/mismo`, { method: "POST" });
+}
+
+export interface ApplicationEditResult {
+  updated: true;
+  refNumber: string;
+  fields: string[];
+  mismo: { status: "written" | "failed"; filename?: string; error?: string };
+}
+
+/**
+ * A loan officer's correction to borrower-entered fields. Partial; the
+ * website merges it over the stored application, validates the whole, and
+ * regenerates the MISMO document. Consent, e-signature and SSN are refused.
+ */
+export function updateApplicationData(refNumber: string, edit: Record<string, unknown>): Promise<ApplicationEditResult> {
+  const ref = refNumber.toUpperCase();
+  if (!REF_PATTERN.test(ref)) throw new WebsiteApiError(404, "Not found");
+  return requestJson<ApplicationEditResult>(`/applications/${ref}/data`, { method: "PUT", body: edit });
 }
 
 /** Deletes the application, its MISMO document, and the borrower's uploads and drafts if this was their last. */

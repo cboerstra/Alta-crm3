@@ -20,8 +20,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ApplicationDocuments } from "@/components/ApplicationDocuments";
+import { ApplicationEditDialog } from "@/components/ApplicationEditDialog";
 import { REVIEW_LABELS, ReviewStatusBadge, type ReviewStatus } from "@/components/ReviewStatus";
-import { AlertCircle, ArrowLeft, Download, FileText, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, Download, FileText, RefreshCw, Trash2 } from "lucide-react";
 
 function when(iso: string): string {
   const d = new Date(iso);
@@ -100,6 +101,23 @@ function ReviewCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function RegenerateButton({ refNumber }: { refNumber: string }) {
+  const utils = trpc.useUtils();
+  const regen = trpc.applications.regenerateMismo.useMutation({
+    onSuccess: (result) => {
+      utils.applications.get.invalidate({ refNumber });
+      toast.success(`MISMO document regenerated (${result.mismoFilename})`);
+    },
+    onError: (e) => toast.error(e.message || "Could not regenerate"),
+  });
+  return (
+    <Button variant="outline" disabled={regen.isPending} onClick={() => regen.mutate({ refNumber })}>
+      <RefreshCw className={`mr-2 h-4 w-4${regen.isPending ? " animate-spin" : ""}`} />
+      {regen.isPending ? "Regenerating…" : "Regenerate MISMO"}
+    </Button>
   );
 }
 
@@ -198,8 +216,10 @@ export default function ApplicationDetail() {
         </div>
 
         {app && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <DeleteButton refNumber={app.refNumber} applicant={`${app.firstName} ${app.lastName}`} />
+            <ApplicationEditDialog refNumber={app.refNumber} editable={app.editable} />
+            <RegenerateButton refNumber={app.refNumber} />
             <Button asChild disabled={!app.mismoAvailable}>
               {/*
                 A plain link, not a fetch: the browser handles the download and

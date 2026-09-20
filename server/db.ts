@@ -1617,7 +1617,24 @@ export async function runAutoMigrations(): Promise<void> {
       column: "backgroundHtmlUrl",
       sql: "ALTER TABLE `landing_pages` ADD COLUMN `backgroundHtmlUrl` text DEFAULT NULL",
     },
-
+    // 0031: Add formEnabled to landing_pages (lead form can be switched off per page)
+    {
+      table: "landing_pages",
+      column: "formEnabled",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `formEnabled` tinyint(1) NOT NULL DEFAULT 1",
+    },
+    // 0032: Add smsConsentEnabled to landing_pages (SMS consent block can be switched off per page)
+    {
+      table: "landing_pages",
+      column: "smsConsentEnabled",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `smsConsentEnabled` tinyint(1) NOT NULL DEFAULT 1",
+    },
+    // 0033: Add headScripts to landing_pages (tracking pixels / tags injected on the public page)
+    {
+      table: "landing_pages",
+      column: "headScripts",
+      sql: "ALTER TABLE `landing_pages` ADD COLUMN `headScripts` text DEFAULT NULL",
+    },
     // ── Marketing engine: lead attribution ────────────────────────────────
     // Every column below is first-touch attribution captured at lead capture.
     { table: "leads", column: "campaignId", sql: "ALTER TABLE `leads` ADD COLUMN `campaignId` int DEFAULT NULL" },

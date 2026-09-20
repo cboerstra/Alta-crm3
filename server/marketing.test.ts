@@ -5,6 +5,7 @@ import { buildUserData, buildEventPayload, normalizePhone } from "./meta/convers
 import { buildDestinationUrl } from "./meta/publisher";
 import { buildTargetingSpec, normalizeAdAccountId, toMinorUnits, extractLeadCount } from "./meta/marketingApi";
 import { resolvePlaceholders } from "./automations/engine";
+import { detectPixelInMarkup, pageViewEventId } from "../client/src/lib/metaPixel";
 
 const sha256 = (v: string) => crypto.createHash("sha256").update(v).digest("hex");
 
@@ -251,5 +252,65 @@ describe("automation placeholders", () => {
 
   it("tolerates whitespace inside the braces", () => {
     expect(resolvePlaceholders("Hi {{ firstName }}", lead)).toBe("Hi Dana");
+  });
+});
+
+describe("pasted-pixel detection", () => {
+  // Landing pages can carry staff-pasted tracking code. If a Meta Pixel is in
+  // there and the CRM loads its own too, both send PageView — and Meta does not
+  // de-duplicate PageView. These guard the hand-off that prevents that.
+
+  const metaSnippet = `
+    <!-- Meta Pixel Code -->
+    <script>
+      !function(f,b,e,v,n,t,s){/* ... */}(window, document,'script');
+      fbq('init', '1234567890123456');
+      fbq('track', 'PageView');
+    </script>
+  `;
+
+  it("finds the pixel id in a standard Meta snippet", () => {
+    expect(detectPixelInMarkup(metaSnippet)).toBe("1234567890123456");
+  });
+
+  it("handles double quotes and odd spacing", () => {
+    expect(detectPixelInMarkup(`fbq( "init" , "999888777" )`)).toBe("999888777");
+  });
+
+  it("handles template literals", () => {
+    expect(detectPixelInMarkup("fbq('init', `555444333`)")).toBe("555444333");
+  });
+
+  it("reports 'unknown' when an init call is present but the id is templated", () => {
+    expect(detectPixelInMarkup("fbq('init', PIXEL_ID);")).toBe("unknown");
+  });
+
+  it("ignores a Google tag with no Meta pixel", () => {
+    const googleOnly = `<script async src="https://www.googletagmanager.com/gtag/js?id=G-ABC"></script>`;
+    expect(detectPixelInMarkup(googleOnly)).toBeNull();
+  });
+
+  it("does not fire on a mention of fbq without an init call", () => {
+    expect(detectPixelInMarkup("fbq('track', 'Lead');")).toBeNull();
+  });
+
+  it("treats empty or missing markup as no pixel", () => {
+    expect(detectPixelInMarkup("")).toBeNull();
+    expect(detectPixelInMarkup(null)).toBeNull();
+    expect(detectPixelInMarkup(undefined)).toBeNull();
+  });
+});
+
+describe("PageView event id", () => {
+  it("derives a distinct id from the visit's base id", () => {
+    expect(pageViewEventId("lp_abc123")).toBe("lp_abc123_pv");
+  });
+
+  it("matches the suffix the server applies, so the pair de-duplicates", () => {
+    // server/routers/marketing.ts builds `${eventId}_pv` for the same visit.
+    const base = "lp_xyz789";
+    const browserSide = pageViewEventId(base);
+    const serverSide = `${base}_pv`;
+    expect(browserSide).toBe(serverSide);
   });
 });

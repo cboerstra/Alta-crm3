@@ -318,7 +318,12 @@ export const marketingRouter = router({
 
         const res = await sendConversionEvents(config, [{
           eventName: "PageView",
-          eventId: input.attribution?.eventId || generateEventId("pv"),
+          // Must match the browser's PageView id, which the page derives from the
+          // same base id with the same "_pv" suffix (see pageViewEventId), or Meta
+          // counts the view twice instead of de-duplicating the pair.
+          eventId: input.attribution?.eventId
+            ? `${input.attribution.eventId}_pv`
+            : generateEventId("pv"),
           eventSourceUrl: attribution.landingUrl,
           actionSource: "website",
           userData: {

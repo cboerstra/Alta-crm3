@@ -34,9 +34,7 @@ import {
   Calendar,
   DollarSign,
   Settings,
-  BarChart3,
-  Building2,
-  UserCog,
+  BarChart3,  UserCog,
   ShieldCheck,
   Shield,
   MessageSquare,
@@ -107,15 +105,8 @@ export default function DashboardLayout({
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-brand-green-dark via-brand-green to-brand-green-light">
         <div className="flex flex-col items-center gap-8 p-10 max-w-md w-full bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl">
           <div className="flex flex-col items-center gap-2">
-            <div className="flex items-center gap-3 mb-2">
-              <Building2 className="h-10 w-10 text-brand-green" />
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-brand-green-dark" style={{ fontFamily: 'Raleway, sans-serif' }}>
-                  Clarke & Associates
-                </h1>
-                <p className="text-xs font-medium text-brand-gold tracking-widest uppercase">CRM Platform</p>
-              </div>
-            </div>
+            <img src="/alta-logo.png" alt="Alta Mortgage Group" className="h-24 w-auto mb-2" />
+            <p className="text-xs font-medium text-brand-gold tracking-widest uppercase">Clarke &amp; Associates · CRM</p>
           </div>
           <div className="text-center">
             <h2 className="text-lg font-semibold text-gray-800">Sign in to continue</h2>
@@ -224,15 +215,10 @@ function DashboardLayoutContent({
               </button>
               {!isCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0">
-                  <Building2 className="h-5 w-5 text-brand-gold shrink-0" />
-                  <div className="min-w-0">
-                    <span className="font-bold text-sm tracking-tight truncate text-sidebar-foreground block" style={{ fontFamily: 'Raleway, sans-serif' }}>
-                      Clarke & Associates
-                    </span>
-                    <span className="text-[10px] text-brand-gold font-medium tracking-widest uppercase block">
-                      CRM
-                    </span>
-                  </div>
+                  <img src="/alta-logo.png" alt="Alta Mortgage Group" className="h-10 w-auto shrink-0" />
+                  <span className="text-[10px] text-brand-gold font-medium tracking-widest uppercase truncate">
+                    CRM
+                  </span>
                 </div>
               ) : null}
             </div>
