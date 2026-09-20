@@ -5,6 +5,10 @@
 -- guards so nothing is overwritten or duplicated.
 -- ============================================================
 
+-- Select the CRM database explicitly. Every check below compares against
+-- DATABASE(); run from the server level it is NULL and everything reads MISSING.
+USE `u833783884_AltaCRM`;
+
 -- 1. Add passwordHash column to users (migration 0007)
 --    Skips silently if the column already exists.
 SET @col_exists = (
