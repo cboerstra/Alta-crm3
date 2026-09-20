@@ -77,6 +77,8 @@ export const landingPagesRouter = router({
       showOptIn: z.boolean().optional(),
       confirmationEmailSubject: z.string().optional(),
       confirmationEmailBody: z.string().optional(),
+      formEnabled: z.boolean().optional(),
+      smsConsentEnabled: z.boolean().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const existing = await getLandingPageBySlug(input.slug);
@@ -116,6 +118,8 @@ export const landingPagesRouter = router({
       logoSize: z.number().min(20).max(300).optional(),
       logoOnHtmlBackground: z.boolean().optional(),
       formEmbedded: z.boolean().optional(),
+      formEnabled: z.boolean().optional(),
+      smsConsentEnabled: z.boolean().optional(),
     }))
     .mutation(async ({ input }) => {
       const { id, ...data } = input;

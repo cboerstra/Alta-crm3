@@ -133,6 +133,12 @@ export const landingPages = mysqlTable("landing_pages", {
   logoOnHtmlBackground: boolean("logoOnHtmlBackground").default(false),
   // NEW: Embed the registration form directly into the HTML background template
   formEmbedded: boolean("formEmbedded").default(false),
+  // Whether the CRM lead-capture form is rendered at all. Off = an uploaded
+  // HTML page is shown exactly as uploaded and submissions are refused.
+  formEnabled: boolean("formEnabled").default(true).notNull(),
+  // Whether the 10DLC SMS-consent checkbox accompanies the phone field. Off =
+  // phone is still collected but no consent is asked and no opt-in text is sent.
+  smsConsentEnabled: boolean("smsConsentEnabled").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

@@ -287,6 +287,12 @@ export default function PublicLandingPage() {
 
   // ─── Derived feature flags ───
   const formEmbedded = !!(page as any)?.formEmbedded && hasHtmlBackground;
+  // Pages created before these columns existed read as undefined -> treat as on.
+  const formEnabled = (page as any)?.formEnabled ?? true;
+  const askSmsConsent = ((page as any)?.smsConsentEnabled ?? true) && showField("phone");
+  // An uploaded HTML page with the form switched off is rendered inline, as-is,
+  // rather than as a pointer-events-none iframe behind a floating card.
+  const renderHtmlInline = hasHtmlBackground && (formEmbedded || !formEnabled);
   // logoOnBackground only applies in non-embedded mode (embedded mode has the logo inside the form card in the HTML)
   const logoOnBackground = !!(page as any)?.logoOnHtmlBackground && hasHtmlBackground && !formEmbedded;
 
@@ -309,14 +315,14 @@ export default function PublicLandingPage() {
 
   // ─── Fetch HTML for embedded mode ───
   useEffect(() => {
-    if (!formEmbedded) { setFetchedHtml(null); setFormMountPoint(null); return; }
+    if (!renderHtmlInline) { setFetchedHtml(null); setFormMountPoint(null); return; }
     const url = (page as any)?.backgroundHtmlUrl as string;
     if (!url) return;
     fetch(url)
       .then(r => r.text())
       .then(html => setFetchedHtml(html))
       .catch(() => setFetchedHtml(""));
-  }, [formEmbedded, (page as any)?.backgroundHtmlUrl]);
+  }, [renderHtmlInline, (page as any)?.backgroundHtmlUrl]);
 
   // ─── Render uploaded HTML body and locate form mount point ───
   useEffect(() => {
@@ -324,10 +330,16 @@ export default function PublicLandingPage() {
     const container = htmlContainerRef.current;
     const baseUrl = new URL((page as any)?.backgroundHtmlUrl || window.location.href, window.location.origin).toString();
     const placeholder = '<div id="alta-crm-form-mount"></div>';
-    let modified = fetchedHtml.includes("{{alta_form}}")
-      ? fetchedHtml.replace(/\{\{alta_form\}\}/g, placeholder)
-      : fetchedHtml.replace(/<\/body>/i, `${placeholder}</body>`);
-    if (!modified.includes(placeholder)) modified += placeholder;
+    let modified: string;
+    if (!formEnabled) {
+      // Form is off: publish the HTML as uploaded, dropping any placeholder.
+      modified = fetchedHtml.replace(/\{\{alta_form\}\}/g, "");
+    } else {
+      modified = fetchedHtml.includes("{{alta_form}}")
+        ? fetchedHtml.replace(/\{\{alta_form\}\}/g, placeholder)
+        : fetchedHtml.replace(/<\/body>/i, `${placeholder}</body>`);
+      if (!modified.includes(placeholder)) modified += placeholder;
+    }
 
     // Replace {{alta_logo}} with actual logo img tags from the media library
     const logoHtml = foregroundLogos.map(item =>
@@ -366,7 +378,7 @@ export default function PublicLandingPage() {
       container.innerHTML = "";
       setFormMountPoint(null);
     };
-  }, [fetchedHtml, foregroundLogos, logoSize, (page as any)?.backgroundHtmlUrl]);
+  }, [fetchedHtml, foregroundLogos, logoSize, formEnabled, (page as any)?.backgroundHtmlUrl]);
 
   if (pageLoading) {
     return (
@@ -395,7 +407,7 @@ export default function PublicLandingPage() {
       lastName: form.lastName,
       email: form.email,
       phone: form.phone || undefined,
-      smsConsent,
+      smsConsent: askSmsConsent && smsConsent,
       contactOptIn,
       webinarSessionId,
     });
@@ -532,7 +544,7 @@ export default function PublicLandingPage() {
             </Select>
           </div>
         )}
-        {showField("phone") && (
+        {askSmsConsent && (
           <div className="space-y-2 pt-1 font-sans">
             <div className="flex items-start gap-2.5">
               <Checkbox id="sms-consent" checked={smsConsent} onCheckedChange={(v) => setSmsConsent(v === true)} className="mt-0.5 flex-shrink-0" />
@@ -571,13 +583,13 @@ export default function PublicLandingPage() {
   // EMBEDDED MODE — HTML template is rendered as page content,
   // form is portalled into {{alta_form}} placeholder
   // ═══════════════════════════════════════════════════════════
-  if (formEmbedded) {
+  if (renderHtmlInline) {
     return (
       <div className="w-full min-h-screen">
         {/* Full-page HTML rendered via innerHTML */}
         <div ref={htmlContainerRef} className="w-full min-h-screen" />
         {/* Portal form into the #alta-crm-form-mount element */}
-        {formMountPoint && createPortal(
+        {formEnabled && formMountPoint && createPortal(
           <div className={`${EMBEDDED_FORM_CLASS} p-4 flex justify-center`}>
             <div className="w-full max-w-md">
               {formCardContent}
@@ -643,6 +655,7 @@ export default function PublicLandingPage() {
         )}
 
         {/* Registration form card */}
+        {formEnabled && (
         <div className="w-full max-w-md">
           {/* When logo is shown on the background, hide it inside the card to avoid duplication */}
           {logoOnBackground && foregroundLogos.length > 0
@@ -710,7 +723,7 @@ export default function PublicLandingPage() {
                           </Select>
                         </div>
                       )}
-                      {showField("phone") && (
+                      {askSmsConsent && (
                         <div className="space-y-2 pt-1">
                           <div className="flex items-start gap-2.5">
                             <Checkbox id="sms-consent" checked={smsConsent} onCheckedChange={(v) => setSmsConsent(v === true)} className="mt-0.5 flex-shrink-0" />
@@ -749,6 +762,7 @@ export default function PublicLandingPage() {
             : formCardContent
           }
         </div>
+        )}
 
         {/* Footer */}
         <div className="text-center text-white/40 text-xs mt-8 space-y-1" style={{ textShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>

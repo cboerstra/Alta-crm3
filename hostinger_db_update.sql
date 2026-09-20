@@ -76,8 +76,36 @@ SET @sql5 = IF(@col5_exists = 0,
 );
 PREPARE stmt5 FROM @sql5; EXECUTE stmt5; DEALLOCATE PREPARE stmt5;
 
+-- 6. Add formEnabled column to landing_pages (migration 0020)
+--    Off = an uploaded HTML page renders without the CRM lead form.
+SET @col6_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME   = 'landing_pages'
+    AND COLUMN_NAME  = 'formEnabled'
+);
+SET @sql6 = IF(@col6_exists = 0,
+  'ALTER TABLE `landing_pages` ADD COLUMN `formEnabled` tinyint(1) NOT NULL DEFAULT 1',
+  'SELECT ''formEnabled column already exists'' AS info'
+);
+PREPARE stmt6 FROM @sql6; EXECUTE stmt6; DEALLOCATE PREPARE stmt6;
+
+-- 7. Add smsConsentEnabled column to landing_pages (migration 0020)
+--    Off = the phone field is collected without the SMS-consent checkbox.
+SET @col7_exists = (
+  SELECT COUNT(*) FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME   = 'landing_pages'
+    AND COLUMN_NAME  = 'smsConsentEnabled'
+);
+SET @sql7 = IF(@col7_exists = 0,
+  'ALTER TABLE `landing_pages` ADD COLUMN `smsConsentEnabled` tinyint(1) NOT NULL DEFAULT 1',
+  'SELECT ''smsConsentEnabled column already exists'' AS info'
+);
+PREPARE stmt7 FROM @sql7; EXECUTE stmt7; DEALLOCATE PREPARE stmt7;
+
 -- ============================================================
--- Verification — should show all 5 items as OK
+-- Verification — should show all 7 items as OK
 -- ============================================================
 SELECT
   'passwordHash column'   AS check_item,
@@ -115,4 +143,20 @@ SELECT
   'formEmbedded column',
   IF(COUNT(*) > 0, 'OK', 'MISSING')
 FROM information_schema.COLUMNS
-WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'landing_pages' AND COLUMN_NAME = 'formEmbedded';
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'landing_pages' AND COLUMN_NAME = 'formEmbedded'
+
+UNION ALL
+
+SELECT
+  'formEnabled column',
+  IF(COUNT(*) > 0, 'OK', 'MISSING')
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'landing_pages' AND COLUMN_NAME = 'formEnabled'
+
+UNION ALL
+
+SELECT
+  'smsConsentEnabled column',
+  IF(COUNT(*) > 0, 'OK', 'MISSING')
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'landing_pages' AND COLUMN_NAME = 'smsConsentEnabled';
