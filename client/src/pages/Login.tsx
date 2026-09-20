@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Eye, EyeOff, Lock, Mail, Building2 } from "lucide-react";
+import { Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { getLoginUrl, isManus } from "@/const";
 
 export default function Login() {
@@ -37,11 +37,8 @@ export default function Login() {
       <div className="w-full max-w-md space-y-6">
         {/* Logo / Branding */}
         <div className="text-center space-y-2">
-          <div className="flex items-center justify-center gap-2">
-            <div className="w-10 h-10 rounded-lg bg-brand-green flex items-center justify-center">
-              <Building2 className="w-6 h-6 text-white" />
-            </div>
-            <span className="text-2xl font-bold text-foreground font-heading">Clarke &amp; Associates</span>
+          <div className="flex justify-center">
+            <img src="/alta-logo.png" alt="Alta Mortgage Group" className="h-24 w-auto" />
           </div>
           <p className="text-muted-foreground text-sm">CRM Platform</p>
         </div>
