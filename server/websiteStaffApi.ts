@@ -277,6 +277,47 @@ export function listDrafts(input: { page?: number }): Promise<DraftPage> {
   return requestJson<DraftPage>("/drafts", { query: { page: input.page } });
 }
 
+/**
+ * What a borrower-portal sign-in attempt actually did. The website answers the
+ * borrower identically in every case, so this is the only place it shows.
+ */
+export const PORTAL_LOGIN_OUTCOMES = [
+  "sent",
+  "no_match",
+  "rate_limited",
+  "email_not_configured",
+  "email_failed",
+  "error",
+] as const;
+export type PortalLoginOutcome = (typeof PORTAL_LOGIN_OUTCOMES)[number];
+
+export interface PortalLoginEvent {
+  id: number;
+  email: string;
+  outcome: PortalLoginOutcome;
+  detail: string | null;
+  createdAt: string;
+}
+
+/**
+ * Recent portal sign-in attempts, newest first. With `email`, one borrower's;
+ * without, everyone's — which is how a sign-in under a different address than
+ * the application's gets found, since it belongs to no application.
+ */
+export function listPortalLoginEvents(input: {
+  email?: string;
+  limit?: number;
+  problemsOnly?: boolean;
+}): Promise<{ events: PortalLoginEvent[] }> {
+  return requestJson<{ events: PortalLoginEvent[] }>("/portal/login-events", {
+    query: {
+      email: input.email,
+      limit: input.limit,
+      problemsOnly: input.problemsOnly ? 1 : undefined,
+    },
+  });
+}
+
 /** The documents a borrower has uploaded for an application (matched by email). */
 export function listApplicationDocuments(refNumber: string): Promise<ApplicationDocuments> {
   const ref = refNumber.toUpperCase();

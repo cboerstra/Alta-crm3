@@ -20,6 +20,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ApplicationDocuments } from "@/components/ApplicationDocuments";
+import { PortalSignInLog } from "@/components/PortalSignInLog";
 import { ApplicationEditDialog } from "@/components/ApplicationEditDialog";
 import { REVIEW_LABELS, ReviewStatusBadge, type ReviewStatus } from "@/components/ReviewStatus";
 import { AlertCircle, ArrowLeft, Download, FileText, RefreshCw, Trash2 } from "lucide-react";
@@ -278,6 +279,13 @@ export default function ApplicationDetail() {
             )}
 
             <ApplicationDocuments refNumber={app.refNumber} />
+
+            <PortalSignInLog
+              email={app.email}
+              title="Portal sign-in"
+              description="Whether this borrower has been able to get a code to sign in and upload documents."
+              limit={10}
+            />
           </div>
 
           <div className="space-y-6">
