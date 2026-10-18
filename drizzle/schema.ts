@@ -8,6 +8,7 @@ import {
   boolean,
   decimal,
   json,
+  date,
 } from "drizzle-orm/mysql-core";
 
 // ─── Users ───────────────────────────────────────────────────────────────────
@@ -409,3 +410,109 @@ export const smsTemplates = mysqlTable("sms_templates", {
 });
 export type SmsTemplate = typeof smsTemplates.$inferSelect;
 export type InsertSmsTemplate = typeof smsTemplates.$inferInsert;
+
+// ─── Payroll: Companies (one per LLC / employer EIN) ─────────────────────────
+export const payrollCompanies = mysqlTable("payroll_companies", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 256 }).notNull(),
+  ein: varchar("ein", { length: 16 }),
+  // How the IRS taxes the LLC — owners can only be on payroll when it is taxed as a corporation
+  taxClassification: mysqlEnum("taxClassification", ["s_corp", "c_corp", "partnership", "disregarded"]).default("s_corp").notNull(),
+  address: varchar("address", { length: 256 }),
+  city: varchar("city", { length: 128 }),
+  state: varchar("state", { length: 2 }).default("UT"),
+  zip: varchar("zip", { length: 10 }),
+  utahWithholdingAccount: varchar("utahWithholdingAccount", { length: 32 }),
+  utahUiAccount: varchar("utahUiAccount", { length: 32 }),
+  // Percent, e.g. 1.200 for 1.2% — DWS mails each employer its rate every December
+  utahUiRate: decimal("utahUiRate", { precision: 6, scale: 3 }).default("1.200").notNull(),
+  depositSchedule: mysqlEnum("depositSchedule", ["monthly", "semiweekly"]).default("monthly").notNull(),
+  utahFilingFrequency: mysqlEnum("utahFilingFrequency", ["monthly", "quarterly", "annual"]).default("quarterly").notNull(),
+  payFrequency: mysqlEnum("payFrequency", ["weekly", "biweekly", "semimonthly", "monthly", "quarterly", "annual"]).default("monthly").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  notes: text("notes"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type PayrollCompany = typeof payrollCompanies.$inferSelect;
+export type InsertPayrollCompany = typeof payrollCompanies.$inferInsert;
+
+// ─── Payroll: People paid by a company (owner, spouse) ───────────────────────
+export const payrollPeople = mysqlTable("payroll_people", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  firstName: varchar("firstName", { length: 128 }).notNull(),
+  lastName: varchar("lastName", { length: 128 }).notNull(),
+  // Only the last four digits are stored; full SSNs are typed straight into the filing sites
+  ssnLast4: varchar("ssnLast4", { length: 4 }),
+  relationship: mysqlEnum("relationship", ["owner", "spouse", "other"]).default("owner").notNull(),
+  // Form W-4
+  filingStatus: mysqlEnum("filingStatus", ["single", "married_joint", "head_of_household"]).default("married_joint").notNull(),
+  multipleJobs: boolean("multipleJobs").default(false).notNull(),
+  dependentsCredit: decimal("dependentsCredit", { precision: 10, scale: 2 }).default("0").notNull(),
+  otherIncome: decimal("otherIncome", { precision: 12, scale: 2 }).default("0").notNull(),
+  deductions: decimal("deductions", { precision: 12, scale: 2 }).default("0").notNull(),
+  extraWithholding: decimal("extraWithholding", { precision: 10, scale: 2 }).default("0").notNull(),
+  futaExempt: boolean("futaExempt").default(false).notNull(),
+  utahUiExempt: boolean("utahUiExempt").default(false).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type PayrollPerson = typeof payrollPeople.$inferSelect;
+export type InsertPayrollPerson = typeof payrollPeople.$inferInsert;
+
+// ─── Payroll: Paychecks (amounts in cents, taxes frozen when saved) ──────────
+export const payrollPaychecks = mysqlTable("payroll_paychecks", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  personId: int("personId").notNull(),
+  payDate: date("payDate", { mode: "string" }).notNull(),
+  periodStart: date("periodStart", { mode: "string" }),
+  periodEnd: date("periodEnd", { mode: "string" }),
+  grossCents: int("grossCents").notNull(),
+  retirement401kCents: int("retirement401kCents").default(0).notNull(),
+  shareholderHealthCents: int("shareholderHealthCents").default(0).notNull(),
+  federalWagesCents: int("federalWagesCents").notNull(),
+  stateWagesCents: int("stateWagesCents").notNull(),
+  ssWagesCents: int("ssWagesCents").notNull(),
+  medicareWagesCents: int("medicareWagesCents").notNull(),
+  addlMedicareWagesCents: int("addlMedicareWagesCents").default(0).notNull(),
+  futaWagesCents: int("futaWagesCents").notNull(),
+  utahUiWagesCents: int("utahUiWagesCents").notNull(),
+  federalWithholdingCents: int("federalWithholdingCents").notNull(),
+  utahWithholdingCents: int("utahWithholdingCents").notNull(),
+  // True when the withholding was typed in rather than taken from the formula
+  withholdingOverridden: boolean("withholdingOverridden").default(false).notNull(),
+  ssEmployeeCents: int("ssEmployeeCents").notNull(),
+  medicareEmployeeCents: int("medicareEmployeeCents").notNull(),
+  addlMedicareCents: int("addlMedicareCents").default(0).notNull(),
+  ssEmployerCents: int("ssEmployerCents").notNull(),
+  medicareEmployerCents: int("medicareEmployerCents").notNull(),
+  futaCents: int("futaCents").notNull(),
+  utahUiCents: int("utahUiCents").notNull(),
+  netPayCents: int("netPayCents").notNull(),
+  memo: text("memo"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type PayrollPaycheck = typeof payrollPaychecks.$inferSelect;
+export type InsertPayrollPaycheck = typeof payrollPaychecks.$inferInsert;
+
+// ─── Payroll: Tax deposits made (EFTPS, Utah TAP, DWS) ───────────────────────
+export const payrollDeposits = mysqlTable("payroll_deposits", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  agency: mysqlEnum("agency", ["irs_941", "irs_940", "utah_withholding", "utah_ui"]).notNull(),
+  taxYear: int("taxYear").notNull(),
+  quarter: int("quarter"), // null for annual (940)
+  amountCents: int("amountCents").notNull(),
+  depositDate: date("depositDate", { mode: "string" }).notNull(),
+  confirmation: varchar("confirmation", { length: 128 }),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PayrollDeposit = typeof payrollDeposits.$inferSelect;
+export type InsertPayrollDeposit = typeof payrollDeposits.$inferInsert;

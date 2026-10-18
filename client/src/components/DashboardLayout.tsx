@@ -34,11 +34,13 @@ import {
   Calendar,
   DollarSign,
   Settings,
-  BarChart3,  UserCog,
+  BarChart3,
+  UserCog,
   ShieldCheck,
   Shield,
   MessageSquare,
   ClipboardList,
+  Landmark,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -65,6 +67,7 @@ const menuItems: MenuItem[] = [
   { icon: DollarSign, label: "Deals", path: "/deals", section: "main" },
   { icon: BarChart3, label: "Revenue", path: "/revenue", section: "main" },
   { icon: MessageSquare, label: "SMS Inbox", path: "/sms-inbox", section: "main" },
+  { icon: Landmark, label: "Payroll", path: "/payroll", adminOnly: true, section: "admin" },
   { icon: UserCog, label: "User Management", path: "/users", adminOnly: true, section: "admin" },
   { icon: Settings, label: "Settings", path: "/settings", adminOnly: true, section: "admin" },
 ];

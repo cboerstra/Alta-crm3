@@ -28,6 +28,7 @@ import SmsOptIn from "./pages/SmsOptIn";
 import Login from "./pages/Login";
 import Setup from "./pages/Setup";
 import SmsInbox from "./pages/SmsInbox";
+import Payroll from "./pages/Payroll";
 import { useAuth } from "./_core/hooks/useAuth";
 import { ShieldAlert } from "lucide-react";
 
@@ -84,6 +85,9 @@ function CRMRoutes() {
         </Route>
         <Route path="/settings">
           {() => <AdminRoute component={SettingsPage} />}
+        </Route>
+        <Route path="/payroll">
+          {() => <AdminRoute component={Payroll} />}
         </Route>
         <Route component={NotFound} />
       </Switch>

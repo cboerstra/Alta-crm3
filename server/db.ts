@@ -1657,6 +1657,106 @@ export async function runAutoMigrations(): Promise<void> {
     if (!msg.includes("already exists")) console.error("[Auto-Migration] sms_reminders table:", msg);
   }
 
+  // 0034: Payroll tables (quarterly payroll reporting for the owner's LLCs)
+  const payrollTables = [
+    `CREATE TABLE IF NOT EXISTS \`payroll_companies\` (
+	\`id\` int AUTO_INCREMENT NOT NULL,
+	\`name\` varchar(256) NOT NULL,
+	\`ein\` varchar(16),
+	\`taxClassification\` enum('s_corp','c_corp','partnership','disregarded') NOT NULL DEFAULT 's_corp',
+	\`address\` varchar(256),
+	\`city\` varchar(128),
+	\`state\` varchar(2) DEFAULT 'UT',
+	\`zip\` varchar(10),
+	\`utahWithholdingAccount\` varchar(32),
+	\`utahUiAccount\` varchar(32),
+	\`utahUiRate\` decimal(6,3) NOT NULL DEFAULT '1.200',
+	\`depositSchedule\` enum('monthly','semiweekly') NOT NULL DEFAULT 'monthly',
+	\`utahFilingFrequency\` enum('monthly','quarterly','annual') NOT NULL DEFAULT 'quarterly',
+	\`payFrequency\` enum('weekly','biweekly','semimonthly','monthly','quarterly','annual') NOT NULL DEFAULT 'monthly',
+	\`isActive\` boolean NOT NULL DEFAULT true,
+	\`notes\` text,
+	\`createdBy\` int,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	\`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT \`payroll_companies_id\` PRIMARY KEY(\`id\`)
+);`,
+    `CREATE TABLE IF NOT EXISTS \`payroll_deposits\` (
+	\`id\` int AUTO_INCREMENT NOT NULL,
+	\`companyId\` int NOT NULL,
+	\`agency\` enum('irs_941','irs_940','utah_withholding','utah_ui') NOT NULL,
+	\`taxYear\` int NOT NULL,
+	\`quarter\` int,
+	\`amountCents\` int NOT NULL,
+	\`depositDate\` date NOT NULL,
+	\`confirmation\` varchar(128),
+	\`createdBy\` int,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT \`payroll_deposits_id\` PRIMARY KEY(\`id\`)
+);`,
+    `CREATE TABLE IF NOT EXISTS \`payroll_paychecks\` (
+	\`id\` int AUTO_INCREMENT NOT NULL,
+	\`companyId\` int NOT NULL,
+	\`personId\` int NOT NULL,
+	\`payDate\` date NOT NULL,
+	\`periodStart\` date,
+	\`periodEnd\` date,
+	\`grossCents\` int NOT NULL,
+	\`retirement401kCents\` int NOT NULL DEFAULT 0,
+	\`shareholderHealthCents\` int NOT NULL DEFAULT 0,
+	\`federalWagesCents\` int NOT NULL,
+	\`stateWagesCents\` int NOT NULL,
+	\`ssWagesCents\` int NOT NULL,
+	\`medicareWagesCents\` int NOT NULL,
+	\`addlMedicareWagesCents\` int NOT NULL DEFAULT 0,
+	\`futaWagesCents\` int NOT NULL,
+	\`utahUiWagesCents\` int NOT NULL,
+	\`federalWithholdingCents\` int NOT NULL,
+	\`utahWithholdingCents\` int NOT NULL,
+	\`withholdingOverridden\` boolean NOT NULL DEFAULT false,
+	\`ssEmployeeCents\` int NOT NULL,
+	\`medicareEmployeeCents\` int NOT NULL,
+	\`addlMedicareCents\` int NOT NULL DEFAULT 0,
+	\`ssEmployerCents\` int NOT NULL,
+	\`medicareEmployerCents\` int NOT NULL,
+	\`futaCents\` int NOT NULL,
+	\`utahUiCents\` int NOT NULL,
+	\`netPayCents\` int NOT NULL,
+	\`memo\` text,
+	\`createdBy\` int,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	\`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT \`payroll_paychecks_id\` PRIMARY KEY(\`id\`)
+);`,
+    `CREATE TABLE IF NOT EXISTS \`payroll_people\` (
+	\`id\` int AUTO_INCREMENT NOT NULL,
+	\`companyId\` int NOT NULL,
+	\`firstName\` varchar(128) NOT NULL,
+	\`lastName\` varchar(128) NOT NULL,
+	\`ssnLast4\` varchar(4),
+	\`relationship\` enum('owner','spouse','other') NOT NULL DEFAULT 'owner',
+	\`filingStatus\` enum('single','married_joint','head_of_household') NOT NULL DEFAULT 'married_joint',
+	\`multipleJobs\` boolean NOT NULL DEFAULT false,
+	\`dependentsCredit\` decimal(10,2) NOT NULL DEFAULT '0',
+	\`otherIncome\` decimal(12,2) NOT NULL DEFAULT '0',
+	\`deductions\` decimal(12,2) NOT NULL DEFAULT '0',
+	\`extraWithholding\` decimal(10,2) NOT NULL DEFAULT '0',
+	\`futaExempt\` boolean NOT NULL DEFAULT false,
+	\`utahUiExempt\` boolean NOT NULL DEFAULT false,
+	\`isActive\` boolean NOT NULL DEFAULT true,
+	\`createdAt\` timestamp NOT NULL DEFAULT (now()),
+	\`updatedAt\` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT \`payroll_people_id\` PRIMARY KEY(\`id\`)
+);`,
+  ];
+  for (const ddl of payrollTables) {
+    try {
+      await (db as any).execute(ddl);
+    } catch (err) {
+      console.error("[Auto-Migration] payroll table:", err instanceof Error ? err.message : String(err));
+    }
+  }
+
   for (const m of migrations) {
     try {
       // Check if column already exists
