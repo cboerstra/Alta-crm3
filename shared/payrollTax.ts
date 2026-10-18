@@ -230,3 +230,28 @@ export function computePaycheck(input: PaycheckInput): PaycheckResult {
     exactTaxYear: exact,
   };
 }
+
+export type GrossUpInput = Omit<PaycheckInput, "grossCents" | "federalWithholdingOverrideCents" | "utahWithholdingOverrideCents"> & {
+  targetNetCents: number;
+};
+
+/**
+ * Gross-up: the smallest gross pay whose take-home is at least the target,
+ * with withholding from the W-4 / Pub 14 formulas and the same wage-base caps
+ * as a real paycheck. Net rises with gross (every tax rate is under 100%), so
+ * a binary search over cents finds it; rounding can leave net a cent over.
+ */
+export function grossUpForNet(input: GrossUpInput): { grossCents: number; result: PaycheckResult } {
+  const { targetNetCents, ...rest } = input;
+  const at = (grossCents: number) => computePaycheck({ ...rest, grossCents });
+  const floor = targetNetCents + rest.retirement401kCents;
+  let lo = Math.max(1, floor);
+  let hi = Math.max(lo * 2, lo + 100_000);
+  while (at(hi).netPayCents < targetNetCents) hi *= 2;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (at(mid).netPayCents >= targetNetCents) hi = mid;
+    else lo = mid + 1;
+  }
+  return { grossCents: lo, result: at(lo) };
+}

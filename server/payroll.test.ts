@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computePaycheck,
+  grossUpForNet,
   federalWithholdingCents,
   utahWithholdingCents,
   TAX_YEARS,
@@ -202,5 +203,36 @@ describe("reports", () => {
   it("due dates fall on the last day of the month after the quarter", () => {
     expect(quarterDueDate(2026, 3).toISOString().slice(0, 10)).toBe("2026-10-31");
     expect(quarterDueDate(2026, 4).toISOString().slice(0, 10)).toBe("2027-01-31");
+  });
+});
+
+describe("gross-up", () => {
+  const base = {
+    retirement401kCents: 0, shareholderHealthCents: 0, periodsPerYear: 12, payYear: 2026,
+    w4: { ...single, filingStatus: "married_joint" as const }, futaExempt: false, utahUiExempt: false, utahUiRate: 0.012,
+    ytd: { ssWagesCents: 0, medicareWagesCents: 0, futaWagesCents: 0, utahUiWagesCents: 0 },
+  };
+
+  it("finds the gross behind a known net", () => {
+    // $6,000 MFJ monthly nets $4,940.42 (federal 356.67, Utah 243.91, FICA 459.00)
+    const { grossCents, result } = grossUpForNet({ ...base, targetNetCents: 494_042 });
+    expect(grossCents).toBe(600_000);
+    expect(result.netPayCents).toBe(494_042);
+  });
+
+  it("returns the smallest gross that reaches the target", () => {
+    for (const target of [100_000, 333_333, 1_234_567]) {
+      const { grossCents, result } = grossUpForNet({ ...base, targetNetCents: target });
+      expect(result.netPayCents).toBeGreaterThanOrEqual(target);
+      expect(computePaycheck({ ...base, grossCents: grossCents - 1 }).netPayCents).toBeLessThan(target);
+    }
+  });
+
+  it("accounts for 401(k) and the Social Security cap", () => {
+    const withK = grossUpForNet({ ...base, targetNetCents: 400_000, retirement401kCents: 50_000 });
+    expect(withK.result.netPayCents).toBeGreaterThanOrEqual(400_000);
+    const capped = grossUpForNet({ ...base, targetNetCents: 400_000, ytd: { ...base.ytd, ssWagesCents: 18_450_000, medicareWagesCents: 18_450_000 } });
+    expect(capped.result.ssEmployeeCents).toBe(0);
+    expect(capped.grossCents).toBeLessThan(grossUpForNet({ ...base, targetNetCents: 400_000 }).grossCents);
   });
 });

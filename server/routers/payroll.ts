@@ -4,7 +4,7 @@ import { adminProcedure, router } from "../_core/trpc";
 import {
   listCompanies, getCompany, createCompany, updateCompany, deleteCompany,
   listPeople, getPerson, createPerson, updatePerson, deletePerson,
-  listPaychecks, getPaycheck, previewPaycheck, savePaycheck, deletePaycheck,
+  listPaychecks, getPaycheck, previewPaycheck, grossUpPaycheck, savePaycheck, deletePaycheck,
   listDeposits, getDeposit, createDeposit, updateDeposit, deleteDeposit,
   recomputeCompanyYear, loadReportData,
 } from "../payrollDb";
@@ -183,6 +183,22 @@ export const payrollRouter = router({
       const company = await requireCompany(input.companyId);
       const person = await requirePerson(input.personId, input.companyId);
       return previewPaycheck(company, person, input, input.id);
+    }),
+
+  grossUp: adminProcedure
+    .input(z.object({
+      companyId: z.number(),
+      personId: z.number(),
+      payDate: isoDate,
+      targetNetCents: cents.min(1).max(100_000_000),
+      retirement401kCents: cents,
+      shareholderHealthCents: cents,
+      id: z.number().optional(), // when editing, leave this check out of year-to-date
+    }))
+    .query(async ({ input }) => {
+      const company = await requireCompany(input.companyId);
+      const person = await requirePerson(input.personId, input.companyId);
+      return grossUpPaycheck(company, person, input, input.id);
     }),
 
   savePaycheck: adminProcedure

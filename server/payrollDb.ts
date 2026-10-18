@@ -9,7 +9,7 @@ import {
   payrollPaychecks, PayrollPaycheck,
   payrollDeposits, InsertPayrollDeposit,
 } from "../drizzle/schema";
-import { computePaycheck, type FilingStatus, type W4 } from "../shared/payrollTax";
+import { computePaycheck, grossUpForNet, type FilingStatus, type W4 } from "../shared/payrollTax";
 import type { ReportCompany, ReportDeposit, ReportPaycheck, ReportPerson } from "../shared/payrollReports";
 
 async function db() {
@@ -139,6 +139,27 @@ export async function previewPaycheck(company: PayrollCompany, person: PayrollPe
     ytd: await ytdBefore(company.id, person.id, entry.payDate, excludeId),
     federalWithholdingOverrideCents: entry.federalWithholdingCents,
     utahWithholdingOverrideCents: entry.utahWithholdingCents,
+  });
+}
+
+/** Gross pay needed for a target take-home on this date, using the formula withholding. */
+export async function grossUpPaycheck(
+  company: PayrollCompany,
+  person: PayrollPerson,
+  entry: { payDate: string; targetNetCents: number; retirement401kCents: number; shareholderHealthCents: number },
+  excludeId?: number,
+) {
+  return grossUpForNet({
+    targetNetCents: entry.targetNetCents,
+    retirement401kCents: entry.retirement401kCents,
+    shareholderHealthCents: entry.shareholderHealthCents,
+    periodsPerYear: PERIODS_PER_YEAR[company.payFrequency],
+    payYear: Number(entry.payDate.slice(0, 4)),
+    w4: w4Of(person),
+    futaExempt: person.futaExempt,
+    utahUiExempt: person.utahUiExempt,
+    utahUiRate: Number(company.utahUiRate) / 100,
+    ytd: await ytdBefore(company.id, person.id, entry.payDate, excludeId),
   });
 }
 

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Calculator, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { fmtDate, fromCents, todayIso, toCents, usd, type PayrollOutputs } from "./format";
 
@@ -37,6 +37,10 @@ export default function PaychecksTab({ companyId, year }: { companyId: number; y
   const { data: checks = [], isLoading } = trpc.payroll.listPaychecks.useQuery({ companyId, year });
   const [dialog, setDialog] = useState<{ id?: number; form: typeof emptyForm } | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  // Gross-up: type the take-home pay wanted and solve for the gross
+  const [showGrossUp, setShowGrossUp] = useState(false);
+  const [targetNet, setTargetNet] = useState("");
+  const [grossingUp, setGrossingUp] = useState(false);
 
   const save = trpc.payroll.savePaycheck.useMutation({
     onSuccess: () => { toast.success("Paycheck saved"); setDialog(null); utils.payroll.invalidate(); },
@@ -73,11 +77,35 @@ export default function PaychecksTab({ companyId, year }: { companyId: number; y
     return p ? `${p.firstName} ${p.lastName}` : "—";
   };
 
-  const openNew = () => {
+  const runGrossUp = async () => {
+    if (!f?.personId || toCents(targetNet) <= 0) return;
+    setGrossingUp(true);
+    try {
+      const r = await utils.payroll.grossUp.fetch({
+        companyId, personId: Number(f.personId), payDate: f.payDate, id: dialog?.id,
+        targetNetCents: toCents(targetNet),
+        retirement401kCents: toCents(f.retirement401k),
+        shareholderHealthCents: toCents(f.shareholderHealth),
+      });
+      // Gross-up assumes the formula withholding, so drop any typed-in amounts
+      set({ gross: fromCents(r.grossCents), federalWithholding: "", utahWithholding: "" });
+      toast.success(`Gross pay set to ${usd(r.grossCents)} for ${usd(r.result.netPayCents)} take-home`);
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setGrossingUp(false);
+    }
+  };
+
+  const openNew = (grossUp = false) => {
     setShowAdvanced(false);
+    setShowGrossUp(grossUp);
+    setTargetNet("");
     setDialog({ form: { ...emptyForm, personId: people.length === 1 ? String(people[0].id) : "" } });
   };
   const openEdit = (c: Paycheck) => {
+    setShowGrossUp(false);
+    setTargetNet("");
     setShowAdvanced(!!(c.retirement401kCents || c.shareholderHealthCents || c.periodStart));
     setDialog({
       id: c.id,
@@ -97,9 +125,14 @@ export default function PaychecksTab({ companyId, year }: { companyId: number; y
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">Enter each paycheck on the date it was paid. Taxes are reported by pay date.</p>
-        <Button className="bg-brand-green hover:bg-brand-green-dark text-white gap-2" onClick={openNew} disabled={people.length === 0}>
-          <Plus className="h-4 w-4" /> Add paycheck
-        </Button>
+        <div className="flex shrink-0 gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => openNew(true)} disabled={people.length === 0}>
+            <Calculator className="h-4 w-4" /> Gross-up calculator
+          </Button>
+          <Button className="bg-brand-green hover:bg-brand-green-dark text-white gap-2" onClick={() => openNew()} disabled={people.length === 0}>
+            <Plus className="h-4 w-4" /> Add paycheck
+          </Button>
+        </div>
       </div>
       {people.length === 0 && (
         <Card><CardContent className="py-8 text-center text-muted-foreground">Add a person to this company on the Companies tab first.</CardContent></Card>
@@ -168,7 +201,7 @@ export default function PaychecksTab({ companyId, year }: { companyId: number; y
 
       <Dialog open={!!dialog} onOpenChange={(o) => !o && setDialog(null)}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{dialog?.id ? "Edit paycheck" : "Add paycheck"}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{dialog?.id ? "Edit paycheck" : showGrossUp ? "Gross-up calculator" : "Add paycheck"}</DialogTitle></DialogHeader>
           {f && (
             <div className="grid sm:grid-cols-2 gap-6 py-2">
               <div className="grid gap-3 content-start">
@@ -185,6 +218,27 @@ export default function PaychecksTab({ companyId, year }: { companyId: number; y
                   <Label className="mb-1.5 block">Pay date</Label>
                   <Input type="date" value={f.payDate} onChange={(e) => set({ payDate: e.target.value })} />
                 </div>
+                {showGrossUp ? (
+                  <div className="rounded-md border border-brand-green/40 bg-brand-green/5 p-3 space-y-2">
+                    <Label className="block">Take-home pay wanted ($)</Label>
+                    <div className="flex gap-2">
+                      <Input type="number" step="0.01" value={targetNet} placeholder="0.00" autoFocus
+                        onChange={(e) => setTargetNet(e.target.value)} onKeyDown={(e) => e.key === "Enter" && runGrossUp()} />
+                      <Button type="button" className="bg-brand-green hover:bg-brand-green-dark text-white gap-1 shrink-0"
+                        onClick={runGrossUp} disabled={!f.personId || toCents(targetNet) <= 0 || grossingUp}>
+                        {grossingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calculator className="h-4 w-4" />} Gross up
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Finds the gross pay that leaves this much after federal and Utah withholding (from the W-4), Social Security,
+                      Medicare and any 401(k) entered below. Year-to-date wage limits are included.
+                    </p>
+                  </div>
+                ) : (
+                  <button type="button" className="text-xs text-brand-green underline text-left" onClick={() => setShowGrossUp(true)}>
+                    Gross up from take-home pay
+                  </button>
+                )}
                 <div>
                   <Label className="mb-1.5 block">Gross pay ($)</Label>
                   <Input type="number" step="0.01" value={f.gross} onChange={(e) => set({ gross: e.target.value })} placeholder="0.00" />
