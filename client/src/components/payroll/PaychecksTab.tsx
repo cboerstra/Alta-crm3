@@ -137,9 +137,10 @@ export default function PaychecksTab({ companyId, year }: { companyId: number; y
                     <TableCell className="text-right tabular-nums font-medium">{usd(c.netPayCents)}</TableCell>
                     <TableCell className="text-right tabular-nums">{usd(c.ssEmployerCents + c.medicareEmployerCents + c.futaCents + c.utahUiCents)}</TableCell>
                     <TableCell className="text-right whitespace-nowrap">
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(c)}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button variant="ghost" size="sm" onClick={() => confirm("Delete this paycheck?") && remove.mutate({ id: c.id })}>
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => openEdit(c)}><Pencil className="h-3.5 w-3.5" /> Edit</Button>
+                      <Button variant="ghost" size="sm" className="gap-1 text-destructive hover:text-destructive"
+                        onClick={() => confirm(`Delete the ${fmtDate(c.payDate)} paycheck for ${personName(c.personId)}?`) && remove.mutate({ id: c.id })}>
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
                       </Button>
                     </TableCell>
                   </TableRow>

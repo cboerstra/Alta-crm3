@@ -7,23 +7,28 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { AGENCY_LABELS, fmtDate, todayIso, toCents, usd } from "./format";
+import { AGENCY_LABELS, fmtDate, fromCents, todayIso, toCents, usd } from "./format";
 
 type Agency = keyof typeof AGENCY_LABELS;
 
 export default function DepositsTab({ companyId, year }: { companyId: number; year: number }) {
   const utils = trpc.useUtils();
   const { data: deposits = [] } = trpc.payroll.listDeposits.useQuery({ companyId, year });
-  const [form, setForm] = useState<{ agency: Agency; quarter: string; amount: string; depositDate: string; confirmation: string } | null>(null);
+  const [form, setForm] = useState<{ id?: number; agency: Agency; quarter: string; amount: string; depositDate: string; confirmation: string } | null>(null);
 
   const create = trpc.payroll.createDeposit.useMutation({
     onSuccess: () => { toast.success("Deposit recorded"); setForm(null); utils.payroll.invalidate(); },
     onError: (e) => toast.error(e.message),
   });
+  const update = trpc.payroll.updateDeposit.useMutation({
+    onSuccess: () => { toast.success("Deposit updated"); setForm(null); utils.payroll.invalidate(); },
+    onError: (e) => toast.error(e.message),
+  });
   const remove = trpc.payroll.deleteDeposit.useMutation({
     onSuccess: () => { toast.success("Deposit deleted"); utils.payroll.invalidate(); },
+    onError: (e) => toast.error(e.message),
   });
 
   const set = (patch: Partial<NonNullable<typeof form>>) => form && setForm({ ...form, ...patch });
@@ -62,9 +67,16 @@ export default function DepositsTab({ companyId, year }: { companyId: number; ye
                     <TableCell>{d.quarter ? `Q${d.quarter} ${d.taxYear}` : d.taxYear}</TableCell>
                     <TableCell className="text-right tabular-nums">{usd(d.amountCents)}</TableCell>
                     <TableCell className="font-mono text-xs">{d.confirmation}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => confirm("Delete this deposit?") && remove.mutate({ id: d.id })}>
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    <TableCell className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="sm" className="gap-1" onClick={() => setForm({
+                        id: d.id, agency: d.agency, quarter: String(d.quarter ?? 1), amount: fromCents(d.amountCents),
+                        depositDate: d.depositDate, confirmation: d.confirmation ?? "",
+                      })}>
+                        <Pencil className="h-3.5 w-3.5" /> Edit
+                      </Button>
+                      <Button variant="ghost" size="sm" className="gap-1 text-destructive hover:text-destructive"
+                        onClick={() => confirm(`Delete the ${usd(d.amountCents)} deposit paid ${fmtDate(d.depositDate)}?`) && remove.mutate({ id: d.id })}>
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -77,7 +89,7 @@ export default function DepositsTab({ companyId, year }: { companyId: number; ye
 
       <Dialog open={!!form} onOpenChange={(o) => !o && setForm(null)}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>Record tax deposit</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{form?.id ? "Edit tax deposit" : "Record tax deposit"}</DialogTitle></DialogHeader>
           {form && (
             <div className="grid gap-3 py-2">
               <div>
@@ -116,13 +128,18 @@ export default function DepositsTab({ companyId, year }: { companyId: number; ye
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setForm(null)}>Cancel</Button>
-            <Button className="bg-brand-green hover:bg-brand-green-dark text-white" disabled={!form || toCents(form.amount) <= 0 || create.isPending}
-              onClick={() => form && create.mutate({
-                companyId, agency: form.agency, taxYear: year,
-                quarter: form.agency === "irs_940" ? null : Number(form.quarter),
-                amountCents: toCents(form.amount), depositDate: form.depositDate,
-                confirmation: form.confirmation || undefined,
-              })}>Save</Button>
+            <Button className="bg-brand-green hover:bg-brand-green-dark text-white" disabled={!form || toCents(form.amount) <= 0 || create.isPending || update.isPending}
+              onClick={() => {
+                if (!form) return;
+                const data = {
+                  companyId, agency: form.agency, taxYear: year,
+                  quarter: form.agency === "irs_940" ? null : Number(form.quarter),
+                  amountCents: toCents(form.amount), depositDate: form.depositDate,
+                  confirmation: form.confirmation || undefined,
+                };
+                if (form.id) update.mutate({ id: form.id, ...data });
+                else create.mutate(data);
+              }}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -245,6 +245,15 @@ export async function createDeposit(data: InsertPayrollDeposit) {
   return (r as any).insertId as number;
 }
 
+export async function getDeposit(id: number) {
+  const [row] = await (await db()).select().from(payrollDeposits).where(eq(payrollDeposits.id, id));
+  return row;
+}
+
+export async function updateDeposit(id: number, data: Partial<InsertPayrollDeposit>) {
+  await (await db()).update(payrollDeposits).set(data).where(eq(payrollDeposits.id, id));
+}
+
 export async function deleteDeposit(id: number) {
   await (await db()).delete(payrollDeposits).where(eq(payrollDeposits.id, id));
 }

@@ -5,7 +5,7 @@ import {
   listCompanies, getCompany, createCompany, updateCompany, deleteCompany,
   listPeople, getPerson, createPerson, updatePerson, deletePerson,
   listPaychecks, getPaycheck, previewPaycheck, savePaycheck, deletePaycheck,
-  listDeposits, createDeposit, deleteDeposit,
+  listDeposits, getDeposit, createDeposit, updateDeposit, deleteDeposit,
   recomputeCompanyYear, loadReportData,
 } from "../payrollDb";
 import {
@@ -67,6 +67,24 @@ const paycheckFields = z.object({
   utahWithholdingCents: cents.nullable(),
   memo: z.string().nullable().optional(),
 });
+
+const depositFields = z.object({
+  companyId: z.number(),
+  agency: z.enum(["irs_941", "irs_940", "utah_withholding", "utah_ui"]),
+  taxYear: year,
+  quarter: quarter.nullable(),
+  amountCents: cents.min(1),
+  depositDate: isoDate,
+  confirmation: z.string().optional(),
+});
+
+/** 940 deposits are annual; everything else needs its quarter. */
+function checkDeposit<T extends z.infer<typeof depositFields>>(input: T): T {
+  if (input.agency !== "irs_940" && input.quarter === null) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Pick the quarter this deposit is for" });
+  }
+  return { ...input, quarter: input.agency === "irs_940" ? null : input.quarter };
+}
 
 const money = (n: number) => n.toFixed(2);
 
@@ -193,23 +211,20 @@ export const payrollRouter = router({
     .input(z.object({ companyId: z.number(), year }))
     .query(({ input }) => listDeposits(input.companyId, input.year)),
 
-  createDeposit: adminProcedure
-    .input(z.object({
-      companyId: z.number(),
-      agency: z.enum(["irs_941", "irs_940", "utah_withholding", "utah_ui"]),
-      taxYear: year,
-      quarter: quarter.nullable(),
-      amountCents: cents.min(1),
-      depositDate: isoDate,
-      confirmation: z.string().optional(),
-    }))
-    .mutation(async ({ input, ctx }) => {
-      await requireCompany(input.companyId);
-      if (input.agency !== "irs_940" && input.quarter === null) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Pick the quarter this deposit is for" });
-      }
-      const id = await createDeposit({ ...input, quarter: input.agency === "irs_940" ? null : input.quarter, createdBy: ctx.user.id });
-      return { id };
+  createDeposit: adminProcedure.input(depositFields).mutation(async ({ input, ctx }) => {
+    await requireCompany(input.companyId);
+    const id = await createDeposit({ ...checkDeposit(input), createdBy: ctx.user.id });
+    return { id };
+  }),
+
+  updateDeposit: adminProcedure
+    .input(depositFields.extend({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const existing = await getDeposit(input.id);
+      if (!existing || existing.companyId !== input.companyId) throw new TRPCError({ code: "NOT_FOUND", message: "Deposit not found" });
+      const { id, ...rest } = input;
+      await updateDeposit(id, { ...checkDeposit(rest), confirmation: rest.confirmation ?? null });
+      return { success: true };
     }),
 
   deleteDeposit: adminProcedure.input(z.object({ id: z.number() })).mutation(async ({ input }) => {

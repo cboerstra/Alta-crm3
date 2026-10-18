@@ -52,7 +52,7 @@ function ownerWarning(company: Company, people: Person[]) {
     : "Partners in a multi-member LLC can't be W-2 employees of it — they receive guaranteed payments instead. If the LLC elected S-corp status, change the tax classification.";
 }
 
-function CompanyCard({ company, year, onEdit }: { company: Company; year: number; onEdit: () => void }) {
+function CompanyCard({ company, year, onEdit, onDelete }: { company: Company; year: number; onEdit: () => void; onDelete: () => void }) {
   const utils = trpc.useUtils();
   const { data: people = [] } = trpc.payroll.listPeople.useQuery({ companyId: company.id });
   const [personDialog, setPersonDialog] = useState<{ id?: number; form: typeof emptyPerson } | null>(null);
@@ -101,7 +101,12 @@ function CompanyCard({ company, year, onEdit }: { company: Company; year: number
               {CLASSIFICATION_LABELS[company.taxClassification]} · EIN {company.ein || "—"} · UI rate {Number(company.utahUiRate)}% · Paid {company.payFrequency} · {company.depositSchedule} depositor
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={onEdit} className="gap-1"><Pencil className="h-3.5 w-3.5" /> Edit</Button>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="outline" size="sm" onClick={onEdit} className="gap-1"><Pencil className="h-3.5 w-3.5" /> Edit</Button>
+            <Button variant="outline" size="sm" onClick={onDelete} className="gap-1 text-destructive hover:text-destructive">
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -120,18 +125,18 @@ function CompanyCard({ company, year, onEdit }: { company: Company; year: number
                 {p.futaExempt && <Badge variant="outline" className="ml-2">FUTA exempt</Badge>}
                 {p.utahUiExempt && <Badge variant="outline" className="ml-1">UI exempt</Badge>}
               </div>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="sm" onClick={() => setPersonDialog({
+              <div className="flex shrink-0 gap-1">
+                <Button variant="ghost" size="sm" className="gap-1" onClick={() => setPersonDialog({
                   id: p.id,
                   form: {
                     ...emptyPerson, ...p, ssnLast4: p.ssnLast4 ?? "",
                     dependentsCredit: String(Number(p.dependentsCredit)), otherIncome: String(Number(p.otherIncome)),
                     deductions: String(Number(p.deductions)), extraWithholding: String(Number(p.extraWithholding)),
                   },
-                })}><Pencil className="h-3.5 w-3.5" /></Button>
-                <Button variant="ghost" size="sm" onClick={() => {
-                  if (confirm(`Remove ${p.firstName} and all of their paychecks?`)) deletePerson.mutate({ id: p.id });
-                }}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                })}><Pencil className="h-3.5 w-3.5" /> Edit</Button>
+                <Button variant="ghost" size="sm" className="gap-1 text-destructive hover:text-destructive" onClick={() => {
+                  if (confirm(`Delete ${p.firstName} ${p.lastName} and all of their paychecks? This can't be undone.`)) deletePerson.mutate({ id: p.id });
+                }}><Trash2 className="h-3.5 w-3.5" /> Delete</Button>
               </div>
             </div>
           ))}
@@ -239,13 +244,16 @@ export default function CompaniesTab({ year }: { year: number }) {
     }
   };
 
-  const remove = async () => {
-    if (!dialog?.id) return;
-    if (!confirm(`Delete ${dialog.form.name} and ALL of its people, paychecks and deposits? This can't be undone.`)) return;
-    await deleteCompany.mutateAsync({ id: dialog.id });
-    toast.success("Company deleted");
-    setDialog(null);
-    utils.payroll.invalidate();
+  const remove = async (id: number, name: string) => {
+    if (!confirm(`Delete ${name} and ALL of its people, paychecks and deposits? This can't be undone.`)) return;
+    try {
+      await deleteCompany.mutateAsync({ id });
+      toast.success("Company deleted");
+      setDialog(null);
+      utils.payroll.invalidate();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
   };
 
   return (
@@ -260,7 +268,7 @@ export default function CompaniesTab({ year }: { year: number }) {
         <Card><CardContent className="py-10 text-center text-muted-foreground">Add your first company to get started.</CardContent></Card>
       )}
       {companies.map((c) => (
-        <CompanyCard key={c.id} company={c} year={year} onEdit={() => setDialog({
+        <CompanyCard key={c.id} company={c} year={year} onDelete={() => remove(c.id, c.name)} onEdit={() => setDialog({
           id: c.id,
           form: {
             ...emptyCompany,
@@ -340,7 +348,7 @@ export default function CompaniesTab({ year }: { year: number }) {
             </div>
           )}
           <DialogFooter className="gap-2">
-            {dialog?.id && <Button variant="outline" className="text-destructive mr-auto" onClick={remove}>Delete</Button>}
+            {dialog?.id && <Button variant="outline" className="text-destructive mr-auto" onClick={() => remove(dialog.id!, dialog.form.name)}>Delete</Button>}
             <Button variant="outline" onClick={() => setDialog(null)}>Cancel</Button>
             <Button className="bg-brand-green hover:bg-brand-green-dark text-white" onClick={save} disabled={!dialog?.form.name}>Save</Button>
           </DialogFooter>
