@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, Printer } from "lucide-react";
 import { fmtDate, printElement, type PayrollOutputs } from "./format";
+import { DwsFileButton, W2FilesButton } from "./WageFiles";
 
 /** Amount as typed on a form: 1,234.56 */
 const amt = (cents: number) => (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -23,7 +24,7 @@ function Line({ n, label, value, wages, note }: { n: string; label: string; valu
   );
 }
 
-function FormCard({ id, title, subtitle, children }: { id: string; title: string; subtitle: string; children: React.ReactNode }) {
+function FormCard({ id, title, subtitle, actions, children }: { id: string; title: string; subtitle: string; actions?: React.ReactNode; children: React.ReactNode }) {
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -32,9 +33,12 @@ function FormCard({ id, title, subtitle, children }: { id: string; title: string
             <CardTitle className="text-base">{title}</CardTitle>
             <p className="text-sm text-muted-foreground">{subtitle}</p>
           </div>
-          <Button variant="outline" size="sm" className="gap-1" onClick={() => printElement(id, title)}>
-            <Printer className="h-3.5 w-3.5" /> Print
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            {actions}
+            <Button variant="outline" size="sm" className="gap-1" onClick={() => printElement(id, title)}>
+              <Printer className="h-3.5 w-3.5" /> Print
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -177,7 +181,7 @@ function Form3({ data }: { data: QData }) {
   const f = data.utahForm3;
   const c = data.companyInfo;
   return (
-    <FormCard id="form3" title={`Utah DWS Form 3 — Q${f.quarter} ${f.year}`}
+    <FormCard id="form3" title={`Utah DWS Form 3 — Q${f.quarter} ${f.year}`} actions={<DwsFileButton data={data} />}
       subtitle={`${c.name} · DWS account ${c.utahUiAccount || "—"} · File at jobs.utah.gov (Employer Online Services) · Due ${fmtDate(f.dueDate)}`}>
       <Tbl>
         <Line n="1" label="Covered workers in pay period including the 12th — Month 1" value={String(f.workersBy12th[0])} />
@@ -254,7 +258,7 @@ function W2s({ data }: { data: AData }) {
   const c = data.companyInfo;
   return (
     <>
-      <FormCard id="w2" title={`W-2s and W-3 — ${r.year}`} subtitle={`${c.name} · EIN ${c.ein || "—"} · File with SSA (Business Services Online) and give copies to employees · Due ${fmtDate(r.dueDate)}`}>
+      <FormCard id="w2" title={`W-2s and W-3 — ${r.year}`} actions={<W2FilesButton data={data} />} subtitle={`${c.name} · EIN ${c.ein || "—"} · File with SSA (Business Services Online) and give copies to employees · Due ${fmtDate(r.dueDate)}`}>
         {r.w2s.length === 0 && <p className="text-sm text-muted-foreground">No wages paid in {r.year}.</p>}
         {r.w2s.map((w) => (
           <div key={w.name} className="mb-4">

@@ -185,6 +185,9 @@ export function buildUtahForm3(company: ReportCompany, people: ReportPerson[], c
     .map((p) => {
       const mine = qc.filter((c) => c.personId === p.id);
       return {
+        personId: p.id,
+        firstName: p.firstName,
+        lastName: p.lastName,
         name: `${p.lastName}, ${p.firstName}`,
         ssnLast4: p.ssnLast4,
         wages: sum(mine, (c) => c.grossCents),
@@ -263,6 +266,9 @@ export function buildW2s(company: ReportCompany, people: ReportPerson[], checks:
       const mine = yc.filter((c) => c.personId === p.id);
       const box12D = sum(mine, (c) => c.retirement401kCents);
       return {
+        personId: p.id,
+        firstName: p.firstName,
+        lastName: p.lastName,
         name: `${p.firstName} ${p.lastName}`,
         ssnLast4: p.ssnLast4,
         box1: sum(mine, (c) => c.federalWagesCents),
