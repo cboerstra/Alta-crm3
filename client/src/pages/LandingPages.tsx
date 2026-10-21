@@ -49,6 +49,8 @@ type FormState = {
   smsConsentEnabled: boolean;
   headScripts: string;
   pageType: "re_agent" | "past_mortgage" | "prospective_mortgage" | "prospective_re_client";
+  purpose: "webinar" | "advertising";
+  hostSite: "altamortgagecrm" | "freehomesearchutah";
 };
 
 type MediaSelection = {
@@ -103,6 +105,8 @@ const defaultForm: FormState = {
   smsConsentEnabled: true,
   headScripts: "",
   pageType: "prospective_mortgage",
+  purpose: "advertising",
+  hostSite: "altamortgagecrm",
 };
 
 const ALTA_FORM_BLOCK = `<div class="alta-crm-form-shell">
@@ -244,6 +248,7 @@ function FieldError({ message }: { message: string }) {
 
 export default function LandingPages() {
   const [showCreate, setShowCreate] = useState(false);
+  const [createStep, setCreateStep] = useState<"audience" | "purpose" | "form">("audience");
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState<FormState>({ ...defaultForm });
   const [artworkPreview, setArtworkPreview] = useState<string | null>(null);
@@ -457,6 +462,7 @@ export default function LandingPages() {
 
   function resetForm() {
     setForm({ ...defaultForm });
+    setCreateStep("audience");
     setArtworkPreview(null);
     setBackgroundHtmlPreview(null);
     setPreviewHtml(null);
@@ -490,6 +496,8 @@ export default function LandingPages() {
       confirmationEmailSubject: page.confirmationEmailSubject || DEFAULT_EMAIL_SUBJECT,
       confirmationEmailBody: page.confirmationEmailBody || DEFAULT_EMAIL_BODY,
       pageType: page.pageType || "prospective_mortgage",
+      purpose: page.purpose || "advertising",
+      hostSite: page.hostSite || "altamortgagecrm",
     });
     setArtworkPreview(page.artworkUrl || null);
     setBackgroundHtmlPreview((page as any).backgroundHtmlUrl || null);
@@ -663,11 +671,15 @@ export default function LandingPages() {
         formEnabled: form.formEnabled, smsConsentEnabled: form.smsConsentEnabled,
         headScripts: form.headScripts.trim() || null,
         pageType: form.pageType,
+        purpose: form.purpose,
+        hostSite: form.hostSite,
       });
     } else {
       createMutation.mutate({
         title: form.title, slug: form.slug,
         pageType: form.pageType,
+        purpose: form.purpose,
+        hostSite: form.hostSite,
         headline: form.headline || undefined, subheadline: form.subheadline || undefined,
         bodyText: form.bodyText || undefined, ctaText: form.ctaText || undefined,
         campaignTag: form.campaignTag || undefined, sourceTag: form.sourceTag || undefined,
@@ -709,9 +721,113 @@ export default function LandingPages() {
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle style={{ fontFamily: "Raleway, sans-serif" }}>
-                {editId ? "Edit Landing Page" : "Create Landing Page"}
+                {editId ? "Edit Landing Page" : createStep === "form" ? "Create Landing Page" : "New Landing Page"}
               </DialogTitle>
             </DialogHeader>
+
+            {/* ─── Step 1: Choose Audience (create only) ─── */}
+            {!editId && createStep === "audience" && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">What audience is this landing page for?</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    { value: "prospective_mortgage", label: "Prospective Mortgage Client", desc: "New mortgage lead capture", icon: "🏦", suggestedHost: "altamortgagecrm" },
+                    { value: "past_mortgage", label: "Past Mortgage Client", desc: "Re-engage past clients", icon: "🔄", suggestedHost: "altamortgagecrm" },
+                    { value: "prospective_re_client", label: "Prospective RE Client", desc: "Home buyers & sellers", icon: "🏠", suggestedHost: "freehomesearchutah" },
+                    { value: "re_agent", label: "Real Estate Agent", desc: "Agent referral partnerships", icon: "🤝", suggestedHost: "altamortgagecrm" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => {
+                        setForm(prev => ({ ...prev, pageType: opt.value, hostSite: opt.suggestedHost }));
+                        setCreateStep("purpose");
+                      }}
+                      className={`p-4 rounded-lg border-2 text-left transition-all hover:border-brand-green hover:shadow-md ${
+                        form.pageType === opt.value ? "border-brand-green bg-brand-green/5" : "border-muted"
+                      }`}
+                    >
+                      <span className="text-2xl block mb-2">{opt.icon}</span>
+                      <p className="font-semibold text-sm">{opt.label}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{opt.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ─── Step 2: Choose Purpose (create only) ─── */}
+            {!editId && createStep === "purpose" && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <button onClick={() => setCreateStep("audience")} className="hover:text-foreground transition-colors">&larr; Back</button>
+                  <span>/</span>
+                  <Badge variant="outline" className="text-[10px]">
+                    {form.pageType === "prospective_mortgage" ? "Prosp. Mortgage" : form.pageType === "past_mortgage" ? "Past Mortgage" : form.pageType === "prospective_re_client" ? "Prosp. RE Client" : "RE Agent"}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">What's the purpose of this page?</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => {
+                      setForm(prev => ({ ...prev, purpose: "webinar" }));
+                      setCreateStep("form");
+                    }}
+                    className="p-4 rounded-lg border-2 text-left transition-all hover:border-brand-green hover:shadow-md border-muted"
+                  >
+                    <span className="text-2xl block mb-2">🎥</span>
+                    <p className="font-semibold text-sm">Webinar Registration</p>
+                    <p className="text-xs text-muted-foreground mt-1">Capture signups for a webinar or seminar event</p>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setForm(prev => ({ ...prev, purpose: "advertising" }));
+                      setCreateStep("form");
+                    }}
+                    className="p-4 rounded-lg border-2 text-left transition-all hover:border-brand-green hover:shadow-md border-muted"
+                  >
+                    <span className="text-2xl block mb-2">📢</span>
+                    <p className="font-semibold text-sm">Advertising / Lead Capture</p>
+                    <p className="text-xs text-muted-foreground mt-1">General lead capture from ads, social media, or direct outreach</p>
+                  </button>
+                </div>
+
+                {/* Host site selector */}
+                <div className="pt-2">
+                  <Label className="text-xs text-muted-foreground mb-1.5 block">Host site (auto-suggested)</Label>
+                  <Select value={form.hostSite} onValueChange={(v: any) => setForm(prev => ({ ...prev, hostSite: v }))}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="altamortgagecrm">altamortgagecrm.net</SelectItem>
+                      <SelectItem value="freehomesearchutah">freehomesearchutah.com</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
+            {/* ─── Full Form (create step 3 or edit) ─── */}
+            {(editId || createStep === "form") && (<>
+
+            {/* Breadcrumb for create mode */}
+            {!editId && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground -mt-1 flex-wrap">
+                <button onClick={() => setCreateStep("audience")} className="hover:text-foreground transition-colors">&larr; Start over</button>
+                <span>/</span>
+                <Badge variant="outline" className="text-[10px]">
+                  {form.pageType === "prospective_mortgage" ? "Prosp. Mortgage" : form.pageType === "past_mortgage" ? "Past Mortgage" : form.pageType === "prospective_re_client" ? "Prosp. RE Client" : "RE Agent"}
+                </Badge>
+                <span>/</span>
+                <Badge variant="outline" className="text-[10px]">
+                  {form.purpose === "webinar" ? "Webinar" : "Advertising"}
+                </Badge>
+                <span>/</span>
+                <Badge variant="outline" className="text-[10px]">
+                  {form.hostSite === "altamortgagecrm" ? "altamortgagecrm.net" : "freehomesearchutah.com"}
+                </Badge>
+              </div>
+            )}
 
             {/* ─── Required Fields Notice ─── */}
             <div className="text-xs text-muted-foreground flex items-center gap-1 -mt-1">
@@ -812,23 +928,42 @@ export default function LandingPages() {
                 {editId && (
                   <p className="text-xs text-muted-foreground -mt-2">Slug is locked after creation to preserve existing links.</p>
                 )}
-                <div>
-                  <Label className="flex items-center">Page Type <RequiredStar /></Label>
-                  <Select value={form.pageType} onValueChange={(v: any) => setForm({ ...form, pageType: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="prospective_mortgage">Prospective Mortgage Client</SelectItem>
-                      <SelectItem value="past_mortgage">Past Mortgage Client</SelectItem>
-                      <SelectItem value="prospective_re_client">Prospective Real Estate Client</SelectItem>
-                      <SelectItem value="re_agent">Real Estate Agent</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {form.pageType === "prospective_mortgage" && "For new mortgage lead capture"}
-                    {form.pageType === "past_mortgage" && "For re-engaging past mortgage clients"}
-                    {form.pageType === "prospective_re_client" && "For home buyers/sellers (direct consumers)"}
-                    {form.pageType === "re_agent" && "For real estate agent referral partnerships"}
-                  </p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label className="flex items-center">Audience <RequiredStar /></Label>
+                    <Select value={form.pageType} onValueChange={(v: any) => {
+                      const suggestedHost = v === "prospective_re_client" ? "freehomesearchutah" : "altamortgagecrm";
+                      setForm(prev => ({ ...prev, pageType: v, hostSite: suggestedHost }));
+                    }}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="prospective_mortgage">Prosp. Mortgage</SelectItem>
+                        <SelectItem value="past_mortgage">Past Mortgage</SelectItem>
+                        <SelectItem value="prospective_re_client">Prosp. RE Client</SelectItem>
+                        <SelectItem value="re_agent">RE Agent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Purpose</Label>
+                    <Select value={form.purpose} onValueChange={(v: any) => setForm(prev => ({ ...prev, purpose: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="webinar">Webinar</SelectItem>
+                        <SelectItem value="advertising">Advertising</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Host Site</Label>
+                    <Select value={form.hostSite} onValueChange={(v: any) => setForm(prev => ({ ...prev, hostSite: v }))}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="altamortgagecrm">altamortgagecrm.net</SelectItem>
+                        <SelectItem value="freehomesearchutah">freehomesearchutah.com</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div>
                   <Label className="flex items-center">Headline <RequiredStar /></Label>
@@ -1570,6 +1705,7 @@ export default function LandingPages() {
                 {uploading ? "Uploading..." : editId ? "Update Page" : "Create Page"}
               </Button>
             </div>
+            </>)}
           </DialogContent>
         </Dialog>
       </div>
@@ -1666,6 +1802,16 @@ export default function LandingPages() {
                         {(page as any).pageType && (
                           <Badge variant="outline" className="text-[10px]">
                             {(page as any).pageType === "prospective_mortgage" ? "Prosp. Mortgage" : (page as any).pageType === "past_mortgage" ? "Past Mortgage" : (page as any).pageType === "prospective_re_client" ? "Prosp. RE Client" : "RE Agent"}
+                          </Badge>
+                        )}
+                        {(page as any).purpose && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {(page as any).purpose === "webinar" ? "Webinar" : "Ad/Lead Capture"}
+                          </Badge>
+                        )}
+                        {(page as any).hostSite && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {(page as any).hostSite === "freehomesearchutah" ? "FHSU" : "Alta CRM"}
                           </Badge>
                         )}
                         {(page as any).leadCount !== undefined && (

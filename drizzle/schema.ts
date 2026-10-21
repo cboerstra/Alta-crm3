@@ -194,6 +194,10 @@ export const landingPages = mysqlTable("landing_pages", {
   slug: varchar("slug", { length: 128 }).notNull().unique(),
   // Page type: what audience this landing page targets
   pageType: mysqlEnum("pageType", ["re_agent", "past_mortgage", "prospective_mortgage", "prospective_re_client"]).default("prospective_mortgage").notNull(),
+  // Purpose: webinar registration or advertising/lead capture
+  purpose: mysqlEnum("purpose", ["webinar", "advertising"]).default("advertising").notNull(),
+  // Which domain hosts this page
+  hostSite: mysqlEnum("hostSite", ["altamortgagecrm", "freehomesearchutah"]).default("altamortgagecrm").notNull(),
   headline: text("headline"),
   subheadline: text("subheadline"),
   ctaText: varchar("ctaText", { length: 256 }),
