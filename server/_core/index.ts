@@ -495,6 +495,18 @@ async function startServer() {
     res.send(`<html><body style="font-family:sans-serif;text-align:center;padding:60px"><h2>You have been unsubscribed</h2><p>You will no longer receive emails from us.</p></body></html>`);
   });
 
+  // Allow freehomesearchutah.com to load assets and call APIs cross-origin (landing page proxy)
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && (origin === "https://freehomesearchutah.com" || origin === "http://freehomesearchutah.com")) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    }
+    if (req.method === "OPTIONS") { res.sendStatus(204); return; }
+    next();
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",
