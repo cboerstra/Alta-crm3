@@ -162,7 +162,7 @@ export const templatesRouter = router({
         confirmationEmailSubject: fillTokens(template.confirmationEmailSubject, tokens),
         confirmationEmailBody: fillTokens(template.confirmationEmailBody, tokens),
         templateId: template.id,
-        campaignId: input.campaignId ?? null,
+        adCampaignId: input.campaignId ?? null,
         metaPixelId: input.metaPixelId,
         trackingEnabled: true,
         capiEnabled: true,

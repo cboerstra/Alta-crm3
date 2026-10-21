@@ -23,13 +23,13 @@ import {
 } from "./marketingApi";
 import { MetaApiError } from "./graph";
 import {
-  getCampaignById,
+  getAdCampaignById,
   getMetaSettings,
-  updateCampaign,
-  upsertCampaignMetric,
+  updateAdCampaign,
+  upsertAdCampaignMetric,
 } from "../marketingDb";
 import { getLandingPageById } from "../db";
-import type { Campaign } from "../../drizzle/schema";
+import type { AdCampaign } from "../../drizzle/schema";
 
 export class CampaignPublishError extends Error {
   readonly stage: string;
@@ -115,7 +115,7 @@ export type PublishResult = {
  * the ad account stays clean and the operator can just fix the error and retry.
  */
 export async function publishCampaign(campaignId: number): Promise<PublishResult> {
-  const campaign = await getCampaignById(campaignId);
+  const campaign = await getAdCampaignById(campaignId);
   if (!campaign) throw new CampaignPublishError("load", "Campaign not found");
 
   const settings = await getMetaSettings();
@@ -156,7 +156,7 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
     throw new CampaignPublishError("creative", "Add ad copy (primary text) before publishing");
   }
 
-  await updateCampaign(campaignId, { syncStatus: "syncing", syncError: null });
+  await updateAdCampaign(campaignId, { syncStatus: "syncing", syncError: null });
 
   try {
     // ── Campaign ───────────────────────────────────────────────────────────
@@ -168,7 +168,7 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
         status: "PAUSED",
       });
       metaCampaignId = created.id;
-      await updateCampaign(campaignId, { metaCampaignId, metaAdAccountId: creds.adAccountId });
+      await updateAdCampaign(campaignId, { metaCampaignId, metaAdAccountId: creds.adAccountId });
     }
 
     // ── Ad set ─────────────────────────────────────────────────────────────
@@ -188,7 +188,7 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
         status: "PAUSED",
       });
       metaAdSetId = created.id;
-      await updateCampaign(campaignId, { metaAdSetId });
+      await updateAdCampaign(campaignId, { metaAdSetId });
     }
 
     // ── Creative ───────────────────────────────────────────────────────────
@@ -207,7 +207,7 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
         },
       });
       metaCreativeId = created.id;
-      await updateCampaign(campaignId, { metaCreativeId });
+      await updateAdCampaign(campaignId, { metaCreativeId });
     }
 
     // ── Ad ─────────────────────────────────────────────────────────────────
@@ -220,10 +220,10 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
         status: "PAUSED",
       });
       metaAdId = created.id;
-      await updateCampaign(campaignId, { metaAdId });
+      await updateAdCampaign(campaignId, { metaAdId });
     }
 
-    await updateCampaign(campaignId, {
+    await updateAdCampaign(campaignId, {
       syncStatus: "synced",
       syncError: null,
       lastSyncedAt: new Date(),
@@ -237,7 +237,7 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
       err instanceof MetaApiError ? err.message
       : err instanceof Error ? err.message
       : String(err);
-    await updateCampaign(campaignId, { syncStatus: "error", syncError: message });
+    await updateAdCampaign(campaignId, { syncStatus: "error", syncError: message });
     throw new CampaignPublishError("publish", message);
   }
 }
@@ -246,14 +246,14 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
 export async function setCampaignDelivery(
   campaignId: number,
   active: boolean
-): Promise<{ status: Campaign["status"] }> {
-  const campaign = await getCampaignById(campaignId);
+): Promise<{ status: AdCampaign["status"] }> {
+  const campaign = await getAdCampaignById(campaignId);
   if (!campaign) throw new CampaignPublishError("load", "Campaign not found");
 
   // Local-only campaigns just flip their CRM status.
   if (!campaign.metaCampaignId) {
     const status = active ? "active" : "paused";
-    await updateCampaign(campaignId, { status });
+    await updateAdCampaign(campaignId, { status });
     return { status };
   }
 
@@ -269,25 +269,25 @@ export async function setCampaignDelivery(
     if (campaign.metaAdId) await updateObjectStatus(creds, campaign.metaAdId, metaStatus);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await updateCampaign(campaignId, { syncStatus: "error", syncError: message });
+    await updateAdCampaign(campaignId, { syncStatus: "error", syncError: message });
     throw new CampaignPublishError("status", message);
   }
 
   const status = active ? "active" : "paused";
-  await updateCampaign(campaignId, { status, syncStatus: "synced", syncError: null, lastSyncedAt: new Date() });
+  await updateAdCampaign(campaignId, { status, syncStatus: "synced", syncError: null, lastSyncedAt: new Date() });
   return { status };
 }
 
 /** Pushes a budget change to the live ad set. */
 export async function syncCampaignBudget(campaignId: number): Promise<void> {
-  const campaign = await getCampaignById(campaignId);
+  const campaign = await getAdCampaignById(campaignId);
   if (!campaign?.metaAdSetId) return;
   const creds = await resolveCredentials();
   await updateAdSetBudget(creds, campaign.metaAdSetId, {
     dailyBudget: campaign.dailyBudget ? Number(campaign.dailyBudget) : null,
     lifetimeBudget: campaign.lifetimeBudget ? Number(campaign.lifetimeBudget) : null,
   });
-  await updateCampaign(campaignId, { lastSyncedAt: new Date() });
+  await updateAdCampaign(campaignId, { lastSyncedAt: new Date() });
 }
 
 /** Pulls daily insights for one campaign and stores them. Returns rows written. */
@@ -295,15 +295,15 @@ export async function syncCampaignMetrics(
   campaignId: number,
   opts?: { datePreset?: string; since?: string; until?: string }
 ): Promise<number> {
-  const campaign = await getCampaignById(campaignId);
+  const campaign = await getAdCampaignById(campaignId);
   if (!campaign?.metaCampaignId) return 0;
 
   const creds = await resolveCredentials();
   const rows = await fetchCampaignInsights(creds, campaign.metaCampaignId, opts);
 
   for (const row of rows) {
-    await upsertCampaignMetric({
-      campaignId,
+    await upsertAdCampaignMetric({
+      adCampaignId: campaignId,
       date: row.date_start,
       impressions: Number(row.impressions ?? 0),
       reach: Number(row.reach ?? 0),
@@ -317,14 +317,14 @@ export async function syncCampaignMetrics(
     });
   }
 
-  await updateCampaign(campaignId, { lastSyncedAt: new Date() });
+  await updateAdCampaign(campaignId, { lastSyncedAt: new Date() });
   return rows.length;
 }
 
 /** Refreshes insights for every campaign that has been published to Meta. */
 export async function syncAllCampaignMetrics(): Promise<{ campaigns: number; rows: number }> {
-  const { getCampaigns } = await import("../marketingDb");
-  const all = await getCampaigns();
+  const { getAdCampaigns } = await import("../marketingDb");
+  const all = await getAdCampaigns();
   const published = all.filter((c) => c.metaCampaignId);
   let rows = 0;
   for (const c of published) {

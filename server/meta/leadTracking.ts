@@ -12,7 +12,7 @@
  */
 
 import {
-  findCampaignForAttribution,
+  findAdCampaignForAttribution,
   getMetaSettings,
   logConversionEvent,
   updateConversionEvent,
@@ -26,7 +26,7 @@ export type TrackedLandingPage = {
   id: number;
   title: string;
   slug: string;
-  campaignId?: number | null;
+  adCampaignId?: number | null;
   metaPixelId?: string | null;
   trackingEnabled?: boolean | null;
   capiEnabled?: boolean | null;
@@ -86,14 +86,14 @@ export async function trackCapturedLead(input: TrackLeadInput): Promise<TrackLea
   let campaign = null;
   try {
     campaign =
-      (await findCampaignForAttribution({
+      (await findAdCampaignForAttribution({
         metaCampaignId: attribution.metaCampaignId,
         landingPageId: page?.id,
         utmCampaign: attribution.utmCampaign,
       })) ?? null;
-    if (!campaign && page?.campaignId) {
-      const { getCampaignById } = await import("../marketingDb");
-      campaign = (await getCampaignById(page.campaignId)) ?? null;
+    if (!campaign && page?.adCampaignId) {
+      const { getAdCampaignById } = await import("../marketingDb");
+      campaign = (await getAdCampaignById(page.adCampaignId)) ?? null;
     }
     result.campaignId = campaign?.id ?? null;
   } catch (err) {
@@ -103,7 +103,7 @@ export async function trackCapturedLead(input: TrackLeadInput): Promise<TrackLea
   // ── 2. Persist attribution ───────────────────────────────────────────────
   try {
     await updateLead(leadId, {
-      campaignId: campaign?.id ?? null,
+      adCampaignId: campaign?.id ?? null,
       utmSource: attribution.utmSource ?? null,
       utmMedium: attribution.utmMedium ?? null,
       utmCampaign: attribution.utmCampaign ?? campaign?.utmCampaign ?? null,
@@ -133,7 +133,7 @@ export async function trackCapturedLead(input: TrackLeadInput): Promise<TrackLea
       title: "Attribution captured",
       content: describeAttribution(attribution),
       metadata: {
-        campaignId: campaign?.id ?? null,
+        adCampaignId: campaign?.id ?? null,
         campaignName: campaign?.name ?? null,
         utm: {
           source: attribution.utmSource,
@@ -165,7 +165,7 @@ export async function trackCapturedLead(input: TrackLeadInput): Promise<TrackLea
 
       const logId = await logConversionEvent({
         leadId,
-        campaignId: campaign?.id ?? null,
+        adCampaignId: campaign?.id ?? null,
         landingPageId: page?.id ?? null,
         eventName,
         eventId,
@@ -259,7 +259,7 @@ export async function reportLeadConversion(
     const eventId = generateEventId(eventName.toLowerCase());
     const logId = await logConversionEvent({
       leadId,
-      campaignId: (lead as any).campaignId ?? null,
+      adCampaignId: lead.adCampaignId ?? null,
       eventName,
       eventId,
       pixelId: config.pixelId,

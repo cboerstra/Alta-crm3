@@ -205,8 +205,10 @@ export const automationsRouter = router({
       dueAt: z.date().nullable().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
+      const { campaignId, ...rest } = input;
       const id = await createTask({
-        ...input,
+        ...rest,
+        adCampaignId: campaignId ?? null,
         assignedTo: input.assignedTo ?? ctx.user.id,
         createdBy: ctx.user.id,
         source: "manual",

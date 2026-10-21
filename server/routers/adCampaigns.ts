@@ -2,16 +2,16 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc";
 import {
-  createCampaign,
-  deleteCampaign,
-  getCampaignById,
-  getCampaignMetrics,
-  getCampaigns,
-  getCampaignSpendTotals,
-  getLeadsForCampaign,
+  createAdCampaign,
+  deleteAdCampaign,
+  getAdCampaignById,
+  getAdCampaignMetrics,
+  getAdCampaigns,
+  getAdCampaignSpendTotals,
+  getLeadsForAdCampaign,
   getMetaSettings,
   getSequenceById,
-  updateCampaign,
+  updateAdCampaign,
 } from "../marketingDb";
 import { getLandingPageById, getLandingPageBySlug, updateLandingPage } from "../db";
 import {
@@ -78,14 +78,14 @@ function toPublishError(err: unknown): TRPCError {
   });
 }
 
-export const campaignsRouter = router({
+export const adCampaignsRouter = router({
   // ─── Read ──────────────────────────────────────────────────────────────────
 
   list: protectedProcedure
     .input(z.object({ status: statusEnum.optional() }).optional())
     .query(async ({ input }) => {
-      const items = await getCampaigns({ status: input?.status });
-      const totals = await getCampaignSpendTotals(items.map((c) => c.id));
+      const items = await getAdCampaigns({ status: input?.status });
+      const totals = await getAdCampaignSpendTotals(items.map((c) => c.id));
       const byId = new Map(totals.map((t) => [t.campaignId, t]));
       return items.map((c) => ({
         ...c,
@@ -96,12 +96,12 @@ export const campaignsRouter = router({
   getById: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      const campaign = await getCampaignById(input.id);
+      const campaign = await getAdCampaignById(input.id);
       if (!campaign) return null;
 
       const [metrics, leads, page, sequence] = await Promise.all([
-        getCampaignMetrics(input.id),
-        getLeadsForCampaign(input.id, 200),
+        getAdCampaignMetrics(input.id),
+        getLeadsForAdCampaign(input.id, 200),
         campaign.landingPageId ? getLandingPageById(campaign.landingPageId) : Promise.resolve(undefined),
         campaign.sequenceId ? getSequenceById(campaign.sequenceId) : Promise.resolve(undefined),
       ]);
@@ -160,7 +160,7 @@ export const campaignsRouter = router({
 
   metrics: protectedProcedure
     .input(z.object({ id: z.number(), since: z.string().optional(), until: z.string().optional() }))
-    .query(({ input }) => getCampaignMetrics(input.id, { since: input.since, until: input.until })),
+    .query(({ input }) => getAdCampaignMetrics(input.id, { since: input.since, until: input.until })),
 
   // ─── Write ─────────────────────────────────────────────────────────────────
 
@@ -192,7 +192,7 @@ export const campaignsRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Set a daily or lifetime budget" });
       }
 
-      const id = await createCampaign({
+      const id = await createAdCampaign({
         name: input.name,
         description: input.description,
         objective: input.objective,
@@ -217,7 +217,7 @@ export const campaignsRouter = router({
       // Claim the landing page so lead capture can resolve the campaign even when
       // the click parameters are stripped (shared links, copy-pasted URLs).
       if (input.landingPageId) {
-        await updateLandingPage(input.landingPageId, { campaignId: id } as any);
+        await updateLandingPage(input.landingPageId, { adCampaignId: id });
       }
 
       return { id };
@@ -245,7 +245,7 @@ export const campaignsRouter = router({
     }))
     .mutation(async ({ input }) => {
       const { id, dailyBudget, lifetimeBudget, targeting, creative, ...rest } = input;
-      const existing = await getCampaignById(id);
+      const existing = await getAdCampaignById(id);
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Campaign not found" });
 
       const data: Record<string, unknown> = { ...rest };
@@ -254,10 +254,10 @@ export const campaignsRouter = router({
       if (targeting !== undefined) data.targeting = targeting;
       if (creative !== undefined) data.creative = creative;
 
-      await updateCampaign(id, data as any);
+      await updateAdCampaign(id, data as any);
 
       if (input.landingPageId) {
-        await updateLandingPage(input.landingPageId, { campaignId: id } as any);
+        await updateLandingPage(input.landingPageId, { adCampaignId: id });
       }
 
       // Keep a live ad set's budget in step with the CRM. A failure here is
@@ -280,21 +280,21 @@ export const campaignsRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
-      const campaign = await getCampaignById(input.id);
+      const campaign = await getAdCampaignById(input.id);
       if (campaign?.metaCampaignId) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "This campaign exists on Meta. Archive it instead so its spend history and attribution stay intact.",
         });
       }
-      await deleteCampaign(input.id);
+      await deleteAdCampaign(input.id);
       return { success: true };
     }),
 
   archive: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
-      await updateCampaign(input.id, { status: "archived" });
+      await updateAdCampaign(input.id, { status: "archived" });
       return { success: true };
     }),
 
@@ -304,7 +304,7 @@ export const campaignsRouter = router({
   previewDestinationUrl: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      const campaign = await getCampaignById(input.id);
+      const campaign = await getAdCampaignById(input.id);
       if (!campaign?.landingPageId) return { url: null, reason: "No landing page attached" };
       const page = await getLandingPageById(campaign.landingPageId);
       if (!page) return { url: null, reason: "Landing page not found" };

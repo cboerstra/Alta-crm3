@@ -4,7 +4,7 @@ import { adminProcedure, protectedProcedure, publicProcedure, router } from "../
 import {
   getAdLevelBreakdown,
   getAttributionBreakdown,
-  getCampaignPerformance,
+  getAdCampaignPerformance,
   getConversionEvents,
   getLandingPagesForCampaignPicker,
   getMetaSettings,
@@ -184,7 +184,7 @@ export const marketingRouter = router({
         metaPixelId: (page as any).metaPixelId ?? "",
         conversionEventName: (page as any).conversionEventName ?? "Lead",
         conversionValue: (page as any).conversionValue != null ? Number((page as any).conversionValue) : null,
-        campaignId: (page as any).campaignId ?? null,
+        campaignId: page.adCampaignId ?? null,
         templateId: (page as any).templateId ?? null,
       };
     }),
@@ -200,9 +200,10 @@ export const marketingRouter = router({
       campaignId: z.number().nullable().optional(),
     }))
     .mutation(async ({ input }) => {
-      const { landingPageId, conversionValue, ...rest } = input;
+      const { landingPageId, conversionValue, campaignId, ...rest } = input;
       await updateLandingPage(landingPageId, {
         ...rest,
+        ...(campaignId !== undefined ? { adCampaignId: campaignId } : {}),
         ...(conversionValue !== undefined
           ? { conversionValue: conversionValue != null ? String(conversionValue) : null }
           : {}),
@@ -222,7 +223,7 @@ export const marketingRouter = router({
    */
   campaignPerformance: protectedProcedure
     .input(z.object({ since: z.date().optional(), until: z.date().optional() }).optional())
-    .query(({ input }) => getCampaignPerformance({ since: input?.since, until: input?.until })),
+    .query(({ input }) => getAdCampaignPerformance({ since: input?.since, until: input?.until })),
 
   attributionBreakdown: protectedProcedure
     .input(z.object({ since: z.date().optional(), until: z.date().optional() }).optional())
@@ -236,7 +237,7 @@ export const marketingRouter = router({
   overview: protectedProcedure
     .input(z.object({ since: z.date().optional(), until: z.date().optional() }).optional())
     .query(async ({ input }) => {
-      const rows = await getCampaignPerformance({ since: input?.since, until: input?.until });
+      const rows = await getAdCampaignPerformance({ since: input?.since, until: input?.until });
       const totals = rows.reduce(
         (acc, r) => ({
           spend: acc.spend + r.spend,

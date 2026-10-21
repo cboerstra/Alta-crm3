@@ -1637,7 +1637,7 @@ export async function runAutoMigrations(): Promise<void> {
     },
     // ── Marketing engine: lead attribution ────────────────────────────────
     // Every column below is first-touch attribution captured at lead capture.
-    { table: "leads", column: "campaignId", sql: "ALTER TABLE `leads` ADD COLUMN `campaignId` int DEFAULT NULL" },
+    { table: "leads", column: "adCampaignId", sql: "ALTER TABLE `leads` ADD COLUMN `adCampaignId` int DEFAULT NULL" },
     { table: "leads", column: "utmSource", sql: "ALTER TABLE `leads` ADD COLUMN `utmSource` varchar(128) DEFAULT NULL" },
     { table: "leads", column: "utmMedium", sql: "ALTER TABLE `leads` ADD COLUMN `utmMedium` varchar(128) DEFAULT NULL" },
     { table: "leads", column: "utmCampaign", sql: "ALTER TABLE `leads` ADD COLUMN `utmCampaign` varchar(128) DEFAULT NULL" },
@@ -1662,7 +1662,7 @@ export async function runAutoMigrations(): Promise<void> {
 
     // ── Marketing engine: landing page tracking ───────────────────────────
     { table: "landing_pages", column: "templateId", sql: "ALTER TABLE `landing_pages` ADD COLUMN `templateId` int DEFAULT NULL" },
-    { table: "landing_pages", column: "campaignId", sql: "ALTER TABLE `landing_pages` ADD COLUMN `campaignId` int DEFAULT NULL" },
+    { table: "landing_pages", column: "adCampaignId", sql: "ALTER TABLE `landing_pages` ADD COLUMN `adCampaignId` int DEFAULT NULL" },
     { table: "landing_pages", column: "metaPixelId", sql: "ALTER TABLE `landing_pages` ADD COLUMN `metaPixelId` varchar(64) DEFAULT NULL" },
     { table: "landing_pages", column: "trackingEnabled", sql: "ALTER TABLE `landing_pages` ADD COLUMN `trackingEnabled` tinyint(1) DEFAULT 1" },
     { table: "landing_pages", column: "capiEnabled", sql: "ALTER TABLE `landing_pages` ADD COLUMN `capiEnabled` tinyint(1) DEFAULT 1" },
@@ -1728,8 +1728,8 @@ export async function runAutoMigrations(): Promise<void> {
       )`,
     },
     {
-      name: "campaigns",
-      sql: `CREATE TABLE IF NOT EXISTS campaigns (
+      name: "ad_campaigns",
+      sql: `CREATE TABLE IF NOT EXISTS ad_campaigns (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(256) NOT NULL,
         description TEXT NULL,
@@ -1762,15 +1762,15 @@ export async function runAutoMigrations(): Promise<void> {
         createdBy INT NULL,
         createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_campaigns_meta (metaCampaignId),
-        INDEX idx_campaigns_utm (utmCampaign)
+        INDEX idx_ad_campaigns_meta (metaCampaignId),
+        INDEX idx_ad_campaigns_utm (utmCampaign)
       )`,
     },
     {
-      name: "campaign_metrics",
-      sql: `CREATE TABLE IF NOT EXISTS campaign_metrics (
+      name: "ad_campaign_metrics",
+      sql: `CREATE TABLE IF NOT EXISTS ad_campaign_metrics (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        campaignId INT NOT NULL,
+        adCampaignId INT NOT NULL,
         date VARCHAR(10) NOT NULL,
         impressions INT NOT NULL DEFAULT 0,
         reach INT NOT NULL DEFAULT 0,
@@ -1782,7 +1782,7 @@ export async function runAutoMigrations(): Promise<void> {
         ctr DECIMAL(8,4) NULL,
         raw JSON NULL,
         fetchedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE KEY uniq_campaign_date (campaignId, date)
+        UNIQUE KEY uniq_ad_campaign_date (adCampaignId, date)
       )`,
     },
     {
@@ -1825,7 +1825,7 @@ export async function runAutoMigrations(): Promise<void> {
         id INT AUTO_INCREMENT PRIMARY KEY,
         sequenceId INT NOT NULL,
         leadId INT NOT NULL,
-        campaignId INT NULL,
+        adCampaignId INT NULL,
         status ENUM('active','completed','cancelled','failed') NOT NULL DEFAULT 'active',
         currentStepOrder INT NOT NULL DEFAULT 0,
         nextRunAt TIMESTAMP NULL,
@@ -1854,7 +1854,7 @@ export async function runAutoMigrations(): Promise<void> {
       sql: `CREATE TABLE IF NOT EXISTS tasks (
         id INT AUTO_INCREMENT PRIMARY KEY,
         leadId INT NULL,
-        campaignId INT NULL,
+        adCampaignId INT NULL,
         assignedTo INT NULL,
         title VARCHAR(512) NOT NULL,
         notes TEXT NULL,
@@ -1875,7 +1875,7 @@ export async function runAutoMigrations(): Promise<void> {
       sql: `CREATE TABLE IF NOT EXISTS meta_conversion_events (
         id INT AUTO_INCREMENT PRIMARY KEY,
         leadId INT NULL,
-        campaignId INT NULL,
+        adCampaignId INT NULL,
         landingPageId INT NULL,
         eventName VARCHAR(64) NOT NULL,
         eventId VARCHAR(128) NOT NULL,

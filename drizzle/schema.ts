@@ -148,8 +148,8 @@ export const landingPages = mysqlTable("landing_pages", {
   // ─── Tracking / attribution ───────────────────────────────────────────────
   // Template this page was stamped out from (null for hand-built pages)
   templateId: int("templateId"),
-  // Campaign that owns this page — drives the "one campaign, one page" wiring
-  campaignId: int("campaignId"),
+  // Ad campaign that owns this page — drives the "one campaign, one page" wiring
+  adCampaignId: int("adCampaignId"),
   // Per-page pixel override; falls back to the global meta_settings pixel
   metaPixelId: varchar("metaPixelId", { length: 64 }),
   trackingEnabled: boolean("trackingEnabled").default(true),
@@ -206,7 +206,7 @@ export const leads = mysqlTable("leads", {
   // ─── Attribution ──────────────────────────────────────────────────────────
   // Captured once, at first touch, and never overwritten. Six months from now
   // this is what tells you which ad produced a closed loan.
-  campaignId: int("campaignId"),
+  adCampaignId: int("adCampaignId"),
   utmSource: varchar("utmSource", { length: 128 }),
   utmMedium: varchar("utmMedium", { length: 128 }),
   utmCampaign: varchar("utmCampaign", { length: 128 }),
@@ -593,7 +593,7 @@ export const automationEnrollments = mysqlTable("automation_enrollments", {
   id: int("id").autoincrement().primaryKey(),
   sequenceId: int("sequenceId").notNull(),
   leadId: int("leadId").notNull(),
-  campaignId: int("campaignId"),
+  adCampaignId: int("adCampaignId"),
   status: mysqlEnum("status", ["active", "completed", "cancelled", "failed"]).default("active").notNull(),
   currentStepOrder: int("currentStepOrder").default(0).notNull(),
   nextRunAt: timestamp("nextRunAt"),
@@ -621,7 +621,7 @@ export type AutomationStepRun = typeof automationStepRuns.$inferSelect;
 export const tasks = mysqlTable("tasks", {
   id: int("id").autoincrement().primaryKey(),
   leadId: int("leadId"),
-  campaignId: int("campaignId"),
+  adCampaignId: int("adCampaignId"),
   assignedTo: int("assignedTo"),
   title: varchar("title", { length: 512 }).notNull(),
   notes: text("notes"),
@@ -639,10 +639,11 @@ export const tasks = mysqlTable("tasks", {
 export type Task = typeof tasks.$inferSelect;
 export type InsertTask = typeof tasks.$inferInsert;
 
-// ─── Campaigns ───────────────────────────────────────────────────────────────
+// ─── Ad Campaigns (Facebook / Instagram) ─────────────────────────────────────
+// Paid-ad campaigns, distinct from the email campaigns in email_campaigns.
 // The control-center record. Ties budget + creative + landing page + automation
 // together, and mirrors the objects Meta creates on its side.
-export const campaigns = mysqlTable("campaigns", {
+export const adCampaigns = mysqlTable("ad_campaigns", {
   id: int("id").autoincrement().primaryKey(),
   name: varchar("name", { length: 256 }).notNull(),
   description: text("description"),
@@ -696,13 +697,13 @@ export const campaigns = mysqlTable("campaigns", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
-export type Campaign = typeof campaigns.$inferSelect;
-export type InsertCampaign = typeof campaigns.$inferInsert;
+export type AdCampaign = typeof adCampaigns.$inferSelect;
+export type InsertAdCampaign = typeof adCampaigns.$inferInsert;
 
-// ─── Campaign Metrics (daily insights pulled from Meta) ──────────────────────
-export const campaignMetrics = mysqlTable("campaign_metrics", {
+// ─── Ad Campaign Metrics (daily insights pulled from Meta) ───────────────────
+export const adCampaignMetrics = mysqlTable("ad_campaign_metrics", {
   id: int("id").autoincrement().primaryKey(),
-  campaignId: int("campaignId").notNull(),
+  adCampaignId: int("adCampaignId").notNull(),
   // YYYY-MM-DD, one row per campaign per day
   date: varchar("date", { length: 10 }).notNull(),
   impressions: int("impressions").default(0).notNull(),
@@ -718,8 +719,8 @@ export const campaignMetrics = mysqlTable("campaign_metrics", {
   fetchedAt: timestamp("fetchedAt").defaultNow().notNull(),
 });
 
-export type CampaignMetric = typeof campaignMetrics.$inferSelect;
-export type InsertCampaignMetric = typeof campaignMetrics.$inferInsert;
+export type AdCampaignMetric = typeof adCampaignMetrics.$inferSelect;
+export type InsertAdCampaignMetric = typeof adCampaignMetrics.$inferInsert;
 
 // ─── Meta Conversions API event log ──────────────────────────────────────────
 // Every server-side event we send, with the eventId used to de-duplicate against
@@ -727,7 +728,7 @@ export type InsertCampaignMetric = typeof campaignMetrics.$inferInsert;
 export const metaConversionEvents = mysqlTable("meta_conversion_events", {
   id: int("id").autoincrement().primaryKey(),
   leadId: int("leadId"),
-  campaignId: int("campaignId"),
+  adCampaignId: int("adCampaignId"),
   landingPageId: int("landingPageId"),
   eventName: varchar("eventName", { length: 64 }).notNull(),
   eventId: varchar("eventId", { length: 128 }).notNull(),

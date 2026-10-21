@@ -20,7 +20,7 @@ import { mediaRouter } from "./routers/media";
 import { userManagementRouter } from "./routers/userManagement";
 import { smsTemplatesRouter } from "./routers/smsTemplates";
 import { applicationsRouter } from "./routers/applications";
-import { campaignsRouter } from "./routers/campaigns";
+import { adCampaignsRouter } from "./routers/adCampaigns";
 import { templatesRouter } from "./routers/templates";
 import { automationsRouter } from "./routers/automations";
 import { marketingRouter } from "./routers/marketing";
@@ -119,7 +119,7 @@ export const appRouter = router({
   userManagement: userManagementRouter,
   smsTemplates: smsTemplatesRouter,
   applications: applicationsRouter,
-  campaigns: campaignsRouter,
+  adCampaigns: adCampaignsRouter,
   templates: templatesRouter,
   automations: automationsRouter,
   marketing: marketingRouter,

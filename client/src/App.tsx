@@ -14,8 +14,8 @@ import Pipeline from "./pages/Pipeline";
 import Webinars from "./pages/Webinars";
 import WebinarDetail from "./pages/WebinarDetail";
 import LandingPages from "./pages/LandingPages";
-import Campaigns from "./pages/Campaigns";
-import CampaignDetail from "./pages/CampaignDetail";
+import AdCampaigns from "./pages/AdCampaigns";
+import AdCampaignDetail from "./pages/AdCampaignDetail";
 import Templates from "./pages/Templates";
 import Automations from "./pages/Automations";
 import MarketingAnalytics from "./pages/MarketingAnalytics";
@@ -79,8 +79,8 @@ function CRMRoutes() {
         <Route path="/webinars" component={Webinars} />
         <Route path="/webinars/:id" component={WebinarDetail} />
         <Route path="/landing-pages" component={LandingPages} />
-        <Route path="/campaigns" component={Campaigns} />
-        <Route path="/campaigns/:id" component={CampaignDetail} />
+        <Route path="/ad-campaigns" component={AdCampaigns} />
+        <Route path="/ad-campaigns/:id" component={AdCampaignDetail} />
         <Route path="/templates" component={Templates} />
         <Route path="/automations" component={Automations} />
         <Route path="/marketing" component={MarketingAnalytics} />

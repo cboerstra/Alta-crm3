@@ -64,7 +64,7 @@ const menuItems: MenuItem[] = [
   { icon: Columns3, label: "Pipeline", path: "/pipeline", section: "main" },
   { icon: Video, label: "Webinars", path: "/webinars", section: "main" },
   { icon: FileText, label: "Landing Pages", path: "/landing-pages", section: "main" },
-  { icon: Megaphone, label: "Campaigns", path: "/campaigns", section: "main" },
+  { icon: Megaphone, label: "Ad Campaigns", path: "/ad-campaigns", section: "main" },
   { icon: LayoutTemplate, label: "Page Templates", path: "/templates", section: "main" },
   { icon: Workflow, label: "Automations", path: "/automations", section: "main" },
   { icon: BarChart3, label: "Marketing", path: "/marketing", section: "main" },

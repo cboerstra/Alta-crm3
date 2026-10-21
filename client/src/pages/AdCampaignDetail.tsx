@@ -51,41 +51,41 @@ export default function CampaignDetail() {
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [dailyBudget, setDailyBudget] = useState("");
 
-  const { data: campaign, isLoading } = trpc.campaigns.getById.useQuery(
+  const { data: campaign, isLoading } = trpc.adCampaigns.getById.useQuery(
     { id: campaignId },
     { enabled: Number.isFinite(campaignId) }
   );
 
-  const publish = trpc.campaigns.publish.useMutation({
+  const publish = trpc.adCampaigns.publish.useMutation({
     onSuccess: () => {
       toast.success("Campaign created on Meta — it starts paused, so nothing is spending yet");
-      utils.campaigns.getById.invalidate({ id: campaignId });
+      utils.adCampaigns.getById.invalidate({ id: campaignId });
     },
     onError: (err) => toast.error(err.message),
   });
 
-  const setDelivery = trpc.campaigns.setDelivery.useMutation({
+  const setDelivery = trpc.adCampaigns.setDelivery.useMutation({
     onSuccess: (res) => {
       toast.success(res.status === "active" ? "Campaign is live" : "Campaign paused");
-      utils.campaigns.getById.invalidate({ id: campaignId });
+      utils.adCampaigns.getById.invalidate({ id: campaignId });
     },
     onError: (err) => toast.error(err.message),
   });
 
-  const syncMetrics = trpc.campaigns.syncMetrics.useMutation({
+  const syncMetrics = trpc.adCampaigns.syncMetrics.useMutation({
     onSuccess: (res) => {
       toast.success(res.rows > 0 ? `Pulled ${res.rows} day(s) of insights` : "No new insights yet");
-      utils.campaigns.getById.invalidate({ id: campaignId });
+      utils.adCampaigns.getById.invalidate({ id: campaignId });
     },
     onError: (err) => toast.error(err.message),
   });
 
-  const updateCampaign = trpc.campaigns.update.useMutation({
+  const updateAdCampaign = trpc.adCampaigns.update.useMutation({
     onSuccess: (res: any) => {
       if (res?.warning) toast.warning(res.warning);
       else toast.success("Budget updated");
       setBudgetOpen(false);
-      utils.campaigns.getById.invalidate({ id: campaignId });
+      utils.adCampaigns.getById.invalidate({ id: campaignId });
     },
     onError: (err) => toast.error(err.message),
   });
@@ -103,7 +103,7 @@ export default function CampaignDetail() {
       <Card>
         <CardContent className="p-12 text-center">
           <h3 className="font-semibold">Campaign not found</h3>
-          <Button variant="outline" className="mt-4" onClick={() => navigate("/campaigns")}>
+          <Button variant="outline" className="mt-4" onClick={() => navigate("/ad-campaigns")}>
             Back to campaigns
           </Button>
         </CardContent>
@@ -124,7 +124,7 @@ export default function CampaignDetail() {
 
   return (
     <div className="space-y-6">
-      <Button variant="ghost" size="sm" className="-ml-2" onClick={() => navigate("/campaigns")}>
+      <Button variant="ghost" size="sm" className="-ml-2" onClick={() => navigate("/ad-campaigns")}>
         <ArrowLeft className="h-4 w-4 mr-1.5" /> Campaigns
       </Button>
 
@@ -458,10 +458,10 @@ export default function CampaignDetail() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setBudgetOpen(false)}>Cancel</Button>
             <Button
-              disabled={!dailyBudget || updateCampaign.isPending}
-              onClick={() => updateCampaign.mutate({ id: campaignId, dailyBudget: Number(dailyBudget) })}
+              disabled={!dailyBudget || updateAdCampaign.isPending}
+              onClick={() => updateAdCampaign.mutate({ id: campaignId, dailyBudget: Number(dailyBudget) })}
             >
-              {updateCampaign.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+              {updateAdCampaign.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

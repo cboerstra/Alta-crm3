@@ -108,7 +108,7 @@ On submit, that payload travels with the lead and is written to the lead record:
 
 | Field group | Columns |
 | --- | --- |
-| Campaign link | `campaignId` |
+| Campaign link | `adCampaignId` |
 | UTM | `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm` |
 | Click IDs | `fbclid`, `fbc`, `fbp`, `gclid` |
 | Meta hierarchy | `metaCampaignId`/`Name`, `metaAdsetId`/`Name`, `metaAdId`/`Name`, `metaPlacement` |
@@ -203,7 +203,9 @@ SMS reminder schedulers.
 
 ---
 
-## Campaigns
+## Ad Campaigns
+
+These are Facebook and Instagram ad campaigns, under **Ad Campaigns** in the sidebar. They are separate from the CRM's **Campaigns** page, which sends email blasts.
 
 Create a campaign, and in one flow you:
 
@@ -272,7 +274,7 @@ trustworthy.
 
 ## Database
 
-New tables: `campaigns`, `campaign_metrics`, `landing_page_templates`,
+New tables: `ad_campaigns`, `ad_campaign_metrics`, `landing_page_templates`,
 `automation_sequences`, `automation_steps`, `automation_enrollments`,
 `automation_step_runs`, `tasks`, `meta_settings`, `meta_conversion_events`.
 

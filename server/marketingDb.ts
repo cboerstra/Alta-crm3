@@ -11,8 +11,8 @@
 
 import { and, asc, desc, eq, gte, inArray, isNotNull, lte, or, sql } from "drizzle-orm";
 import {
-  campaigns, InsertCampaign, Campaign,
-  campaignMetrics, InsertCampaignMetric,
+  adCampaigns, InsertAdCampaign, AdCampaign,
+  adCampaignMetrics, InsertAdCampaignMetric,
   landingPageTemplates, InsertLandingPageTemplate,
   automationSequences, InsertAutomationSequence,
   automationSteps, InsertAutomationStep,
@@ -100,41 +100,41 @@ export async function deleteTemplate(id: number) {
 // Campaigns
 // ═══════════════════════════════════════════════════════════════════════════
 
-export async function createCampaign(data: InsertCampaign) {
+export async function createAdCampaign(data: InsertAdCampaign) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const [r] = await db.insert(campaigns).values(data);
+  const [r] = await db.insert(adCampaigns).values(data);
   return (r as any).insertId as number;
 }
 
-export async function getCampaigns(filters?: { status?: string; platform?: string }) {
+export async function getAdCampaigns(filters?: { status?: string; platform?: string }) {
   const db = await getDb();
   if (!db) return [];
   const conditions = [];
-  if (filters?.status) conditions.push(eq(campaigns.status, filters.status as any));
-  if (filters?.platform) conditions.push(eq(campaigns.platform, filters.platform as any));
+  if (filters?.status) conditions.push(eq(adCampaigns.status, filters.status as any));
+  if (filters?.platform) conditions.push(eq(adCampaigns.platform, filters.platform as any));
   const where = conditions.length ? and(...conditions) : undefined;
-  return db.select().from(campaigns).where(where).orderBy(desc(campaigns.createdAt));
+  return db.select().from(adCampaigns).where(where).orderBy(desc(adCampaigns.createdAt));
 }
 
-export async function getCampaignById(id: number) {
+export async function getAdCampaignById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const r = await db.select().from(campaigns).where(eq(campaigns.id, id)).limit(1);
+  const r = await db.select().from(adCampaigns).where(eq(adCampaigns.id, id)).limit(1);
   return r[0];
 }
 
-export async function updateCampaign(id: number, data: Partial<InsertCampaign>) {
+export async function updateAdCampaign(id: number, data: Partial<InsertAdCampaign>) {
   const db = await getDb();
   if (!db) return;
-  await db.update(campaigns).set(data).where(eq(campaigns.id, id));
+  await db.update(adCampaigns).set(data).where(eq(adCampaigns.id, id));
 }
 
-export async function deleteCampaign(id: number) {
+export async function deleteAdCampaign(id: number) {
   const db = await getDb();
   if (!db) return;
-  await db.delete(campaignMetrics).where(eq(campaignMetrics.campaignId, id));
-  await db.delete(campaigns).where(eq(campaigns.id, id));
+  await db.delete(adCampaignMetrics).where(eq(adCampaignMetrics.adCampaignId, id));
+  await db.delete(adCampaigns).where(eq(adCampaigns.id, id));
 }
 
 /**
@@ -143,74 +143,74 @@ export async function deleteCampaign(id: number) {
  * is authoritative, the landing page is next, and the utm_campaign tag is the
  * last resort because anyone can type one into a URL.
  */
-export async function findCampaignForAttribution(input: {
+export async function findAdCampaignForAttribution(input: {
   metaCampaignId?: string;
   landingPageId?: number;
   utmCampaign?: string;
-}): Promise<Campaign | undefined> {
+}): Promise<AdCampaign | undefined> {
   const db = await getDb();
   if (!db) return undefined;
 
   if (input.metaCampaignId) {
-    const byMeta = await db.select().from(campaigns)
-      .where(eq(campaigns.metaCampaignId, input.metaCampaignId)).limit(1);
+    const byMeta = await db.select().from(adCampaigns)
+      .where(eq(adCampaigns.metaCampaignId, input.metaCampaignId)).limit(1);
     if (byMeta[0]) return byMeta[0];
   }
   if (input.landingPageId) {
-    const byPage = await db.select().from(campaigns)
-      .where(eq(campaigns.landingPageId, input.landingPageId))
-      .orderBy(desc(campaigns.createdAt)).limit(1);
+    const byPage = await db.select().from(adCampaigns)
+      .where(eq(adCampaigns.landingPageId, input.landingPageId))
+      .orderBy(desc(adCampaigns.createdAt)).limit(1);
     if (byPage[0]) return byPage[0];
   }
   if (input.utmCampaign) {
-    const byUtm = await db.select().from(campaigns)
-      .where(eq(campaigns.utmCampaign, input.utmCampaign))
-      .orderBy(desc(campaigns.createdAt)).limit(1);
+    const byUtm = await db.select().from(adCampaigns)
+      .where(eq(adCampaigns.utmCampaign, input.utmCampaign))
+      .orderBy(desc(adCampaigns.createdAt)).limit(1);
     if (byUtm[0]) return byUtm[0];
   }
   return undefined;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Campaign metrics
+// Ad campaign metrics
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** Upserts one day of insights, keyed on (campaignId, date). */
-export async function upsertCampaignMetric(data: InsertCampaignMetric) {
+export async function upsertAdCampaignMetric(data: InsertAdCampaignMetric) {
   const db = await getDb();
   if (!db) return;
-  const existing = await db.select({ id: campaignMetrics.id }).from(campaignMetrics)
-    .where(and(eq(campaignMetrics.campaignId, data.campaignId), eq(campaignMetrics.date, data.date)))
+  const existing = await db.select({ id: adCampaignMetrics.id }).from(adCampaignMetrics)
+    .where(and(eq(adCampaignMetrics.adCampaignId, data.adCampaignId), eq(adCampaignMetrics.date, data.date)))
     .limit(1);
   if (existing[0]) {
-    await db.update(campaignMetrics).set({ ...data, fetchedAt: new Date() })
-      .where(eq(campaignMetrics.id, existing[0].id));
+    await db.update(adCampaignMetrics).set({ ...data, fetchedAt: new Date() })
+      .where(eq(adCampaignMetrics.id, existing[0].id));
   } else {
-    await db.insert(campaignMetrics).values(data);
+    await db.insert(adCampaignMetrics).values(data);
   }
 }
 
-export async function getCampaignMetrics(campaignId: number, opts?: { since?: string; until?: string }) {
+export async function getAdCampaignMetrics(campaignId: number, opts?: { since?: string; until?: string }) {
   const db = await getDb();
   if (!db) return [];
-  const conditions = [eq(campaignMetrics.campaignId, campaignId)];
-  if (opts?.since) conditions.push(gte(campaignMetrics.date, opts.since));
-  if (opts?.until) conditions.push(lte(campaignMetrics.date, opts.until));
-  return db.select().from(campaignMetrics).where(and(...conditions)).orderBy(asc(campaignMetrics.date));
+  const conditions = [eq(adCampaignMetrics.adCampaignId, campaignId)];
+  if (opts?.since) conditions.push(gte(adCampaignMetrics.date, opts.since));
+  if (opts?.until) conditions.push(lte(adCampaignMetrics.date, opts.until));
+  return db.select().from(adCampaignMetrics).where(and(...conditions)).orderBy(asc(adCampaignMetrics.date));
 }
 
 /** Aggregate spend/impressions/clicks per campaign, for the unified dashboard. */
-export async function getCampaignSpendTotals(campaignIds?: number[]) {
+export async function getAdCampaignSpendTotals(campaignIds?: number[]) {
   const db = await getDb();
   if (!db) return [];
-  const where = campaignIds?.length ? inArray(campaignMetrics.campaignId, campaignIds) : undefined;
+  const where = campaignIds?.length ? inArray(adCampaignMetrics.adCampaignId, campaignIds) : undefined;
   const rows = await db.select({
-    campaignId: campaignMetrics.campaignId,
-    spend: sql<string>`sum(${campaignMetrics.spend})`,
-    impressions: sql<number>`sum(${campaignMetrics.impressions})`,
-    clicks: sql<number>`sum(${campaignMetrics.clicks})`,
-    reportedLeads: sql<number>`sum(${campaignMetrics.reportedLeads})`,
-  }).from(campaignMetrics).where(where).groupBy(campaignMetrics.campaignId);
+    campaignId: adCampaignMetrics.adCampaignId,
+    spend: sql<string>`sum(${adCampaignMetrics.spend})`,
+    impressions: sql<number>`sum(${adCampaignMetrics.impressions})`,
+    clicks: sql<number>`sum(${adCampaignMetrics.clicks})`,
+    reportedLeads: sql<number>`sum(${adCampaignMetrics.reportedLeads})`,
+  }).from(adCampaignMetrics).where(where).groupBy(adCampaignMetrics.adCampaignId);
   return rows.map((r) => ({
     campaignId: r.campaignId,
     spend: Number(r.spend ?? 0),
@@ -428,7 +428,7 @@ export async function getConversionEvents(filters?: { leadId?: number; campaignI
   if (!db) return [];
   const conditions = [];
   if (filters?.leadId) conditions.push(eq(metaConversionEvents.leadId, filters.leadId));
-  if (filters?.campaignId) conditions.push(eq(metaConversionEvents.campaignId, filters.campaignId));
+  if (filters?.campaignId) conditions.push(eq(metaConversionEvents.adCampaignId, filters.campaignId));
   const where = conditions.length ? and(...conditions) : undefined;
   return db.select().from(metaConversionEvents).where(where)
     .orderBy(desc(metaConversionEvents.createdAt)).limit(filters?.limit ?? 100);
@@ -438,7 +438,7 @@ export async function getConversionEvents(filters?: { leadId?: number; campaignI
 // Attribution reporting
 // ═══════════════════════════════════════════════════════════════════════════
 
-export type CampaignPerformanceRow = {
+export type AdCampaignPerformanceRow = {
   campaignId: number | null;
   campaignName: string;
   status: string;
@@ -463,12 +463,12 @@ export type CampaignPerformanceRow = {
  * back to the lead's own `dealValue` when the loan was closed on the lead record
  * without a separate deal — both paths exist in this CRM.
  */
-export async function getCampaignPerformance(opts?: { since?: Date; until?: Date }): Promise<CampaignPerformanceRow[]> {
+export async function getAdCampaignPerformance(opts?: { since?: Date; until?: Date }): Promise<AdCampaignPerformanceRow[]> {
   const db = await getDb();
   if (!db) return [];
 
-  const allCampaigns = await db.select().from(campaigns).orderBy(desc(campaigns.createdAt));
-  const spendTotals = await getCampaignSpendTotals();
+  const allCampaigns = await db.select().from(adCampaigns).orderBy(desc(adCampaigns.createdAt));
+  const spendTotals = await getAdCampaignSpendTotals();
   const spendByCampaign = new Map(spendTotals.map((s) => [s.campaignId, s]));
 
   const dateConditions = [];
@@ -477,24 +477,24 @@ export async function getCampaignPerformance(opts?: { since?: Date; until?: Date
 
   // Lead-side outcomes grouped by campaign.
   const leadRows = await db.select({
-    campaignId: leads.campaignId,
+    campaignId: leads.adCampaignId,
     leadCount: sql<number>`count(*)`,
     consultations: sql<number>`sum(case when ${leads.stage} in ('consultation_booked','under_contract','closed') then 1 else 0 end)`,
     closed: sql<number>`sum(case when ${leads.stage} = 'closed' then 1 else 0 end)`,
     leadRevenue: sql<string>`sum(case when ${leads.stage} = 'closed' then coalesce(${leads.dealValue}, 0) else 0 end)`,
   }).from(leads)
     .where(dateConditions.length ? and(...dateConditions) : undefined)
-    .groupBy(leads.campaignId);
+    .groupBy(leads.adCampaignId);
 
   // Won-deal revenue attributed through the lead that produced the deal.
   const dealRows = await db.select({
-    campaignId: leads.campaignId,
+    campaignId: leads.adCampaignId,
     dealRevenue: sql<string>`sum(${deals.value})`,
     dealCount: sql<number>`count(*)`,
   }).from(deals)
     .innerJoin(leads, eq(deals.leadId, leads.id))
     .where(eq(deals.stage, "closed_won"))
-    .groupBy(leads.campaignId);
+    .groupBy(leads.adCampaignId);
 
   const leadsByCampaign = new Map(leadRows.map((r) => [r.campaignId ?? null, r]));
   const dealsByCampaign = new Map(dealRows.map((r) => [r.campaignId ?? null, r]));
@@ -503,7 +503,7 @@ export async function getCampaignPerformance(opts?: { since?: Date; until?: Date
     campaignId: number | null,
     campaignName: string,
     status: string
-  ): CampaignPerformanceRow => {
+  ): AdCampaignPerformanceRow => {
     const spend = spendByCampaign.get(campaignId ?? -1);
     const l = leadsByCampaign.get(campaignId);
     const d = dealsByCampaign.get(campaignId);
@@ -573,7 +573,7 @@ export async function getAdLevelBreakdown(opts?: { campaignId?: number; limit?: 
   const db = await getDb();
   if (!db) return [];
   const conditions = [isNotNull(leads.metaAdId)];
-  if (opts?.campaignId) conditions.push(eq(leads.campaignId, opts.campaignId));
+  if (opts?.campaignId) conditions.push(eq(leads.adCampaignId, opts.campaignId));
   const rows = await db.select({
     metaAdId: leads.metaAdId,
     metaAdName: leads.metaAdName,
@@ -601,11 +601,11 @@ export async function getAdLevelBreakdown(opts?: { campaignId?: number; limit?: 
 }
 
 /** Leads attributed to one campaign, newest first. */
-export async function getLeadsForCampaign(campaignId: number, limit = 100) {
+export async function getLeadsForAdCampaign(campaignId: number, limit = 100) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(leads)
-    .where(eq(leads.campaignId, campaignId))
+    .where(eq(leads.adCampaignId, campaignId))
     .orderBy(desc(leads.createdAt))
     .limit(limit);
 }
@@ -618,6 +618,6 @@ export async function getLandingPagesForCampaignPicker() {
     title: landingPages.title,
     slug: landingPages.slug,
     isActive: landingPages.isActive,
-    campaignId: landingPages.campaignId,
+    campaignId: landingPages.adCampaignId,
   }).from(landingPages).orderBy(desc(landingPages.createdAt));
 }

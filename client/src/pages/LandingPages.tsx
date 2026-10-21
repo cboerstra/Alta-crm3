@@ -1721,7 +1721,7 @@ export default function LandingPages() {
  * otherwise shows up weeks later as numbers nobody can account for.
  */
 function PastedPixelNotice({ headScripts }: { headScripts: string }) {
-  const { data: pixelSettings } = trpc.campaigns.connectionStatus.useQuery();
+  const { data: pixelSettings } = trpc.adCampaigns.connectionStatus.useQuery();
 
   const pastedPixelId = useMemo(() => {
     if (!headScripts) return null;

@@ -110,7 +110,7 @@ export async function enrollLead(
   const enrollmentId = await createEnrollment({
     sequenceId,
     leadId,
-    campaignId: opts?.campaignId ?? null,
+    adCampaignId: opts?.campaignId ?? null,
     status: "active",
     currentStepOrder: 0,
     nextRunAt,
@@ -245,7 +245,7 @@ export async function executeStep(
         const notes = step.taskNotes ? resolvePlaceholders(step.taskNotes, lead, ctx) : undefined;
         await createTask({
           leadId,
-          campaignId: campaignId ?? null,
+          adCampaignId: campaignId ?? null,
           assignedTo: step.assignTo ?? lead.assignedTo ?? null,
           title,
           notes,
@@ -317,7 +317,7 @@ export async function processDueEnrollments(limit = 50): Promise<number> {
         continue;
       }
 
-      const result = await executeStep(step, enrollment.leadId, enrollment.campaignId);
+      const result = await executeStep(step, enrollment.leadId, enrollment.adCampaignId);
       await logStepRun({
         enrollmentId: enrollment.id,
         stepId: step.id,

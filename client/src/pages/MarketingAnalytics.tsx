@@ -167,7 +167,7 @@ export default function MarketingAnalytics() {
                         <tr
                           key={row.campaignId ?? "none"}
                           className={`border-b last:border-0 ${row.campaignId ? "hover:bg-muted/30 cursor-pointer" : "bg-muted/10"}`}
-                          onClick={() => row.campaignId && navigate(`/campaigns/${row.campaignId}`)}
+                          onClick={() => row.campaignId && navigate(`/ad-campaigns/${row.campaignId}`)}
                         >
                           <td className="p-3">
                             <div className="flex items-center gap-2">

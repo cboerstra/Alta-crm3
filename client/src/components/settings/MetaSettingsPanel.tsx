@@ -55,7 +55,7 @@ export default function MetaSettingsPanel() {
       toast.success("Meta settings saved");
       setForm((prev) => ({ ...prev, accessToken: "", capiAccessToken: "" }));
       utils.marketing.getSettings.invalidate();
-      utils.campaigns.connectionStatus.invalidate();
+      utils.adCampaigns.connectionStatus.invalidate();
     },
     onError: (err) => toast.error(err.message),
   });

@@ -71,7 +71,7 @@ const EMPTY_DRAFT: DraftState = {
 
 /** Banner explaining what still has to be connected before ads can run. */
 function ConnectionBanner() {
-  const { data: status } = trpc.campaigns.connectionStatus.useQuery();
+  const { data: status } = trpc.adCampaigns.connectionStatus.useQuery();
   const [, navigate] = useLocation();
   if (!status) return null;
 
@@ -108,7 +108,7 @@ function ConnectionBanner() {
 /** The plain-language campaign brief → full draft flow. */
 function AiDraftPanel({ onApply }: { onApply: (draft: any) => void }) {
   const [prompt, setPrompt] = useState("");
-  const draftMutation = trpc.campaigns.draftWithAI.useMutation({
+  const draftMutation = trpc.adCampaigns.draftWithAI.useMutation({
     onSuccess: (result) => {
       onApply(result);
       toast.success("Draft ready — review everything before publishing");
@@ -159,7 +159,7 @@ export default function Campaigns() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const utils = trpc.useUtils();
-  const { data: campaigns, isLoading } = trpc.campaigns.list.useQuery(
+  const { data: campaigns, isLoading } = trpc.adCampaigns.list.useQuery(
     statusFilter === "all" ? undefined : { status: statusFilter as any }
   );
   const { data: pages } = trpc.marketing.landingPagePicker.useQuery();
@@ -167,7 +167,7 @@ export default function Campaigns() {
   const { data: sequences } = trpc.automations.list.useQuery();
 
   const createPageFromTemplate = trpc.templates.createLandingPage.useMutation();
-  const createCampaign = trpc.campaigns.create.useMutation();
+  const createAdCampaign = trpc.adCampaigns.create.useMutation();
 
   const resetForm = () => {
     setDraft(EMPTY_DRAFT);
@@ -242,7 +242,7 @@ export default function Campaigns() {
         .filter(Boolean)
         .map((z) => (z.includes(":") ? z : `US:${z}`));
 
-      const result = await createCampaign.mutateAsync({
+      const result = await createAdCampaign.mutateAsync({
         name: draft.name.trim(),
         description: draft.description.trim() || undefined,
         objective: draft.objective as any,
@@ -266,11 +266,11 @@ export default function Campaigns() {
       });
 
       toast.success("Campaign created as a draft");
-      utils.campaigns.list.invalidate();
+      utils.adCampaigns.list.invalidate();
       utils.marketing.landingPagePicker.invalidate();
       setCreateOpen(false);
       resetForm();
-      navigate(`/campaigns/${result.id}`);
+      navigate(`/ad-campaigns/${result.id}`);
     } catch (err: any) {
       toast.error(err?.message ?? "Could not create the campaign");
     }
@@ -364,7 +364,7 @@ export default function Campaigns() {
             <Card
               key={c.id}
               className="hover:border-brand-green/40 transition-colors cursor-pointer"
-              onClick={() => navigate(`/campaigns/${c.id}`)}
+              onClick={() => navigate(`/ad-campaigns/${c.id}`)}
             >
               <CardContent className="p-4">
                 <div className="flex flex-col lg:flex-row lg:items-center gap-4">
@@ -675,9 +675,9 @@ export default function Campaigns() {
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
             <Button
               onClick={submit}
-              disabled={createCampaign.isPending || createPageFromTemplate.isPending}
+              disabled={createAdCampaign.isPending || createPageFromTemplate.isPending}
             >
-              {createCampaign.isPending || createPageFromTemplate.isPending
+              {createAdCampaign.isPending || createPageFromTemplate.isPending
                 ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Creating…</>
                 : "Create campaign"}
             </Button>
