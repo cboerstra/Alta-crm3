@@ -498,13 +498,21 @@ export const smsTemplates = mysqlTable("sms_templates", {
     "under_contract",
     "deal_closed",
   ]).notNull(),
+  contactType: mysqlEnum("contactType", [
+    "re_agent",
+    "re_client",
+    "re_webinar",
+    "mortgage_client",
+    "mortgage_prospect",
+    "mortgage_webinar",
+  ]).default("mortgage_prospect").notNull(),
+  fromDomain: mysqlEnum("fromDomain", [
+    "altamortgagecrm",
+    "freehomesearchutah",
+  ]).default("altamortgagecrm").notNull(),
   body: text("body").notNull(),
-  // Optional email subject line — used when this template is sent as an email (e.g. registered trigger)
   emailSubject: varchar("emailSubject", { length: 512 }),
-  // How many minutes before the webinar to send this reminder (negative = before, null = use default)
-  // e.g. -1440 = 24h before, -60 = 1h before, -10 = 10min before
   sendOffsetMinutes: int("sendOffsetMinutes"),
-  // Optional SMS body for reminder triggers — separate from the email body
   smsBody: text("smsBody"),
   isActive: boolean("isActive").default(true).notNull(),
   createdBy: int("createdBy"),
