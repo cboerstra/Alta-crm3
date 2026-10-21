@@ -98,7 +98,8 @@ export default function SettingsPage() {
   const [newTemplateFromDomain, setNewTemplateFromDomain] = useState<string>("altamortgagecrm");
   const [deletingTemplateId, setDeletingTemplateId] = useState<number | null>(null);
   const [previewTemplateId, setPreviewTemplateId] = useState<number | null>(null);
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [selectedContactType, setSelectedContactType] = useState<string>("mortgage_prospect");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
 
   const CONTACT_TYPES = [
     { value: "re_agent", label: "RE Agent", icon: "🤝", suggestedDomain: "freehomesearchutah" },
@@ -108,8 +109,6 @@ export default function SettingsPage() {
     { value: "mortgage_prospect", label: "Mortgage Prospect", icon: "📋", suggestedDomain: "altamortgagecrm" },
     { value: "mortgage_webinar", label: "Mortgage Webinar", icon: "🎥", suggestedDomain: "altamortgagecrm" },
   ];
-
-  const toggleGroup = (ct: string) => setCollapsedGroups(prev => ({ ...prev, [ct]: !prev[ct] }));
 
   const SAMPLE_VARS: Record<string, string> = {
     '{{first_name}}': 'John',
@@ -1191,7 +1190,7 @@ export default function SettingsPage() {
                 <div>
                   <CardTitle className="text-base" style={{ fontFamily: "Raleway, sans-serif" }}>SMS &amp; Email Templates</CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Manage automated SMS and email messages sent at each lead stage. Multiple templates per trigger are supported — all active templates for a trigger will be sent.
+                    Select a contact type and message step to edit its email and SMS content.
                   </p>
                 </div>
                 <Button
@@ -1199,290 +1198,256 @@ export default function SettingsPage() {
                   className="bg-brand-green hover:bg-brand-green-dark text-white gap-1 shrink-0"
                   onClick={() => setShowAddTemplate(true)}
                 >
-                  <Plus className="h-3.5 w-3.5" /> Add SMS / Email Template
+                  <Plus className="h-3.5 w-3.5" /> Add Template
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {/* Variable reference */}
-              <div className="p-3 rounded-lg bg-muted/30 border border-border/30 text-xs">
-                <p className="font-semibold text-foreground mb-1">Available variables <span className="font-normal text-muted-foreground">(click to copy)</span></p>
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    { tag: '{{first_name}}', desc: 'Lead\'s first name' },
-                    { tag: '{{last_name}}', desc: 'Lead\'s last name' },
-                    { tag: '{{full_name}}', desc: 'Full name' },
-                    { tag: '{{webinar_link}}', desc: 'Zoom join URL' },
-                    { tag: '{{webinar_title}}', desc: 'Webinar title' },
-                    { tag: '{{session_date}}', desc: 'Session date' },
-                  ].map(({ tag, desc }) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      title={desc}
-                      className="font-mono bg-background border border-border/50 px-1.5 py-0.5 rounded hover:border-brand-green hover:text-brand-green transition-colors cursor-pointer"
-                      onClick={() => {
-                        navigator.clipboard.writeText(tag);
-                        toast.success(`Copied ${tag}`);
-                      }}
-                    >{tag}</button>
-                  ))}
-                </div>
-                <p className="text-muted-foreground mt-1.5">Example: <span className="font-mono">Hi {'{{first_name}}'}, join us: {'{{webinar_link}}'}</span></p>
-              </div>
-
+            <CardContent className="space-y-4">
               {templatesLoading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading templates...
                 </div>
-              ) : (
-                <div className="space-y-6">
-                  {(() => {
-                    const grouped = (smsTemplateList ?? []).reduce<Record<string, typeof smsTemplateList>>((acc, tmpl) => {
-                      const ct = (tmpl as any).contactType ?? 'mortgage_prospect';
-                      if (!acc[ct]) acc[ct] = [];
-                      acc[ct]!.push(tmpl);
-                      return acc;
-                    }, {});
-                    return CONTACT_TYPES.filter(ct => grouped[ct.value]?.length).map(ct => {
-                      const isCollapsed = collapsedGroups[ct.value];
-                      const templates = grouped[ct.value] ?? [];
-                      const domain = templates[0] ? (templates[0] as any).fromDomain : ct.suggestedDomain;
-                      const domainLabel = domain === 'freehomesearchutah' ? 'freehomesearchutah.com' : 'altamortgagecrm.net';
-                      return (
-                        <div key={ct.value} className="border border-border/40 rounded-lg overflow-hidden">
-                          <button
-                            type="button"
-                            className="w-full flex items-center gap-2 px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors text-left"
-                            onClick={() => toggleGroup(ct.value)}
-                          >
-                            {isCollapsed ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                            <span className="text-base">{ct.icon}</span>
-                            <span className="font-semibold text-sm" style={{ fontFamily: 'Raleway, sans-serif' }}>{ct.label}</span>
-                            <Badge variant="secondary" className="text-xs ml-1">{templates.length}</Badge>
-                            <span className="text-xs text-muted-foreground ml-auto">from {domainLabel}</span>
-                          </button>
-                          {!isCollapsed && (
-                            <div className="p-4 space-y-4">
-                  {templates.map((tmpl) => {
-                    const draft = templateDrafts[tmpl.id];
-                    // Always use draft if present, otherwise fall back to server data
-                    const currentBody = draft?.body ?? tmpl.body;
-                    const currentActive = draft?.isActive ?? tmpl.isActive;
-                    const currentEmailSubject = draft !== undefined ? (draft.emailSubject ?? null) : ((tmpl as any).emailSubject ?? null);
-                    const currentSendOffset = draft !== undefined ? (draft.sendOffsetMinutes ?? null) : ((tmpl as any).sendOffsetMinutes ?? null);
-                    const currentSmsBody = draft !== undefined ? (draft.smsBody ?? null) : ((tmpl as any).smsBody ?? null);
-                    const charCount = currentBody.length;
-                    const smsCount = Math.ceil(charCount / 160) || 1;
-                    const isDeleting = deletingTemplateId === tmpl.id;
-                    const isSaving = savingTemplateId === tmpl.id;
-                    const isDirty = draft !== undefined && (
-                      draft.body !== tmpl.body ||
-                      draft.isActive !== tmpl.isActive ||
-                      (draft.emailSubject ?? null) !== ((tmpl as any).emailSubject ?? null) ||
-                      (draft.sendOffsetMinutes ?? null) !== ((tmpl as any).sendOffsetMinutes ?? null) ||
-                      (draft.smsBody ?? null) !== ((tmpl as any).smsBody ?? null)
-                    );
+              ) : (() => {
+                const allTemplates = smsTemplateList ?? [];
+                const filteredTemplates = allTemplates.filter((t: any) => (t.contactType ?? 'mortgage_prospect') === selectedContactType);
+                const selectedTmpl = filteredTemplates.find(t => t.id === selectedTemplateId) ?? filteredTemplates[0] ?? null;
+                const ctMeta = CONTACT_TYPES.find(c => c.value === selectedContactType);
+                const fromDomain = selectedTmpl ? ((selectedTmpl as any).fromDomain === 'freehomesearchutah' ? 'freehomesearchutah.com' : 'altamortgagecrm.net') : (ctMeta?.suggestedDomain === 'freehomesearchutah' ? 'freehomesearchutah.com' : 'altamortgagecrm.net');
 
-                    const initDraft = () => {
-                      if (!templateDrafts[tmpl.id]) {
-                        setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: tmpl.body, isActive: tmpl.isActive, emailSubject: (tmpl as any).emailSubject ?? null, sendOffsetMinutes: (tmpl as any).sendOffsetMinutes ?? null, smsBody: (tmpl as any).smsBody ?? null } }));
-                      }
-                    };
-
-                    return (
-                      <div key={tmpl.id} className={`rounded-lg border p-4 space-y-3 transition-colors ${
-                        isDirty ? 'border-brand-green/50 bg-brand-green/5' : 'border-border/40 bg-muted/10'
-                      }`}>
-                        {/* Header row */}
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-sm" style={{ fontFamily: 'Raleway, sans-serif' }}>{tmpl.label}</span>
-                              <Badge variant={currentActive ? 'default' : 'secondary'} className={`text-xs ${
-                                currentActive ? 'bg-green-100 text-green-800 border-green-200' : ''
-                              }`}>
-                                {currentActive ? 'Active' : 'Inactive'}
-                              </Badge>
-                              {isDirty && (
-                                <span className="text-xs text-amber-600 font-medium">Unsaved changes</span>
-                              )}
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-0.5">{tmpl.description}</p>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1"
-                              onClick={() => setPreviewTemplateId(tmpl.id)}
-                            >
-                              <Eye className="h-3.5 w-3.5" /> Preview
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1"
-                              onClick={() => {
-                                // Focus the textarea for this card
-                                initDraft();
-                                const el = document.getElementById(`tmpl-body-${tmpl.id}`);
-                                if (el) { el.focus(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-                              }}
-                            >
-                              <Edit className="h-3.5 w-3.5" /> Edit
-                            </Button>
-                            {isDeleting ? (
-                              <div className="flex items-center gap-1">
-                                <span className="text-xs text-destructive">Delete?</span>
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  disabled={deleteTemplate.isPending}
-                                  onClick={() => deleteTemplate.mutate({ id: tmpl.id })}
-                                >
-                                  {deleteTemplate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Yes'}
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => setDeletingTemplateId(null)}>No</Button>
-                              </div>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                onClick={() => setDeletingTemplateId(tmpl.id)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Send-Time Selector — only for reminder triggers */}
-                        {REMINDER_TRIGGERS.includes(tmpl.trigger) && (
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                              Send Time
-                            </Label>
-                            <Select
-                              value={String(currentSendOffset ?? REMINDER_DEFAULTS[tmpl.trigger] ?? -60)}
-                              onValueChange={(val) => {
-                                initDraft();
-                                setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: Number(val) } }));
-                              }}
-                            >
-                              <SelectTrigger className="text-sm">
-                                <SelectValue placeholder="Select send time..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {SEND_TIME_OPTIONS.map(opt => (
-                                  <SelectItem key={opt.value} value={String(opt.value)}>{opt.label}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <p className="text-xs text-muted-foreground">
-                              This message will be sent {SEND_TIME_OPTIONS.find(o => o.value === (currentSendOffset ?? REMINDER_DEFAULTS[tmpl.trigger]))?.label ?? 'at the configured time'} to all registered leads.
-                            </p>
-                          </div>
-                        )}
-
-                        {/* 1. Email Subject — all triggers */}
-                        <div className="space-y-1.5">
-                          <Label className="text-xs text-muted-foreground flex items-center gap-1"><Mail className="h-3 w-3" /> Email Subject Line</Label>
-                          <Input
-                            className="text-sm"
-                            placeholder={tmpl.trigger === 'registered' ? `You're registered for {{webinar_title}}!` : `Reminder: {{webinar_title}}`}
-                            value={currentEmailSubject ?? ''}
-                            onFocus={initDraft}
-                            onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: currentActive, emailSubject: e.target.value || null, sendOffsetMinutes: currentSendOffset, smsBody: currentSmsBody } }))}
-                          />
-                          <p className="text-xs text-muted-foreground">Subject line for the email. Leave blank to skip sending an email for this trigger.</p>
-                        </div>
-
-                        {/* 2. Email Body — all triggers */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-xs font-semibold flex items-center gap-1.5"><span>✉️</span> Email Body</Label>
-                            <div className="flex items-center gap-1.5">
-                              <Switch
-                                checked={currentActive}
-                                onCheckedChange={(v) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: v, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: currentSmsBody } }))}
-                              />
-                              <span className="text-xs text-muted-foreground">{currentActive ? 'Active' : 'Inactive'}</span>
-                            </div>
-                          </div>
-                          <textarea
-                            id={`tmpl-body-${tmpl.id}`}
-                            className="w-full min-h-[90px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
-                            value={currentBody}
-                            onFocus={initDraft}
-                            onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: e.target.value, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: currentSmsBody } }))}
-                          />
-                          <p className="text-xs text-muted-foreground">Sent as the email body. Use <code className="bg-muted px-1 rounded">{'{{' +'first_name'+'}}' }</code>, <code className="bg-muted px-1 rounded">{'{{' +'webinar_link'+'}}' }</code>, <code className="bg-muted px-1 rounded">{'{{' +'session_date'+'}}' }</code>, <code className="bg-muted px-1 rounded">{'{{' +'webinar_title'+'}}' }</code>.</p>
-                        </div>
-
-                        {/* 3. SMS Message — all triggers */}
-                        <div className="space-y-2 border border-dashed border-border/60 rounded-md p-3 bg-background/50">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-xs font-semibold flex items-center gap-1.5"><span>📱</span> SMS Text Message</Label>
-                            {(() => { const sc = (currentSmsBody ?? '').length; const ss = Math.ceil(sc / 160) || 1; return sc > 0 ? <span className={`text-xs ${sc > 320 ? 'text-destructive font-semibold' : sc > 160 ? 'text-amber-600' : 'text-muted-foreground'}`}>{sc} chars · {ss} segment{ss !== 1 ? 's' : ''}</span> : null; })()}
-                          </div>
-                          <textarea
-                            className="w-full min-h-[70px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
-                            placeholder={`Hi {{first_name}}, ...`}
-                            value={currentSmsBody ?? ''}
-                            onFocus={initDraft}
-                            onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: e.target.value || null } }))}
-                          />
-                          <p className="text-xs text-muted-foreground">Sent as an SMS text. Use <code className="bg-muted px-1 rounded">{'{{' +'first_name'+'}}' }</code>, <code className="bg-muted px-1 rounded">{'{{' +'webinar_link'+'}}' }</code>, <code className="bg-muted px-1 rounded">{'{{' +'session_date'+'}}' }</code>, <code className="bg-muted px-1 rounded">{'{{' +'webinar_title'+'}}' }</code>. Leave blank to skip SMS for this trigger.</p>
-                        </div>
-                        <div className="flex gap-2 justify-between items-center pt-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs text-muted-foreground"
-                            disabled={resetTemplate.isPending}
-                            onClick={() => resetTemplate.mutate({ trigger: tmpl.trigger as any })}
-                          >
-                            {resetTemplate.isPending ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
-                            Reset to default
-                          </Button>
-                          <div className="flex gap-2">
-                            {isDirty && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setTemplateDrafts(prev => { const next = { ...prev }; delete next[tmpl.id]; return next; })}
-                              >
-                                Discard
-                              </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              className={`gap-1 ${ isDirty ? 'bg-brand-green hover:bg-brand-green-dark text-white' : 'bg-muted text-muted-foreground cursor-default' }`}
-                              disabled={isSaving || !isDirty}
-                              onClick={() => {
-                                setSavingTemplateId(tmpl.id);
-                                updateTemplate.mutate({ id: tmpl.id, body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: currentSmsBody });
-                              }}
-                            >
-                              {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                              Save changes
-                            </Button>
-                          </div>
-                        </div>
+                return (
+                  <>
+                    {/* Dropdown selectors row */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-medium">Contact Type</Label>
+                        <Select value={selectedContactType} onValueChange={(v) => { setSelectedContactType(v); setSelectedTemplateId(null); }}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {CONTACT_TYPES.map(ct => (
+                              <SelectItem key={ct.value} value={ct.value}>
+                                {ct.icon} {ct.label}
+                                {allTemplates.some((t: any) => (t.contactType ?? 'mortgage_prospect') === ct.value) ? '' : ' (empty)'}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                    );
-                  })}
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-medium">Message Sequence</Label>
+                        <Select
+                          value={selectedTmpl ? String(selectedTmpl.id) : ""}
+                          onValueChange={(v) => setSelectedTemplateId(Number(v))}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Select a message..." /></SelectTrigger>
+                          <SelectContent>
+                            {filteredTemplates.map((t, i) => (
+                              <SelectItem key={t.id} value={String(t.id)}>
+                                {i + 1}. {t.label} {t.isActive ? '' : '(inactive)'}
+                              </SelectItem>
+                            ))}
+                            {filteredTemplates.length === 0 && (
+                              <SelectItem value="" disabled>No templates yet</SelectItem>
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Info bar */}
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground px-1">
+                      <span>From: <strong className="text-foreground">{fromDomain}</strong></span>
+                      <Separator orientation="vertical" className="h-3" />
+                      <span>{filteredTemplates.length} message{filteredTemplates.length !== 1 ? 's' : ''} in sequence</span>
+                      {selectedTmpl && (
+                        <>
+                          <Separator orientation="vertical" className="h-3" />
+                          <span>{selectedTmpl.isActive ? '✓ Active' : '○ Inactive'}</span>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Sequence overview */}
+                    {filteredTemplates.length > 0 && (
+                      <div className="flex gap-1.5 flex-wrap">
+                        {filteredTemplates.map((t, i) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                              selectedTmpl?.id === t.id
+                                ? 'bg-brand-green text-white border-brand-green'
+                                : t.isActive
+                                  ? 'bg-green-50 text-green-800 border-green-200 hover:border-brand-green'
+                                  : 'bg-muted/50 text-muted-foreground border-border/50 hover:border-border'
+                            }`}
+                            onClick={() => setSelectedTemplateId(t.id)}
+                          >
+                            {i + 1}. {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Selected template editor */}
+                    {selectedTmpl && (() => {
+                      const tmpl = selectedTmpl;
+                      const draft = templateDrafts[tmpl.id];
+                      const currentBody = draft?.body ?? tmpl.body;
+                      const currentActive = draft?.isActive ?? tmpl.isActive;
+                      const currentEmailSubject = draft !== undefined ? (draft.emailSubject ?? null) : ((tmpl as any).emailSubject ?? null);
+                      const currentSendOffset = draft !== undefined ? (draft.sendOffsetMinutes ?? null) : ((tmpl as any).sendOffsetMinutes ?? null);
+                      const currentSmsBody = draft !== undefined ? (draft.smsBody ?? null) : ((tmpl as any).smsBody ?? null);
+                      const isDeleting = deletingTemplateId === tmpl.id;
+                      const isSaving = savingTemplateId === tmpl.id;
+                      const isDirty = draft !== undefined && (
+                        draft.body !== tmpl.body ||
+                        draft.isActive !== tmpl.isActive ||
+                        (draft.emailSubject ?? null) !== ((tmpl as any).emailSubject ?? null) ||
+                        (draft.sendOffsetMinutes ?? null) !== ((tmpl as any).sendOffsetMinutes ?? null) ||
+                        (draft.smsBody ?? null) !== ((tmpl as any).smsBody ?? null)
+                      );
+                      const initDraft = () => {
+                        if (!templateDrafts[tmpl.id]) {
+                          setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: tmpl.body, isActive: tmpl.isActive, emailSubject: (tmpl as any).emailSubject ?? null, sendOffsetMinutes: (tmpl as any).sendOffsetMinutes ?? null, smsBody: (tmpl as any).smsBody ?? null } }));
+                        }
+                      };
+
+                      return (
+                        <div className={`rounded-lg border p-4 space-y-4 transition-colors ${
+                          isDirty ? 'border-brand-green/50 bg-brand-green/5' : 'border-border/40'
+                        }`}>
+                          {/* Header */}
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="font-semibold text-sm" style={{ fontFamily: 'Raleway, sans-serif' }}>{tmpl.label}</h3>
+                              <p className="text-xs text-muted-foreground mt-0.5">{tmpl.description}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5">
+                                <Switch
+                                  checked={currentActive}
+                                  onCheckedChange={(v) => { initDraft(); setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: v, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: currentSmsBody } })); }}
+                                />
+                                <span className="text-xs">{currentActive ? 'Active' : 'Inactive'}</span>
+                              </div>
+                              {isDirty && <span className="text-xs text-amber-600 font-medium">Unsaved</span>}
+                            </div>
+                          </div>
+
+                          {/* Send-Time Selector — only for reminder triggers */}
+                          {REMINDER_TRIGGERS.includes(tmpl.trigger) && (
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">Send Time</Label>
+                              <Select
+                                value={String(currentSendOffset ?? REMINDER_DEFAULTS[tmpl.trigger] ?? -60)}
+                                onValueChange={(val) => { initDraft(); setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: Number(val), smsBody: currentSmsBody } })); }}
+                              >
+                                <SelectTrigger className="text-sm"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {SEND_TIME_OPTIONS.map(opt => (
+                                    <SelectItem key={opt.value} value={String(opt.value)}>{opt.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
                           )}
+
+                          {/* Email Subject */}
+                          <div className="space-y-1.5">
+                            <Label className="text-xs flex items-center gap-1"><Mail className="h-3 w-3" /> Email Subject</Label>
+                            <Input
+                              className="text-sm"
+                              placeholder="Subject line..."
+                              value={currentEmailSubject ?? ''}
+                              onFocus={initDraft}
+                              onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: currentActive, emailSubject: e.target.value || null, sendOffsetMinutes: currentSendOffset, smsBody: currentSmsBody } }))}
+                            />
+                          </div>
+
+                          {/* Email Body */}
+                          <div className="space-y-1.5">
+                            <Label className="text-xs flex items-center gap-1">✉️ Email Body</Label>
+                            <textarea
+                              id={`tmpl-body-${tmpl.id}`}
+                              className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+                              value={currentBody}
+                              onFocus={initDraft}
+                              onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: e.target.value, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: currentSmsBody } }))}
+                            />
+                          </div>
+
+                          {/* SMS Body */}
+                          <div className="space-y-1.5 border border-dashed border-border/60 rounded-md p-3 bg-background/50">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-xs flex items-center gap-1">📱 SMS Message</Label>
+                              {(() => { const sc = (currentSmsBody ?? '').length; const ss = Math.ceil(sc / 160) || 1; return sc > 0 ? <span className={`text-xs ${sc > 320 ? 'text-destructive font-semibold' : sc > 160 ? 'text-amber-600' : 'text-muted-foreground'}`}>{sc} chars · {ss} segment{ss !== 1 ? 's' : ''}</span> : null; })()}
+                            </div>
+                            <textarea
+                              className="w-full min-h-[70px] rounded-md border border-input bg-background px-3 py-2 text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-ring"
+                              placeholder="Hi {{first_name}}, ..."
+                              value={currentSmsBody ?? ''}
+                              onFocus={initDraft}
+                              onChange={(e) => setTemplateDrafts(prev => ({ ...prev, [tmpl.id]: { body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: e.target.value || null } }))}
+                            />
+                          </div>
+
+                          {/* Variables reference */}
+                          <div className="flex flex-wrap gap-1.5 text-xs">
+                            <span className="text-muted-foreground">Variables:</span>
+                            {['{{first_name}}', '{{last_name}}', '{{webinar_link}}', '{{webinar_title}}', '{{session_date}}'].map(tag => (
+                              <button key={tag} type="button" className="font-mono bg-muted/50 border border-border/50 px-1.5 py-0.5 rounded hover:border-brand-green hover:text-brand-green transition-colors cursor-pointer" onClick={() => { navigator.clipboard.writeText(tag); toast.success(`Copied ${tag}`); }}>{tag}</button>
+                            ))}
+                          </div>
+
+                          {/* Action buttons */}
+                          <div className="flex gap-2 justify-between items-center pt-1">
+                            <div className="flex items-center gap-2">
+                              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground gap-1" onClick={() => setPreviewTemplateId(tmpl.id)}>
+                                <Eye className="h-3 w-3" /> Preview
+                              </Button>
+                              {isDeleting ? (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-destructive">Delete?</span>
+                                  <Button variant="destructive" size="sm" disabled={deleteTemplate.isPending} onClick={() => deleteTemplate.mutate({ id: tmpl.id })}>{deleteTemplate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Yes'}</Button>
+                                  <Button variant="ghost" size="sm" onClick={() => setDeletingTemplateId(null)}>No</Button>
+                                </div>
+                              ) : (
+                                <Button variant="ghost" size="sm" className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10 gap-1" onClick={() => setDeletingTemplateId(tmpl.id)}>
+                                  <Trash2 className="h-3 w-3" /> Delete
+                                </Button>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              {isDirty && (
+                                <Button variant="ghost" size="sm" onClick={() => setTemplateDrafts(prev => { const next = { ...prev }; delete next[tmpl.id]; return next; })}>Discard</Button>
+                              )}
+                              <Button
+                                size="sm"
+                                className={`gap-1 ${isDirty ? 'bg-brand-green hover:bg-brand-green-dark text-white' : 'bg-muted text-muted-foreground cursor-default'}`}
+                                disabled={isSaving || !isDirty}
+                                onClick={() => { setSavingTemplateId(tmpl.id); updateTemplate.mutate({ id: tmpl.id, body: currentBody, isActive: currentActive, emailSubject: currentEmailSubject, sendOffsetMinutes: currentSendOffset, smsBody: currentSmsBody }); }}
+                              >
+                                {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                                Save
+                              </Button>
+                            </div>
+                          </div>
                         </div>
                       );
-                    });
-                  })()}
-                </div>
-              )}
+                    })()}
+
+                    {/* Empty state */}
+                    {filteredTemplates.length === 0 && (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p className="text-sm">No templates for {ctMeta?.label ?? selectedContactType} yet.</p>
+                        <Button size="sm" variant="outline" className="mt-3 gap-1" onClick={() => { setNewTemplateContactType(selectedContactType); setNewTemplateFromDomain(ctMeta?.suggestedDomain ?? 'altamortgagecrm'); setShowAddTemplate(true); }}>
+                          <Plus className="h-3.5 w-3.5" /> Add first template
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>
