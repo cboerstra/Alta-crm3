@@ -612,8 +612,15 @@ export default function LandingPages() {
     }));
   };
 
-  const copyUrl = (slug: string) => {
-    const fullUrl = `${window.location.origin}/lp/${slug}`;
+  const HOST_DOMAINS: Record<string, string> = {
+    altamortgagecrm: "https://altamortgagecrm.net",
+    freehomesearchutah: "https://freehomesearchutah.com",
+  };
+
+  const getHostOrigin = (hostSite?: string) => HOST_DOMAINS[hostSite || "altamortgagecrm"] || HOST_DOMAINS.altamortgagecrm;
+
+  const copyUrl = (slug: string, hostSite?: string) => {
+    const fullUrl = `${getHostOrigin(hostSite)}/lp/${slug}`;
     navigator.clipboard.writeText(fullUrl);
     toast.success("URL copied to clipboard");
   };
@@ -699,7 +706,7 @@ export default function LandingPages() {
     catch { return "Date TBD"; }
   };
 
-  const getFullUrl = (slug: string) => `${window.location.origin}/lp/${slug}`;
+  const getFullUrl = (slug: string, hostSite?: string) => `${getHostOrigin(hostSite)}/lp/${slug}`;
 
   // Split media library into logos and images
   const logos = useMemo(() => mediaLibraryItems?.filter(m => m.fileType === "logo") || [], [mediaLibraryItems]);
@@ -900,13 +907,13 @@ export default function LandingPages() {
                 <div className="rounded-lg border bg-muted/40 px-3 py-2.5 flex items-center gap-2">
                   <LinkIcon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                   <span className="text-xs text-muted-foreground flex-1 min-w-0 truncate">
-                    {window.location.origin}/lp/<span className="font-semibold text-foreground">{form.slug || "your-slug"}</span>
+                    {getHostOrigin(form.hostSite)}/lp/<span className="font-semibold text-foreground">{form.slug || "your-slug"}</span>
                   </span>
                   <Button
                     type="button" variant="ghost" size="sm"
                     className="h-6 px-2 text-xs shrink-0"
                     disabled={!form.slug}
-                    onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/lp/${form.slug}`); toast.success("URL copied!"); }}
+                    onClick={() => { navigator.clipboard.writeText(`${getHostOrigin(form.hostSite)}/lp/${form.slug}`); toast.success("URL copied!"); }}
                   >
                     Copy
                   </Button>
@@ -1724,7 +1731,7 @@ export default function LandingPages() {
         <div className="grid gap-4">
           {pages.map((page) => {
             const linkedWebinar = page.webinarId ? webinarMap.get(page.webinarId) : null;
-            const fullUrl = getFullUrl(page.slug);
+            const fullUrl = getFullUrl(page.slug, (page as any).hostSite);
             return (
               <Card key={page.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
                 <CardContent className="p-5">
@@ -1759,7 +1766,7 @@ export default function LandingPages() {
                           {fullUrl}
                         </a>
                         <button
-                          onClick={(e) => { e.preventDefault(); copyUrl(page.slug); }}
+                          onClick={(e) => { e.preventDefault(); copyUrl(page.slug, (page as any).hostSite); }}
                           className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted"
                           title="Copy URL"
                         >
