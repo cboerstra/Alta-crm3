@@ -17,6 +17,26 @@ export const TRIGGER_VALUES = [
   "deal_closed",
 ] as const;
 
+export const CONTACT_TYPE_VALUES = [
+  "re_agent",
+  "re_client",
+  "re_webinar",
+  "mortgage_client",
+  "mortgage_prospect",
+  "mortgage_webinar",
+] as const;
+
+export const CONTACT_TYPE_LABELS: Record<string, string> = {
+  re_agent: "RE Agent",
+  re_client: "RE Client",
+  re_webinar: "RE Webinar",
+  mortgage_client: "Mortgage Client",
+  mortgage_prospect: "Mortgage Prospect",
+  mortgage_webinar: "Mortgage Webinar",
+};
+
+export const FROM_DOMAIN_VALUES = ["altamortgagecrm", "freehomesearchutah"] as const;
+
 export const TRIGGER_LABELS: Record<SmsTemplate["trigger"], string> = {
   new_lead: "New Lead",
   registered: "Webinar Registration",
@@ -57,6 +77,8 @@ const TRIGGER_ORDER: SmsTemplate["trigger"][] = [
 ];
 
 const triggerEnum = z.enum(TRIGGER_VALUES);
+const contactTypeEnum = z.enum(CONTACT_TYPE_VALUES);
+const fromDomainEnum = z.enum(FROM_DOMAIN_VALUES);
 
 export const smsTemplatesRouter = router({
   list: adminProcedure.query(async () => {
@@ -65,9 +87,14 @@ export const smsTemplatesRouter = router({
       ...t,
       label: TRIGGER_LABELS[t.trigger],
       description: TRIGGER_DESCRIPTIONS[t.trigger],
+      contactTypeLabel: CONTACT_TYPE_LABELS[t.contactType] ?? t.contactType,
     }));
-    // Sort by trigger order, then by id within same trigger
+    // Sort by contact type, then trigger order, then by id within same trigger
+    const CT_ORDER = CONTACT_TYPE_VALUES as readonly string[];
     return enriched.sort((a, b) => {
+      const ca = CT_ORDER.indexOf(a.contactType);
+      const cb = CT_ORDER.indexOf(b.contactType);
+      if (ca !== cb) return ca - cb;
       const ai = TRIGGER_ORDER.indexOf(a.trigger);
       const bi = TRIGGER_ORDER.indexOf(b.trigger);
       if (ai !== bi) return ai - bi;
@@ -79,13 +106,15 @@ export const smsTemplatesRouter = router({
     .input(
       z.object({
         trigger: triggerEnum,
+        contactType: contactTypeEnum.default("mortgage_prospect"),
+        fromDomain: fromDomainEnum.default("altamortgagecrm"),
         body: z.string().min(1, "Template body cannot be empty").max(1600, "SMS body cannot exceed 1600 characters"),
         isActive: z.boolean().default(true),
         emailSubject: z.string().max(512).optional(),
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const template = await createSmsTemplate(input.trigger, input.body, input.isActive, ctx.user.id, input.emailSubject);
+      const template = await createSmsTemplate(input.trigger, input.body, input.isActive, ctx.user.id, input.emailSubject, input.contactType, input.fromDomain);
       return { success: true, id: template.id };
     }),
 
@@ -98,10 +127,12 @@ export const smsTemplatesRouter = router({
         emailSubject: z.string().max(512).nullable().optional(),
         sendOffsetMinutes: z.number().nullable().optional(),
         smsBody: z.string().nullable().optional(),
+        contactType: contactTypeEnum.optional(),
+        fromDomain: fromDomainEnum.optional(),
       }),
     )
     .mutation(async ({ input }) => {
-      await updateSmsTemplate(input.id, input.body, input.isActive, input.emailSubject, input.sendOffsetMinutes, input.smsBody);
+      await updateSmsTemplate(input.id, input.body, input.isActive, input.emailSubject, input.sendOffsetMinutes, input.smsBody, input.contactType, input.fromDomain);
       return { success: true };
     }),
 

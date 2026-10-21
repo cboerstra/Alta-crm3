@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import {
   Settings, Video, Calendar, CheckCircle, AlertCircle,
   Upload, Image, Trash2, Edit, ImageIcon, FileImage,
-  LayoutGrid, Tag, Loader2, X, MessageSquare, Phone, Eye, EyeOff, Send, Mail, Plus,
+  LayoutGrid, Tag, Loader2, X, MessageSquare, Phone, Eye, EyeOff, Send, Mail, Plus, ChevronDown, ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -92,11 +92,24 @@ export default function SettingsPage() {
   const [savingTemplateId, setSavingTemplateId] = useState<number | null>(null);
   const [showAddTemplate, setShowAddTemplate] = useState(false);
   const [newTemplateTrigger, setNewTemplateTrigger] = useState<string>("new_lead");
-  // SMS_TEMPLATE_DEFAULTS is defined at module level above
   const [newTemplateBody, setNewTemplateBody] = useState(SMS_TEMPLATE_DEFAULTS["new_lead"]);
   const [newTemplateActive, setNewTemplateActive] = useState(true);
+  const [newTemplateContactType, setNewTemplateContactType] = useState<string>("mortgage_prospect");
+  const [newTemplateFromDomain, setNewTemplateFromDomain] = useState<string>("altamortgagecrm");
   const [deletingTemplateId, setDeletingTemplateId] = useState<number | null>(null);
   const [previewTemplateId, setPreviewTemplateId] = useState<number | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  const CONTACT_TYPES = [
+    { value: "re_agent", label: "RE Agent", icon: "🤝", suggestedDomain: "freehomesearchutah" },
+    { value: "re_client", label: "RE Client", icon: "🏠", suggestedDomain: "freehomesearchutah" },
+    { value: "re_webinar", label: "RE Webinar", icon: "🎥", suggestedDomain: "freehomesearchutah" },
+    { value: "mortgage_client", label: "Mortgage Client", icon: "🏦", suggestedDomain: "altamortgagecrm" },
+    { value: "mortgage_prospect", label: "Mortgage Prospect", icon: "📋", suggestedDomain: "altamortgagecrm" },
+    { value: "mortgage_webinar", label: "Mortgage Webinar", icon: "🎥", suggestedDomain: "altamortgagecrm" },
+  ];
+
+  const toggleGroup = (ct: string) => setCollapsedGroups(prev => ({ ...prev, [ct]: !prev[ct] }));
 
   const SAMPLE_VARS: Record<string, string> = {
     '{{first_name}}': 'John',
@@ -129,6 +142,8 @@ export default function SettingsPage() {
       setNewTemplateTrigger("new_lead");
       setNewTemplateBody(SMS_TEMPLATE_DEFAULTS["new_lead"]);
       setNewTemplateActive(true);
+      setNewTemplateContactType("mortgage_prospect");
+      setNewTemplateFromDomain("altamortgagecrm");
     },
     onError: (e: any) => toast.error(e.message),
   });
@@ -1005,10 +1020,11 @@ export default function SettingsPage() {
           <Dialog open={showAddTemplate} onOpenChange={(open) => {
             setShowAddTemplate(open);
             if (open) {
-              // Reset to new_lead default each time dialog opens
               setNewTemplateTrigger('new_lead');
               setNewTemplateBody(SMS_TEMPLATE_DEFAULTS['new_lead'] ?? '');
               setNewTemplateActive(true);
+              setNewTemplateContactType('mortgage_prospect');
+              setNewTemplateFromDomain('altamortgagecrm');
             }
           }}>
             <DialogContent className="max-w-lg">
@@ -1016,11 +1032,42 @@ export default function SettingsPage() {
                 <DialogTitle style={{ fontFamily: 'Raleway, sans-serif' }}>Add SMS / Email Template</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
+                {/* Contact Type */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Contact type — who is this template for?</Label>
+                  <Select value={newTemplateContactType} onValueChange={(v) => {
+                    setNewTemplateContactType(v);
+                    const ct = CONTACT_TYPES.find(c => c.value === v);
+                    if (ct) setNewTemplateFromDomain(ct.suggestedDomain);
+                  }}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CONTACT_TYPES.map(ct => (
+                        <SelectItem key={ct.value} value={ct.value}>{ct.icon} {ct.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* From Domain */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Send from domain</Label>
+                  <Select value={newTemplateFromDomain} onValueChange={setNewTemplateFromDomain}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="altamortgagecrm">altamortgagecrm.net</SelectItem>
+                      <SelectItem value="freehomesearchutah">freehomesearchutah.com</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* Trigger */}
                 <div className="space-y-1.5">
                   <Label className="text-xs">Trigger — when should this message be sent?</Label>
                   <Select value={newTemplateTrigger} onValueChange={(v) => {
                     setNewTemplateTrigger(v);
-                    // Always pre-populate body with the default for the selected trigger
                     if (SMS_TEMPLATE_DEFAULTS[v]) {
                       setNewTemplateBody(SMS_TEMPLATE_DEFAULTS[v]);
                     }
@@ -1045,6 +1092,7 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                {/* Message body */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs">Message body</Label>
@@ -1070,7 +1118,7 @@ export default function SettingsPage() {
                     size="sm"
                     className="bg-brand-green hover:bg-brand-green-dark text-white gap-1"
                     disabled={createTemplate.isPending || newTemplateBody.trim().length === 0 || newTemplateBody.length > 1600}
-                    onClick={() => createTemplate.mutate({ trigger: newTemplateTrigger as any, body: newTemplateBody.trim(), isActive: newTemplateActive })}
+                    onClick={() => createTemplate.mutate({ trigger: newTemplateTrigger as any, contactType: newTemplateContactType as any, fromDomain: newTemplateFromDomain as any, body: newTemplateBody.trim(), isActive: newTemplateActive })}
                   >
                     {createTemplate.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                     Create Template
@@ -1188,8 +1236,35 @@ export default function SettingsPage() {
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading templates...
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {(smsTemplateList ?? []).map((tmpl) => {
+                <div className="space-y-6">
+                  {(() => {
+                    const grouped = (smsTemplateList ?? []).reduce<Record<string, typeof smsTemplateList>>((acc, tmpl) => {
+                      const ct = (tmpl as any).contactType ?? 'mortgage_prospect';
+                      if (!acc[ct]) acc[ct] = [];
+                      acc[ct]!.push(tmpl);
+                      return acc;
+                    }, {});
+                    return CONTACT_TYPES.filter(ct => grouped[ct.value]?.length).map(ct => {
+                      const isCollapsed = collapsedGroups[ct.value];
+                      const templates = grouped[ct.value] ?? [];
+                      const domain = templates[0] ? (templates[0] as any).fromDomain : ct.suggestedDomain;
+                      const domainLabel = domain === 'freehomesearchutah' ? 'freehomesearchutah.com' : 'altamortgagecrm.net';
+                      return (
+                        <div key={ct.value} className="border border-border/40 rounded-lg overflow-hidden">
+                          <button
+                            type="button"
+                            className="w-full flex items-center gap-2 px-4 py-3 bg-muted/30 hover:bg-muted/50 transition-colors text-left"
+                            onClick={() => toggleGroup(ct.value)}
+                          >
+                            {isCollapsed ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                            <span className="text-base">{ct.icon}</span>
+                            <span className="font-semibold text-sm" style={{ fontFamily: 'Raleway, sans-serif' }}>{ct.label}</span>
+                            <Badge variant="secondary" className="text-xs ml-1">{templates.length}</Badge>
+                            <span className="text-xs text-muted-foreground ml-auto">from {domainLabel}</span>
+                          </button>
+                          {!isCollapsed && (
+                            <div className="p-4 space-y-4">
+                  {templates.map((tmpl) => {
                     const draft = templateDrafts[tmpl.id];
                     // Always use draft if present, otherwise fall back to server data
                     const currentBody = draft?.body ?? tmpl.body;
@@ -1400,6 +1475,12 @@ export default function SettingsPage() {
                       </div>
                     );
                   })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               )}
             </CardContent>

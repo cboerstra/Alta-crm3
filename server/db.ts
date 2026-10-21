@@ -1021,9 +1021,15 @@ export async function getSmsTemplates(): Promise<SmsTemplate[]> {
   return rows;
 }
 
-export async function getSmsTemplate(trigger: SmsTemplate["trigger"]): Promise<SmsTemplate | null> {
+export async function getSmsTemplate(trigger: SmsTemplate["trigger"], contactType?: string): Promise<SmsTemplate | null> {
   const db = await getDb();
   if (!db) return null;
+  if (contactType) {
+    const [row] = await db.select().from(smsTemplates)
+      .where(and(eq(smsTemplates.trigger, trigger), eq(smsTemplates.contactType, contactType as any)))
+      .limit(1);
+    if (row) return row;
+  }
   const [row] = await db.select().from(smsTemplates).where(eq(smsTemplates.trigger, trigger)).limit(1);
   return row ?? null;
 }
@@ -1070,21 +1076,23 @@ export async function createSmsTemplate(
   isActive: boolean,
   createdBy?: number,
   emailSubject?: string,
+  contactType?: string,
+  fromDomain?: string,
 ): Promise<SmsTemplate> {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  // Use raw pool to avoid Drizzle emitting DEFAULT keyword for auto-columns,
-  // which fails on some MySQL versions (e.g., Hostinger shared hosting).
   const pool = await getPool();
+  const ct = contactType ?? "mortgage_prospect";
+  const fd = fromDomain ?? "altamortgagecrm";
   if (createdBy !== undefined) {
     await pool.execute(
-      "INSERT INTO `sms_templates` (`trigger`, `body`, `isActive`, `createdBy`, `emailSubject`) VALUES (?, ?, ?, ?, ?)",
-      [trigger, body, isActive ? 1 : 0, createdBy, emailSubject ?? null],
+      "INSERT INTO `sms_templates` (`trigger`, `contactType`, `fromDomain`, `body`, `isActive`, `createdBy`, `emailSubject`) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [trigger, ct, fd, body, isActive ? 1 : 0, createdBy, emailSubject ?? null],
     );
   } else {
     await pool.execute(
-      "INSERT INTO `sms_templates` (`trigger`, `body`, `isActive`, `emailSubject`) VALUES (?, ?, ?, ?)",
-      [trigger, body, isActive ? 1 : 0, emailSubject ?? null],
+      "INSERT INTO `sms_templates` (`trigger`, `contactType`, `fromDomain`, `body`, `isActive`, `emailSubject`) VALUES (?, ?, ?, ?, ?, ?)",
+      [trigger, ct, fd, body, isActive ? 1 : 0, emailSubject ?? null],
     );
   }
   const [rows] = await pool.execute(
@@ -1101,10 +1109,15 @@ export async function updateSmsTemplate(
   emailSubject?: string | null,
   sendOffsetMinutes?: number | null,
   smsBody?: string | null,
+  contactType?: string,
+  fromDomain?: string,
 ): Promise<void> {
   const db = await getDb();
   if (!db) return;
-  await db.update(smsTemplates).set({ body, isActive, emailSubject: emailSubject ?? null, sendOffsetMinutes: sendOffsetMinutes ?? null, smsBody: smsBody ?? null, updatedAt: new Date() }).where(eq(smsTemplates.id, id));
+  const updates: Record<string, any> = { body, isActive, emailSubject: emailSubject ?? null, sendOffsetMinutes: sendOffsetMinutes ?? null, smsBody: smsBody ?? null, updatedAt: new Date() };
+  if (contactType) updates.contactType = contactType;
+  if (fromDomain) updates.fromDomain = fromDomain;
+  await db.update(smsTemplates).set(updates).where(eq(smsTemplates.id, id));
 }
 
 export async function deleteSmsTemplate(id: number): Promise<void> {
