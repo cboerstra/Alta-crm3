@@ -423,6 +423,78 @@ async function startServer() {
     }
   });
 
+  // ── Campaign Tracking (open pixel + click redirect + unsubscribe) ───────────
+  app.get("/api/track/open", async (req, res) => {
+    try {
+      const tid = req.query.tid as string;
+      if (tid) {
+        const { getDb } = await import("../db");
+        const { campaignRecipients, emailCampaigns } = await import("../../drizzle/schema");
+        const { eq, sql } = await import("drizzle-orm");
+        const db = await getDb();
+        const [r] = await db.select().from(campaignRecipients)
+          .where(eq(campaignRecipients.trackingId, tid)).limit(1);
+        if (r && !r.openedAt) {
+          await db.update(campaignRecipients).set({ status: "opened", openedAt: new Date() })
+            .where(eq(campaignRecipients.id, r.id));
+          await db.update(emailCampaigns).set({ totalOpened: sql`totalOpened + 1` })
+            .where(eq(emailCampaigns.id, r.campaignId));
+        }
+      }
+    } catch (e) { console.error("[Track] open error:", e); }
+    const pixel = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
+    res.set({ "Content-Type": "image/gif", "Cache-Control": "no-store" }).end(pixel);
+  });
+
+  app.get("/api/track/click", async (req, res) => {
+    try {
+      const tid = req.query.tid as string;
+      const url = req.query.url as string;
+      if (tid) {
+        const { getDb } = await import("../db");
+        const { campaignRecipients, emailCampaigns } = await import("../../drizzle/schema");
+        const { eq, sql } = await import("drizzle-orm");
+        const db = await getDb();
+        const [r] = await db.select().from(campaignRecipients)
+          .where(eq(campaignRecipients.trackingId, tid)).limit(1);
+        if (r && !r.clickedAt) {
+          await db.update(campaignRecipients).set({ status: "clicked", clickedAt: new Date() })
+            .where(eq(campaignRecipients.id, r.id));
+          await db.update(emailCampaigns).set({ totalClicked: sql`totalClicked + 1` })
+            .where(eq(emailCampaigns.id, r.campaignId));
+        }
+      }
+      if (url) return res.redirect(url);
+    } catch (e) { console.error("[Track] click error:", e); }
+    res.status(400).send("Missing url");
+  });
+
+  app.get("/unsubscribe", async (req, res) => {
+    try {
+      const tid = req.query.tid as string;
+      if (tid) {
+        const { getDb } = await import("../db");
+        const { campaignRecipients, agentContacts, mortgageClients } = await import("../../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        const db = await getDb();
+        const [r] = await db.select().from(campaignRecipients)
+          .where(eq(campaignRecipients.trackingId, tid)).limit(1);
+        if (r) {
+          await db.update(campaignRecipients).set({ status: "unsubscribed" })
+            .where(eq(campaignRecipients.id, r.id));
+          if (r.agentContactId) {
+            await db.update(agentContacts).set({ optedOut: true, optOutDate: new Date() })
+              .where(eq(agentContacts.id, r.agentContactId));
+          } else if (r.mortgageClientId) {
+            await db.update(mortgageClients).set({ optedOut: true, optOutDate: new Date() })
+              .where(eq(mortgageClients.id, r.mortgageClientId));
+          }
+        }
+      }
+    } catch (e) { console.error("[Track] unsubscribe error:", e); }
+    res.send(`<html><body style="font-family:sans-serif;text-align:center;padding:60px"><h2>You have been unsubscribed</h2><p>You will no longer receive emails from us.</p></body></html>`);
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

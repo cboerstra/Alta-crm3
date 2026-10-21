@@ -48,6 +48,7 @@ type FormState = {
   formEnabled: boolean;
   smsConsentEnabled: boolean;
   headScripts: string;
+  pageType: "re_agent" | "past_mortgage" | "prospective_mortgage" | "prospective_re_client";
 };
 
 type MediaSelection = {
@@ -101,6 +102,7 @@ const defaultForm: FormState = {
   formEnabled: true,
   smsConsentEnabled: true,
   headScripts: "",
+  pageType: "prospective_mortgage",
 };
 
 const ALTA_FORM_BLOCK = `<div class="alta-crm-form-shell">
@@ -487,6 +489,7 @@ export default function LandingPages() {
       showOptIn: page.showOptIn ?? true,
       confirmationEmailSubject: page.confirmationEmailSubject || DEFAULT_EMAIL_SUBJECT,
       confirmationEmailBody: page.confirmationEmailBody || DEFAULT_EMAIL_BODY,
+      pageType: page.pageType || "prospective_mortgage",
     });
     setArtworkPreview(page.artworkUrl || null);
     setBackgroundHtmlPreview((page as any).backgroundHtmlUrl || null);
@@ -659,10 +662,12 @@ export default function LandingPages() {
         confirmationEmailBody: form.confirmationEmailBody || undefined,
         formEnabled: form.formEnabled, smsConsentEnabled: form.smsConsentEnabled,
         headScripts: form.headScripts.trim() || null,
+        pageType: form.pageType,
       });
     } else {
       createMutation.mutate({
         title: form.title, slug: form.slug,
+        pageType: form.pageType,
         headline: form.headline || undefined, subheadline: form.subheadline || undefined,
         bodyText: form.bodyText || undefined, ctaText: form.ctaText || undefined,
         campaignTag: form.campaignTag || undefined, sourceTag: form.sourceTag || undefined,
@@ -807,6 +812,24 @@ export default function LandingPages() {
                 {editId && (
                   <p className="text-xs text-muted-foreground -mt-2">Slug is locked after creation to preserve existing links.</p>
                 )}
+                <div>
+                  <Label className="flex items-center">Page Type <RequiredStar /></Label>
+                  <Select value={form.pageType} onValueChange={(v: any) => setForm({ ...form, pageType: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="prospective_mortgage">Prospective Mortgage Client</SelectItem>
+                      <SelectItem value="past_mortgage">Past Mortgage Client</SelectItem>
+                      <SelectItem value="prospective_re_client">Prospective Real Estate Client</SelectItem>
+                      <SelectItem value="re_agent">Real Estate Agent</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {form.pageType === "prospective_mortgage" && "For new mortgage lead capture"}
+                    {form.pageType === "past_mortgage" && "For re-engaging past mortgage clients"}
+                    {form.pageType === "prospective_re_client" && "For home buyers/sellers (direct consumers)"}
+                    {form.pageType === "re_agent" && "For real estate agent referral partnerships"}
+                  </p>
+                </div>
                 <div>
                   <Label className="flex items-center">Headline <RequiredStar /></Label>
                   <Input
@@ -1640,6 +1663,11 @@ export default function LandingPages() {
 
                       {/* Tags row + Lead Count */}
                       <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
+                        {(page as any).pageType && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {(page as any).pageType === "prospective_mortgage" ? "Prosp. Mortgage" : (page as any).pageType === "past_mortgage" ? "Past Mortgage" : (page as any).pageType === "prospective_re_client" ? "Prosp. RE Client" : "RE Agent"}
+                          </Badge>
+                        )}
                         {(page as any).leadCount !== undefined && (
                           <span className="flex items-center gap-1 font-medium text-brand-green">
                             <Users className="h-3 w-3" />

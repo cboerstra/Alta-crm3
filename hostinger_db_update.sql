@@ -315,3 +315,146 @@ SELECT
   IF(COUNT(*) > 0, 'OK', 'MISSING')
 FROM information_schema.TABLES
 WHERE TABLE_SCHEMA = 'u833783884_AltaCRM' AND TABLE_NAME = 'payroll_deposits';
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Agent Campaigns (migration 0023)
+-- ═══════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS `agent_contacts` (
+  `id` int AUTO_INCREMENT PRIMARY KEY,
+  `firstName` varchar(128) NOT NULL,
+  `lastName` varchar(128) NOT NULL,
+  `email` varchar(320) NOT NULL,
+  `phone` varchar(32),
+  `brokerage` varchar(256),
+  `licenseNumber` varchar(64),
+  `city` varchar(128),
+  `state` varchar(2) DEFAULT 'UT',
+  `tags` json,
+  `optedOut` boolean NOT NULL DEFAULT false,
+  `optOutDate` timestamp NULL,
+  `importBatch` varchar(64),
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_agent_email` (`email`),
+  INDEX `idx_agent_brokerage` (`brokerage`),
+  INDEX `idx_agent_opted_out` (`optedOut`)
+);
+
+CREATE TABLE IF NOT EXISTS `email_campaigns` (
+  `id` int AUTO_INCREMENT PRIMARY KEY,
+  `createdBy` int NOT NULL,
+  `name` varchar(256) NOT NULL,
+  `subject` varchar(512) NOT NULL,
+  `bodyHtml` text NOT NULL,
+  `fromName` varchar(128) DEFAULT 'Scott Boerstra',
+  `landingPageId` int,
+  `filterTags` json,
+  `filterBrokerage` varchar(256),
+  `filterCity` varchar(128),
+  `filterState` varchar(2),
+  `batchSize` int NOT NULL DEFAULT 50,
+  `batchDelayMinutes` int NOT NULL DEFAULT 15,
+  `status` enum('draft','scheduled','sending','paused','completed','cancelled') NOT NULL DEFAULT 'draft',
+  `scheduledAt` timestamp NULL,
+  `startedAt` timestamp NULL,
+  `completedAt` timestamp NULL,
+  `totalRecipients` int DEFAULT 0,
+  `totalSent` int DEFAULT 0,
+  `totalOpened` int DEFAULT 0,
+  `totalClicked` int DEFAULT 0,
+  `totalBounced` int DEFAULT 0,
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_campaign_status` (`status`)
+);
+
+CREATE TABLE IF NOT EXISTS `campaign_recipients` (
+  `id` int AUTO_INCREMENT PRIMARY KEY,
+  `campaignId` int NOT NULL,
+  `agentContactId` int NOT NULL,
+  `status` enum('pending','sent','opened','clicked','bounced','unsubscribed') NOT NULL DEFAULT 'pending',
+  `sentAt` timestamp NULL,
+  `openedAt` timestamp NULL,
+  `clickedAt` timestamp NULL,
+  `trackingId` varchar(64),
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_recipient_campaign` (`campaignId`),
+  INDEX `idx_recipient_contact` (`agentContactId`),
+  INDEX `idx_recipient_tracking` (`trackingId`)
+);
+
+ALTER TABLE `landing_pages` ADD COLUMN IF NOT EXISTS `pageType` enum('real_estate_consumer','real_estate_agent','mortgage') NOT NULL DEFAULT 'mortgage' AFTER `slug`;
+
+-- Verify agent campaign tables
+SELECT 'agent_contacts table', IF(COUNT(*) > 0, 'OK', 'MISSING')
+FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = 'u833783884_AltaCRM' AND TABLE_NAME = 'agent_contacts'
+UNION ALL
+SELECT 'email_campaigns table', IF(COUNT(*) > 0, 'OK', 'MISSING')
+FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = 'u833783884_AltaCRM' AND TABLE_NAME = 'email_campaigns'
+UNION ALL
+SELECT 'campaign_recipients table', IF(COUNT(*) > 0, 'OK', 'MISSING')
+FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = 'u833783884_AltaCRM' AND TABLE_NAME = 'campaign_recipients';
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Mortgage Clients (migration 0024)
+-- ═══════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS `mortgage_clients` (
+  `id` int AUTO_INCREMENT PRIMARY KEY,
+  `firstName` varchar(128) NOT NULL,
+  `lastName` varchar(128) NOT NULL,
+  `email` varchar(320) NOT NULL,
+  `phone` varchar(32),
+  `address` varchar(512),
+  `city` varchar(128),
+  `state` varchar(2) DEFAULT 'UT',
+  `zipCode` varchar(10),
+  `loanType` varchar(64),
+  `closingDate` date,
+  `loanAmount` decimal(12,2),
+  `tags` json,
+  `optedOut` boolean NOT NULL DEFAULT false,
+  `optOutDate` timestamp NULL,
+  `importBatch` varchar(64),
+  `notes` text,
+  `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_mc_email` (`email`),
+  INDEX `idx_mc_city` (`city`),
+  INDEX `idx_mc_opted_out` (`optedOut`),
+  INDEX `idx_mc_closing_date` (`closingDate`)
+);
+
+ALTER TABLE `email_campaigns` ADD COLUMN IF NOT EXISTS `audience` enum('agents','mortgage_clients') NOT NULL DEFAULT 'agents' AFTER `createdBy`;
+ALTER TABLE `campaign_recipients` ADD COLUMN IF NOT EXISTS `mortgageClientId` int AFTER `agentContactId`;
+
+-- ============================================================
+-- Migration 0025: Expand campaign audiences and landing page types to 4 categories
+-- ============================================================
+
+-- Update existing audience values to new enum names
+UPDATE `email_campaigns` SET `audience` = 're_agent' WHERE `audience` = 'agents';
+UPDATE `email_campaigns` SET `audience` = 'past_mortgage' WHERE `audience` = 'mortgage_clients';
+ALTER TABLE `email_campaigns` MODIFY COLUMN `audience` enum('re_agent','past_mortgage','prospective_mortgage','prospective_re_client') NOT NULL DEFAULT 're_agent';
+
+-- Update existing pageType values to new enum names
+UPDATE `landing_pages` SET `pageType` = 'prospective_re_client' WHERE `pageType` = 'real_estate_consumer';
+UPDATE `landing_pages` SET `pageType` = 're_agent' WHERE `pageType` = 'real_estate_agent';
+UPDATE `landing_pages` SET `pageType` = 'prospective_mortgage' WHERE `pageType` = 'mortgage';
+ALTER TABLE `landing_pages` MODIFY COLUMN `pageType` enum('re_agent','past_mortgage','prospective_mortgage','prospective_re_client') NOT NULL DEFAULT 'prospective_mortgage';
+
+-- Add leadId column to campaign_recipients for prospective campaigns targeting leads
+ALTER TABLE `campaign_recipients` ADD COLUMN IF NOT EXISTS `leadId` int NULL AFTER `mortgageClientId`;
+CREATE INDEX IF NOT EXISTS `idx_recipient_lead` ON `campaign_recipients` (`leadId`);
+
+-- Verify
+SELECT 'mortgage_clients table', IF(COUNT(*) > 0, 'OK', 'MISSING')
+FROM information_schema.TABLES
+WHERE TABLE_SCHEMA = 'u833783884_AltaCRM' AND TABLE_NAME = 'mortgage_clients';
+
+SELECT 'audience enum updated', `audience` FROM `email_campaigns` LIMIT 1;
+SELECT 'pageType enum updated', `pageType` FROM `landing_pages` LIMIT 1;
