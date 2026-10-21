@@ -67,7 +67,7 @@ export default function AgentContacts() {
 
         const firstName = row.firstname || row.first_name || row.first || "";
         const lastName = row.lastname || row.last_name || row.last || "";
-        const email = row.email || row.email_address || "";
+        const email = row.email || row.email_address || row.member_email || row.memberemail || "";
 
         if (!email) continue;
 
@@ -76,7 +76,7 @@ export default function AgentContacts() {
           lastName: lastName || "",
           email,
           phone: row.phone || row.phone_number || undefined,
-          brokerage: row.brokerage || row.company || row.office || undefined,
+          brokerage: row.brokerage || row.company || row.office || row.office_name || row.officename || undefined,
           licenseNumber: row.license || row.licensenumber || row.license_number || undefined,
           city: row.city || undefined,
           state: row.state || "UT",
@@ -211,7 +211,7 @@ export default function AgentContacts() {
           <DialogContent>
             <DialogHeader><DialogTitle>Import Agent Contacts from CSV</DialogTitle></DialogHeader>
             <p className="text-sm text-muted-foreground">
-              Upload a CSV file with columns: firstName, lastName, email, phone, brokerage, licenseNumber, city, state.
+              Upload a CSV file with columns: First Name, Last Name, Email (or Member E-mail), Phone, Brokerage (or Office Name), License Number, City, State.
               Duplicate emails will be skipped.
             </p>
             <input ref={fileInputRef} type="file" accept=".csv" onChange={handleCsvUpload} className="mt-2" />
