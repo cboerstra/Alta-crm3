@@ -21,6 +21,9 @@ import { userManagementRouter } from "./routers/userManagement";
 import { smsTemplatesRouter } from "./routers/smsTemplates";
 import { applicationsRouter } from "./routers/applications";
 import { payrollRouter } from "./routers/payroll";
+import { agentContactsRouter } from "./routers/agentContacts";
+import { campaignsRouter } from "./routers/campaigns";
+import { mortgageClientsRouter } from "./routers/mortgageClients";
 
 export const appRouter = router({
   system: systemRouter,
@@ -117,6 +120,9 @@ export const appRouter = router({
   smsTemplates: smsTemplatesRouter,
   applications: applicationsRouter,
   payroll: payrollRouter,
+  agentContacts: agentContactsRouter,
+  campaigns: campaignsRouter,
+  mortgageClients: mortgageClientsRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -89,12 +89,111 @@ export const webinarSessions = mysqlTable("webinar_sessions", {
 export type WebinarSession = typeof webinarSessions.$inferSelect;
 export type InsertWebinarSession = typeof webinarSessions.$inferInsert;
 
+// ─── Agent Contacts (uploaded real estate agent database) ────────────────────
+export const agentContacts = mysqlTable("agent_contacts", {
+  id: int("id").autoincrement().primaryKey(),
+  firstName: varchar("firstName", { length: 128 }).notNull(),
+  lastName: varchar("lastName", { length: 128 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 32 }),
+  brokerage: varchar("brokerage", { length: 256 }),
+  licenseNumber: varchar("licenseNumber", { length: 64 }),
+  city: varchar("city", { length: 128 }),
+  state: varchar("state", { length: 2 }).default("UT"),
+  tags: json("tags"),
+  optedOut: boolean("optedOut").default(false).notNull(),
+  optOutDate: timestamp("optOutDate"),
+  importBatch: varchar("importBatch", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type AgentContact = typeof agentContacts.$inferSelect;
+export type InsertAgentContact = typeof agentContacts.$inferInsert;
+
+// ─── Mortgage Clients (past client database for email campaigns) ────────────
+export const mortgageClients = mysqlTable("mortgage_clients", {
+  id: int("id").autoincrement().primaryKey(),
+  firstName: varchar("firstName", { length: 128 }).notNull(),
+  lastName: varchar("lastName", { length: 128 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 32 }),
+  address: varchar("address", { length: 512 }),
+  city: varchar("city", { length: 128 }),
+  state: varchar("state", { length: 2 }).default("UT"),
+  zipCode: varchar("zipCode", { length: 10 }),
+  loanType: varchar("loanType", { length: 64 }),
+  closingDate: date("closingDate"),
+  loanAmount: decimal("loanAmount", { precision: 12, scale: 2 }),
+  tags: json("tags"),
+  optedOut: boolean("optedOut").default(false).notNull(),
+  optOutDate: timestamp("optOutDate"),
+  importBatch: varchar("importBatch", { length: 64 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type MortgageClient = typeof mortgageClients.$inferSelect;
+export type InsertMortgageClient = typeof mortgageClients.$inferInsert;
+
+// ─── Email Campaigns (batch sends to agent contacts or mortgage clients) ────
+export const emailCampaigns = mysqlTable("email_campaigns", {
+  id: int("id").autoincrement().primaryKey(),
+  createdBy: int("createdBy").notNull(),
+  audience: mysqlEnum("audience", ["re_agent", "past_mortgage", "prospective_mortgage", "prospective_re_client"]).default("re_agent").notNull(),
+  name: varchar("name", { length: 256 }).notNull(),
+  subject: varchar("subject", { length: 512 }).notNull(),
+  bodyHtml: text("bodyHtml").notNull(),
+  fromName: varchar("fromName", { length: 128 }).default("Scott Boerstra"),
+  landingPageId: int("landingPageId"),
+  // Filter criteria for selecting recipients
+  filterTags: json("filterTags"),
+  filterBrokerage: varchar("filterBrokerage", { length: 256 }),
+  filterCity: varchar("filterCity", { length: 128 }),
+  filterState: varchar("filterState", { length: 2 }),
+  // Batch settings
+  batchSize: int("batchSize").default(50).notNull(),
+  batchDelayMinutes: int("batchDelayMinutes").default(15).notNull(),
+  // Campaign state
+  status: mysqlEnum("status", ["draft", "scheduled", "sending", "paused", "completed", "cancelled"]).default("draft").notNull(),
+  scheduledAt: timestamp("scheduledAt"),
+  startedAt: timestamp("startedAt"),
+  completedAt: timestamp("completedAt"),
+  totalRecipients: int("totalRecipients").default(0),
+  totalSent: int("totalSent").default(0),
+  totalOpened: int("totalOpened").default(0),
+  totalClicked: int("totalClicked").default(0),
+  totalBounced: int("totalBounced").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type EmailCampaign = typeof emailCampaigns.$inferSelect;
+export type InsertEmailCampaign = typeof emailCampaigns.$inferInsert;
+
+// ─── Campaign Recipients (per-contact send tracking) ─────────────────────────
+export const campaignRecipients = mysqlTable("campaign_recipients", {
+  id: int("id").autoincrement().primaryKey(),
+  campaignId: int("campaignId").notNull(),
+  agentContactId: int("agentContactId"),
+  mortgageClientId: int("mortgageClientId"),
+  leadId: int("leadId"),
+  status: mysqlEnum("status", ["pending", "sent", "opened", "clicked", "bounced", "unsubscribed"]).default("pending").notNull(),
+  sentAt: timestamp("sentAt"),
+  openedAt: timestamp("openedAt"),
+  clickedAt: timestamp("clickedAt"),
+  trackingId: varchar("trackingId", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type CampaignRecipient = typeof campaignRecipients.$inferSelect;
+export type InsertCampaignRecipient = typeof campaignRecipients.$inferInsert;
+
 // ─── Landing Pages ────────────────────────────────────────────────────────────
 export const landingPages = mysqlTable("landing_pages", {
   id: int("id").autoincrement().primaryKey(),
   createdBy: int("createdBy").notNull(),
   title: varchar("title", { length: 512 }).notNull(),
   slug: varchar("slug", { length: 128 }).notNull().unique(),
+  // Page type: what audience this landing page targets
+  pageType: mysqlEnum("pageType", ["re_agent", "past_mortgage", "prospective_mortgage", "prospective_re_client"]).default("prospective_mortgage").notNull(),
   headline: text("headline"),
   subheadline: text("subheadline"),
   ctaText: varchar("ctaText", { length: 256 }),
