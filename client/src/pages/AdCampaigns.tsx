@@ -294,7 +294,7 @@ export default function Campaigns() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Megaphone className="h-6 w-6 text-brand-green" /> Campaigns
+            <Megaphone className="h-6 w-6 text-brand-green" /> Ad Campaigns
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Facebook and Instagram campaigns, their landing pages, and the follow-up they trigger.

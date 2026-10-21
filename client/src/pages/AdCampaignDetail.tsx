@@ -125,7 +125,7 @@ export default function CampaignDetail() {
   return (
     <div className="space-y-6">
       <Button variant="ghost" size="sm" className="-ml-2" onClick={() => navigate("/ad-campaigns")}>
-        <ArrowLeft className="h-4 w-4 mr-1.5" /> Campaigns
+        <ArrowLeft className="h-4 w-4 mr-1.5" /> Ad Campaigns
       </Button>
 
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">

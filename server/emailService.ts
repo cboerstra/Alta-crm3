@@ -32,7 +32,7 @@ const REMINDER_TYPE_TO_TRIGGER: Record<string, string> = {
 /**
  * Retrieve the active Gmail integration.
  */
-async function getGmailCredentials(): Promise<{ gmailAddress: string; appPassword: string } | null> {
+export async function getGmailCredentials(): Promise<{ gmailAddress: string; appPassword: string } | null> {
   const db = await getDb();
   if (!db) return null;
   const rows = await db.select().from(integrations).where(eq(integrations.provider, "gmail")).limit(1);

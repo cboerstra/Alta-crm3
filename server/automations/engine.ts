@@ -196,7 +196,10 @@ async function sendAdHocSms(leadId: number, body: string): Promise<{ ok: boolean
 async function sendAdHocEmail(leadId: number, subject: string, body: string): Promise<{ ok: boolean; detail: string }> {
   const lead = await getLeadById(leadId);
   if (!lead?.email) return { ok: false, detail: "Lead has no email address" };
-  const { sendEmail } = await import("../emailService");
+  const { sendEmail, getGmailCredentials } = await import("../emailService");
+  // sendEmail reports success when Gmail is missing (it only notifies the owner),
+  // which would mark this step "sent" for an email that never left.
+  if (!(await getGmailCredentials())) return { ok: false, detail: "Gmail is not connected" };
   const html = body.includes("<") ? body : `<p>${body.replace(/\n/g, "<br>")}</p>`;
   const sent = await sendEmail({ to: lead.email, subject, body: html });
   if (!sent) return { ok: false, detail: "Email delivery failed" };

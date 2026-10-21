@@ -235,7 +235,7 @@ function DashboardLayoutContent({
 
           <SidebarContent className="gap-0 pt-2">
             {/* Main Navigation */}
-            <SidebarMenu className="px-2 py-1 space-y-0.5">
+            <SidebarMenu className="shrink-0 px-2 py-1 space-y-0.5">
               {mainItems.map((item) => {
                 const isActive = location === item.path;
                 return (
@@ -268,7 +268,7 @@ function DashboardLayoutContent({
                     </p>
                   )}
                 </div>
-                <SidebarMenu className="px-2 py-1 space-y-0.5">
+                <SidebarMenu className="shrink-0 px-2 py-1 space-y-0.5">
                   {adminItems.map((item) => {
                     const isActive = location === item.path;
                     return (
