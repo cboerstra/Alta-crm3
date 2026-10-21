@@ -60,6 +60,9 @@ export const landingPagesRouter = router({
     .input(z.object({
       title: z.string().min(1),
       slug: z.string().min(1).regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with hyphens"),
+      pageType: z.enum(["re_agent", "past_mortgage", "prospective_mortgage", "prospective_re_client"]).default("prospective_mortgage"),
+      purpose: z.enum(["webinar", "advertising"]).default("advertising"),
+      hostSite: z.enum(["altamortgagecrm", "freehomesearchutah"]).default("altamortgagecrm"),
       headline: z.string().optional(),
       subheadline: z.string().optional(),
       bodyText: z.string().optional(),
@@ -71,7 +74,6 @@ export const landingPagesRouter = router({
       accentColor: z.string().optional(),
       textColor: z.string().optional(),
       backgroundHtmlUrl: z.string().optional(),
-      // NEW fields
       enabledFields: z.array(z.string()).optional(),
       optInLabel: z.string().optional(),
       showOptIn: z.boolean().optional(),
@@ -119,6 +121,9 @@ export const landingPagesRouter = router({
       logoSize: z.number().min(20).max(300).optional(),
       logoOnHtmlBackground: z.boolean().optional(),
       formEmbedded: z.boolean().optional(),
+      pageType: z.enum(["re_agent", "past_mortgage", "prospective_mortgage", "prospective_re_client"]).optional(),
+      purpose: z.enum(["webinar", "advertising"]).optional(),
+      hostSite: z.enum(["altamortgagecrm", "freehomesearchutah"]).optional(),
       formEnabled: z.boolean().optional(),
       smsConsentEnabled: z.boolean().optional(),
       headScripts: z.string().max(20000).nullable().optional(),

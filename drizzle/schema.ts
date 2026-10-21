@@ -8,6 +8,7 @@ import {
   boolean,
   decimal,
   json,
+  date,
 } from "drizzle-orm/mysql-core";
 
 // ─── Users ───────────────────────────────────────────────────────────────────
@@ -88,12 +89,115 @@ export const webinarSessions = mysqlTable("webinar_sessions", {
 export type WebinarSession = typeof webinarSessions.$inferSelect;
 export type InsertWebinarSession = typeof webinarSessions.$inferInsert;
 
+// ─── Agent Contacts (uploaded real estate agent database) ────────────────────
+export const agentContacts = mysqlTable("agent_contacts", {
+  id: int("id").autoincrement().primaryKey(),
+  firstName: varchar("firstName", { length: 128 }).notNull(),
+  lastName: varchar("lastName", { length: 128 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 32 }),
+  brokerage: varchar("brokerage", { length: 256 }),
+  licenseNumber: varchar("licenseNumber", { length: 64 }),
+  city: varchar("city", { length: 128 }),
+  state: varchar("state", { length: 2 }).default("UT"),
+  tags: json("tags"),
+  optedOut: boolean("optedOut").default(false).notNull(),
+  optOutDate: timestamp("optOutDate"),
+  importBatch: varchar("importBatch", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type AgentContact = typeof agentContacts.$inferSelect;
+export type InsertAgentContact = typeof agentContacts.$inferInsert;
+
+// ─── Mortgage Clients (past client database for email campaigns) ────────────
+export const mortgageClients = mysqlTable("mortgage_clients", {
+  id: int("id").autoincrement().primaryKey(),
+  firstName: varchar("firstName", { length: 128 }).notNull(),
+  lastName: varchar("lastName", { length: 128 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 32 }),
+  address: varchar("address", { length: 512 }),
+  city: varchar("city", { length: 128 }),
+  state: varchar("state", { length: 2 }).default("UT"),
+  zipCode: varchar("zipCode", { length: 10 }),
+  loanType: varchar("loanType", { length: 64 }),
+  closingDate: date("closingDate"),
+  loanAmount: decimal("loanAmount", { precision: 12, scale: 2 }),
+  tags: json("tags"),
+  optedOut: boolean("optedOut").default(false).notNull(),
+  optOutDate: timestamp("optOutDate"),
+  importBatch: varchar("importBatch", { length: 64 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type MortgageClient = typeof mortgageClients.$inferSelect;
+export type InsertMortgageClient = typeof mortgageClients.$inferInsert;
+
+// ─── Email Campaigns (batch sends to agent contacts or mortgage clients) ────
+export const emailCampaigns = mysqlTable("email_campaigns", {
+  id: int("id").autoincrement().primaryKey(),
+  createdBy: int("createdBy").notNull(),
+  audience: mysqlEnum("audience", ["re_agent", "past_mortgage", "prospective_mortgage", "prospective_re_client"]).default("re_agent").notNull(),
+  name: varchar("name", { length: 256 }).notNull(),
+  subject: varchar("subject", { length: 512 }).notNull(),
+  bodyHtml: text("bodyHtml").notNull(),
+  fromName: varchar("fromName", { length: 128 }).default("Scott Boerstra"),
+  landingPageId: int("landingPageId"),
+  // Filter criteria for selecting recipients
+  filterTags: json("filterTags"),
+  filterBrokerage: varchar("filterBrokerage", { length: 256 }),
+  filterCity: varchar("filterCity", { length: 128 }),
+  filterState: varchar("filterState", { length: 2 }),
+  // Batch settings
+  batchSize: int("batchSize").default(50).notNull(),
+  batchDelayMinutes: int("batchDelayMinutes").default(15).notNull(),
+  // Campaign state
+  status: mysqlEnum("status", ["draft", "scheduled", "sending", "paused", "completed", "cancelled"]).default("draft").notNull(),
+  scheduledAt: timestamp("scheduledAt"),
+  startedAt: timestamp("startedAt"),
+  completedAt: timestamp("completedAt"),
+  totalRecipients: int("totalRecipients").default(0),
+  totalSent: int("totalSent").default(0),
+  totalOpened: int("totalOpened").default(0),
+  totalClicked: int("totalClicked").default(0),
+  totalBounced: int("totalBounced").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type EmailCampaign = typeof emailCampaigns.$inferSelect;
+export type InsertEmailCampaign = typeof emailCampaigns.$inferInsert;
+
+// ─── Campaign Recipients (per-contact send tracking) ─────────────────────────
+export const campaignRecipients = mysqlTable("campaign_recipients", {
+  id: int("id").autoincrement().primaryKey(),
+  campaignId: int("campaignId").notNull(),
+  agentContactId: int("agentContactId"),
+  mortgageClientId: int("mortgageClientId"),
+  leadId: int("leadId"),
+  status: mysqlEnum("status", ["pending", "sent", "opened", "clicked", "bounced", "unsubscribed"]).default("pending").notNull(),
+  sentAt: timestamp("sentAt"),
+  openedAt: timestamp("openedAt"),
+  clickedAt: timestamp("clickedAt"),
+  trackingId: varchar("trackingId", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type CampaignRecipient = typeof campaignRecipients.$inferSelect;
+export type InsertCampaignRecipient = typeof campaignRecipients.$inferInsert;
+
 // ─── Landing Pages ────────────────────────────────────────────────────────────
 export const landingPages = mysqlTable("landing_pages", {
   id: int("id").autoincrement().primaryKey(),
   createdBy: int("createdBy").notNull(),
   title: varchar("title", { length: 512 }).notNull(),
   slug: varchar("slug", { length: 128 }).notNull().unique(),
+  // Page type: what audience this landing page targets
+  pageType: mysqlEnum("pageType", ["re_agent", "past_mortgage", "prospective_mortgage", "prospective_re_client"]).default("prospective_mortgage").notNull(),
+  // Purpose: webinar registration or advertising/lead capture
+  purpose: mysqlEnum("purpose", ["webinar", "advertising"]).default("advertising").notNull(),
+  // Which domain hosts this page
+  hostSite: mysqlEnum("hostSite", ["altamortgagecrm", "freehomesearchutah"]).default("altamortgagecrm").notNull(),
   headline: text("headline"),
   subheadline: text("subheadline"),
   ctaText: varchar("ctaText", { length: 256 }),
@@ -440,13 +544,21 @@ export const smsTemplates = mysqlTable("sms_templates", {
     "under_contract",
     "deal_closed",
   ]).notNull(),
+  contactType: mysqlEnum("contactType", [
+    "re_agent",
+    "re_client",
+    "re_webinar",
+    "mortgage_client",
+    "mortgage_prospect",
+    "mortgage_webinar",
+  ]).default("mortgage_prospect").notNull(),
+  fromDomain: mysqlEnum("fromDomain", [
+    "altamortgagecrm",
+    "freehomesearchutah",
+  ]).default("altamortgagecrm").notNull(),
   body: text("body").notNull(),
-  // Optional email subject line — used when this template is sent as an email (e.g. registered trigger)
   emailSubject: varchar("emailSubject", { length: 512 }),
-  // How many minutes before the webinar to send this reminder (negative = before, null = use default)
-  // e.g. -1440 = 24h before, -60 = 1h before, -10 = 10min before
   sendOffsetMinutes: int("sendOffsetMinutes"),
-  // Optional SMS body for reminder triggers — separate from the email body
   smsBody: text("smsBody"),
   isActive: boolean("isActive").default(true).notNull(),
   createdBy: int("createdBy"),
@@ -745,3 +857,109 @@ export const metaConversionEvents = mysqlTable("meta_conversion_events", {
 
 export type MetaConversionEvent = typeof metaConversionEvents.$inferSelect;
 export type InsertMetaConversionEvent = typeof metaConversionEvents.$inferInsert;
+
+// ─── Payroll: Companies (one per LLC / employer EIN) ─────────────────────────
+export const payrollCompanies = mysqlTable("payroll_companies", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 256 }).notNull(),
+  ein: varchar("ein", { length: 16 }),
+  // How the IRS taxes the LLC — owners can only be on payroll when it is taxed as a corporation
+  taxClassification: mysqlEnum("taxClassification", ["s_corp", "c_corp", "partnership", "disregarded"]).default("s_corp").notNull(),
+  address: varchar("address", { length: 256 }),
+  city: varchar("city", { length: 128 }),
+  state: varchar("state", { length: 2 }).default("UT"),
+  zip: varchar("zip", { length: 10 }),
+  utahWithholdingAccount: varchar("utahWithholdingAccount", { length: 32 }),
+  utahUiAccount: varchar("utahUiAccount", { length: 32 }),
+  // Percent, e.g. 1.200 for 1.2% — DWS mails each employer its rate every December
+  utahUiRate: decimal("utahUiRate", { precision: 6, scale: 3 }).default("1.200").notNull(),
+  depositSchedule: mysqlEnum("depositSchedule", ["monthly", "semiweekly"]).default("monthly").notNull(),
+  utahFilingFrequency: mysqlEnum("utahFilingFrequency", ["monthly", "quarterly", "annual"]).default("quarterly").notNull(),
+  payFrequency: mysqlEnum("payFrequency", ["weekly", "biweekly", "semimonthly", "monthly", "quarterly", "annual"]).default("monthly").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  notes: text("notes"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type PayrollCompany = typeof payrollCompanies.$inferSelect;
+export type InsertPayrollCompany = typeof payrollCompanies.$inferInsert;
+
+// ─── Payroll: People paid by a company (owner, spouse) ───────────────────────
+export const payrollPeople = mysqlTable("payroll_people", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  firstName: varchar("firstName", { length: 128 }).notNull(),
+  lastName: varchar("lastName", { length: 128 }).notNull(),
+  // Only the last four digits are stored; full SSNs are typed straight into the filing sites
+  ssnLast4: varchar("ssnLast4", { length: 4 }),
+  relationship: mysqlEnum("relationship", ["owner", "spouse", "other"]).default("owner").notNull(),
+  // Form W-4
+  filingStatus: mysqlEnum("filingStatus", ["single", "married_joint", "head_of_household"]).default("married_joint").notNull(),
+  multipleJobs: boolean("multipleJobs").default(false).notNull(),
+  dependentsCredit: decimal("dependentsCredit", { precision: 10, scale: 2 }).default("0").notNull(),
+  otherIncome: decimal("otherIncome", { precision: 12, scale: 2 }).default("0").notNull(),
+  deductions: decimal("deductions", { precision: 12, scale: 2 }).default("0").notNull(),
+  extraWithholding: decimal("extraWithholding", { precision: 10, scale: 2 }).default("0").notNull(),
+  futaExempt: boolean("futaExempt").default(false).notNull(),
+  utahUiExempt: boolean("utahUiExempt").default(false).notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type PayrollPerson = typeof payrollPeople.$inferSelect;
+export type InsertPayrollPerson = typeof payrollPeople.$inferInsert;
+
+// ─── Payroll: Paychecks (amounts in cents, taxes frozen when saved) ──────────
+export const payrollPaychecks = mysqlTable("payroll_paychecks", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  personId: int("personId").notNull(),
+  payDate: date("payDate", { mode: "string" }).notNull(),
+  periodStart: date("periodStart", { mode: "string" }),
+  periodEnd: date("periodEnd", { mode: "string" }),
+  grossCents: int("grossCents").notNull(),
+  retirement401kCents: int("retirement401kCents").default(0).notNull(),
+  shareholderHealthCents: int("shareholderHealthCents").default(0).notNull(),
+  federalWagesCents: int("federalWagesCents").notNull(),
+  stateWagesCents: int("stateWagesCents").notNull(),
+  ssWagesCents: int("ssWagesCents").notNull(),
+  medicareWagesCents: int("medicareWagesCents").notNull(),
+  addlMedicareWagesCents: int("addlMedicareWagesCents").default(0).notNull(),
+  futaWagesCents: int("futaWagesCents").notNull(),
+  utahUiWagesCents: int("utahUiWagesCents").notNull(),
+  federalWithholdingCents: int("federalWithholdingCents").notNull(),
+  utahWithholdingCents: int("utahWithholdingCents").notNull(),
+  // True when the withholding was typed in rather than taken from the formula
+  withholdingOverridden: boolean("withholdingOverridden").default(false).notNull(),
+  ssEmployeeCents: int("ssEmployeeCents").notNull(),
+  medicareEmployeeCents: int("medicareEmployeeCents").notNull(),
+  addlMedicareCents: int("addlMedicareCents").default(0).notNull(),
+  ssEmployerCents: int("ssEmployerCents").notNull(),
+  medicareEmployerCents: int("medicareEmployerCents").notNull(),
+  futaCents: int("futaCents").notNull(),
+  utahUiCents: int("utahUiCents").notNull(),
+  netPayCents: int("netPayCents").notNull(),
+  memo: text("memo"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type PayrollPaycheck = typeof payrollPaychecks.$inferSelect;
+export type InsertPayrollPaycheck = typeof payrollPaychecks.$inferInsert;
+
+// ─── Payroll: Tax deposits made (EFTPS, Utah TAP, DWS) ───────────────────────
+export const payrollDeposits = mysqlTable("payroll_deposits", {
+  id: int("id").autoincrement().primaryKey(),
+  companyId: int("companyId").notNull(),
+  agency: mysqlEnum("agency", ["irs_941", "irs_940", "utah_withholding", "utah_ui"]).notNull(),
+  taxYear: int("taxYear").notNull(),
+  quarter: int("quarter"), // null for annual (940)
+  amountCents: int("amountCents").notNull(),
+  depositDate: date("depositDate", { mode: "string" }).notNull(),
+  confirmation: varchar("confirmation", { length: 128 }),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type PayrollDeposit = typeof payrollDeposits.$inferSelect;
+export type InsertPayrollDeposit = typeof payrollDeposits.$inferInsert;

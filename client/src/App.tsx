@@ -33,6 +33,10 @@ import SmsOptIn from "./pages/SmsOptIn";
 import Login from "./pages/Login";
 import Setup from "./pages/Setup";
 import SmsInbox from "./pages/SmsInbox";
+import Payroll from "./pages/Payroll";
+import AgentContacts from "./pages/AgentContacts";
+import Campaigns from "./pages/Campaigns";
+import MortgageClients from "./pages/MortgageClients";
 import { useAuth } from "./_core/hooks/useAuth";
 import { ShieldAlert } from "lucide-react";
 
@@ -88,12 +92,18 @@ function CRMRoutes() {
         <Route path="/deals" component={Deals} />
         <Route path="/revenue" component={Revenue} />
         <Route path="/sms-inbox" component={SmsInbox} />
+        <Route path="/agent-contacts" component={AgentContacts} />
+        <Route path="/campaigns" component={Campaigns} />
+        <Route path="/mortgage-clients" component={MortgageClients} />
         {/* Admin-only routes */}
         <Route path="/users">
           {() => <AdminRoute component={UserManagement} />}
         </Route>
         <Route path="/settings">
           {() => <AdminRoute component={SettingsPage} />}
+        </Route>
+        <Route path="/payroll">
+          {() => <AdminRoute component={Payroll} />}
         </Route>
         <Route component={NotFound} />
       </Switch>

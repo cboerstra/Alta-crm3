@@ -530,3 +530,11 @@
 - [ ] Ensure multiple templates per trigger work correctly
 - [x] Fire both SMS and email simultaneously for all trigger events (new_lead, registered, attended, no_show, consultation_booked, under_contract, deal_closed)
 - [ ] Add text color picker to landing page editor
+
+## Payroll (owner payroll for the Utah LLCs, admin-only)
+- [x] Companies (EIN, tax classification, Utah withholding + DWS accounts, UI rate, deposit schedule) and people (W-4, FUTA/UI exemptions, SSN last 4 only)
+- [x] Paychecks with federal (Pub 15-T) and Utah (Pub 14) withholding suggestions, manual override, FICA/FUTA/UI wage-base caps
+- [x] Tax deposit log (EFTPS, TAP, DWS)
+- [x] Quarterly: Form 941 (+ line 16 / Schedule B), Utah withholding return, DWS Form 3
+- [x] Year-end: Form 940, W-2s / W-3, Utah TC-941R
+- [ ] Add the 2027 tax table to shared/payrollTax.ts each January (federal Pub 15-T, SSA wage base, Utah Pub 14, DWS wage base)
