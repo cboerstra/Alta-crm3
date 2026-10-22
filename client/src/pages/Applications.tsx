@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ReviewStatusBadge } from "@/components/ReviewStatus";
+import { PortalSignInLog } from "@/components/PortalSignInLog";
 import { AlertCircle, ChevronLeft, ChevronRight, FileText, Search } from "lucide-react";
 
 const STEP_LABELS = [
@@ -272,9 +273,18 @@ export default function Applications() {
           <TabsList>
             <TabsTrigger value="submitted">Submitted</TabsTrigger>
             <TabsTrigger value="drafts">In progress</TabsTrigger>
+            <TabsTrigger value="portal">Portal sign-ins</TabsTrigger>
           </TabsList>
           <TabsContent value="submitted" className="mt-4"><SubmittedTab /></TabsContent>
           <TabsContent value="drafts" className="mt-4"><DraftsTab /></TabsContent>
+          <TabsContent value="portal" className="mt-4">
+            <PortalSignInLog
+              title="Recent portal sign-in attempts"
+              description="Every request for a document-portal sign-in code, and what happened to it. A borrower who says they never got a code will be here — including one who used a different email than their application, which no application page can show."
+              limit={50}
+              allowProblemsFilter
+            />
+          </TabsContent>
         </Tabs>
       )}
     </div>

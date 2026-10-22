@@ -16,6 +16,7 @@ import {
   listApplicationDocuments,
   listApplications,
   listDrafts,
+  listPortalLoginEvents,
   regenerateMismo,
   REVIEW_STATUSES,
   updateApplicationData,
@@ -163,6 +164,44 @@ export const applicationsRouter = router({
       try {
         return await listDrafts({ page: input?.page });
       } catch (err) {
+        throw toTrpcError(err);
+      }
+    }),
+
+  /**
+   * Borrower-portal sign-in attempts and what each one actually did. The
+   * website tells every borrower "a code is on its way" whatever happened;
+   * this is how a loan officer finds out whether one was sent.
+   */
+  portalLoginEvents: protectedProcedure
+    .input(
+      z
+        .object({
+          email: z.string().trim().max(255).optional(),
+          limit: z.number().int().min(1).max(200).optional(),
+          problemsOnly: z.boolean().optional(),
+        })
+        .optional()
+    )
+    .query(async ({ input }) => {
+      try {
+        return await listPortalLoginEvents({
+          email: input?.email || undefined,
+          limit: input?.limit,
+          problemsOnly: input?.problemsOnly,
+        });
+      } catch (err) {
+        // The CRM and the website deploy separately. A 404 here means the
+        // website predates sign-in logging, which is worth saying plainly
+        // rather than reporting as a missing application.
+        if (err instanceof WebsiteApiError && err.status === 404) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message:
+              "The website has not been updated with portal sign-in logging yet. " +
+              "Deploy the website update, then run its portal_login_events schema block.",
+          });
+        }
         throw toTrpcError(err);
       }
     }),

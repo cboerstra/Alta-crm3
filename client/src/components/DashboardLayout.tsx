@@ -40,6 +40,9 @@ import {
   Shield,
   MessageSquare,
   ClipboardList,
+  Megaphone,
+  LayoutTemplate,
+  Workflow,
   Landmark,
   Contact,
   Mail,
@@ -66,6 +69,10 @@ const menuItems: MenuItem[] = [
   { icon: Columns3, label: "Pipeline", path: "/pipeline", section: "main" },
   { icon: Video, label: "Webinars", path: "/webinars", section: "main" },
   { icon: FileText, label: "Landing Pages", path: "/landing-pages", section: "main" },
+  { icon: Megaphone, label: "Ad Campaigns", path: "/ad-campaigns", section: "main" },
+  { icon: LayoutTemplate, label: "Page Templates", path: "/templates", section: "main" },
+  { icon: Workflow, label: "Automations", path: "/automations", section: "main" },
+  { icon: BarChart3, label: "Marketing", path: "/marketing", section: "main" },
   { icon: Calendar, label: "Scheduling", path: "/scheduling", section: "main" },
   { icon: DollarSign, label: "Deals", path: "/deals", section: "main" },
   { icon: BarChart3, label: "Revenue", path: "/revenue", section: "main" },
@@ -228,7 +235,7 @@ function DashboardLayoutContent({
 
           <SidebarContent className="gap-0 pt-2">
             {/* Main Navigation */}
-            <SidebarMenu className="px-2 py-1 space-y-0.5">
+            <SidebarMenu className="shrink-0 px-2 py-1 space-y-0.5">
               {mainItems.map((item) => {
                 const isActive = location === item.path;
                 return (
@@ -261,7 +268,7 @@ function DashboardLayoutContent({
                     </p>
                   )}
                 </div>
-                <SidebarMenu className="px-2 py-1 space-y-0.5">
+                <SidebarMenu className="shrink-0 px-2 py-1 space-y-0.5">
                   {adminItems.map((item) => {
                     const isActive = location === item.path;
                     return (

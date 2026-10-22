@@ -31,6 +31,7 @@ warn_missing WEBSITE_API_KEY        "the website cannot post leads without it"
 warn_missing WEBSITE_ORIGIN         "CORS falls back to allowing any origin"
 warn_missing WEBSITE_STAFF_API_URL  "the Applications page will show 'not connected'"
 warn_missing WEBSITE_STAFF_API_KEY  "the Applications page will show 'not connected'"
+warn_missing PUBLIC_BASE_URL        "ad campaigns cannot be published to Meta without it"
 
 # --- Code -------------------------------------------------------------------
 echo "==> Pulling latest main"

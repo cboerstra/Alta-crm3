@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { Link as RouteLink, useLocation, useParams } from "wouter";
 import {
   ArrowLeft, Mail, Phone, MapPin, Calendar, MessageSquare, Send,
@@ -217,6 +218,8 @@ export default function LeadProfile() {
               </div>
             </CardContent>
           </Card>
+
+          <AttributionCard lead={lead} />
         </div>
 
         {/* Right: Tabs */}
@@ -466,6 +469,90 @@ function RemindersList({ leadId }: { leadId: number }) {
           </div>
         ) : (
           <p className="text-sm text-muted-foreground text-center py-8">No reminders scheduled</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Where this lead came from.
+ *
+ * Shown on every lead, not just paid ones, because "direct / none" is itself an
+ * answer. The Meta ad hierarchy is spelled out in full — six months from now,
+ * when the ad is long gone from Ads Manager, these ids are the only record of
+ * which creative produced the loan.
+ */
+function AttributionCard({ lead }: { lead: any }) {
+  const hasPaidAttribution =
+    lead.utmSource || lead.utmCampaign || lead.metaAdId || lead.fbclid || lead.gclid;
+
+  const rows: Array<[string, string | null | undefined]> = [
+    ["Source", lead.utmSource ?? lead.source],
+    ["Medium", lead.utmMedium],
+    ["Campaign", lead.utmCampaign ?? lead.campaign],
+    ["Content", lead.utmContent],
+    ["Term", lead.utmTerm],
+  ];
+
+  const metaRows: Array<[string, string | null | undefined]> = [
+    ["Meta campaign", lead.metaCampaignName ?? lead.metaCampaignId],
+    ["Ad set", lead.metaAdsetName ?? lead.metaAdsetId],
+    ["Ad", lead.metaAdName ?? lead.metaAdId],
+    ["Placement", lead.metaPlacement],
+  ];
+
+  return (
+    <Card className="border-0 shadow-sm mt-4">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Attribution
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-4 pt-0 space-y-3">
+        {!hasPaidAttribution ? (
+          <p className="text-sm text-muted-foreground">
+            No campaign data — this lead arrived directly or before tracking was switched on.
+          </p>
+        ) : null}
+
+        <div className="space-y-1.5">
+          {rows.filter(([, value]) => value).map(([label, value]) => (
+            <div key={label} className="flex items-start justify-between gap-3 text-sm">
+              <span className="text-muted-foreground shrink-0">{label}</span>
+              <span className="font-medium text-right break-all">{value}</span>
+            </div>
+          ))}
+        </div>
+
+        {metaRows.some(([, value]) => value) && (
+          <>
+            <Separator />
+            <div className="space-y-1.5">
+              {metaRows.filter(([, value]) => value).map(([label, value]) => (
+                <div key={label} className="flex items-start justify-between gap-3 text-sm">
+                  <span className="text-muted-foreground shrink-0">{label}</span>
+                  <span className="font-medium text-right break-all">{value}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {lead.landingUrl && (
+          <>
+            <Separator />
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Landed on</p>
+              <p className="text-xs break-all">{lead.landingUrl}</p>
+            </div>
+          </>
+        )}
+
+        {lead.attributionCapturedAt && (
+          <p className="text-xs text-muted-foreground">
+            Captured {new Date(lead.attributionCapturedAt).toLocaleString()}
+          </p>
         )}
       </CardContent>
     </Card>

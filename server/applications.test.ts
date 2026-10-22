@@ -164,6 +164,69 @@ describe("applications router", () => {
     expect(init.method).toBe("POST");
   });
 
+  it("reads portal sign-in attempts with the filters passed through", async () => {
+    configure();
+    const events = [
+      { id: 3, email: "dana@example.test", outcome: "no_match", detail: "no application or draft uses this email", createdAt: "2026-10-02T12:00:00.000Z" },
+    ];
+    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(200, { events }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const caller = appRouter.createCaller(ctx(mockUser()));
+    expect(await caller.applications.portalLoginEvents({ email: "Dana@Example.test", limit: 10, problemsOnly: true })).toEqual({ events });
+
+    const [url, init] = fetchSpy.mock.calls[0] as [URL, RequestInit];
+    expect(url.pathname).toBe("/api/staff/portal/login-events");
+    expect(url.searchParams.get("email")).toBe("Dana@Example.test");
+    expect(url.searchParams.get("limit")).toBe("10");
+    expect(url.searchParams.get("problemsOnly")).toBe("1");
+    expect(init.method ?? "GET").toBe("GET");
+  });
+
+  it("omits filters that were not asked for", async () => {
+    configure();
+    const fetchSpy = vi.fn().mockResolvedValue(jsonResponse(200, { events: [] }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const caller = appRouter.createCaller(ctx(mockUser()));
+    await caller.applications.portalLoginEvents();
+
+    const [url] = fetchSpy.mock.calls[0] as [URL, RequestInit];
+    expect(url.searchParams.has("email")).toBe(false);
+    expect(url.searchParams.has("problemsOnly")).toBe(false);
+  });
+
+  it("explains a website that predates sign-in logging instead of reporting NOT_FOUND", async () => {
+    // The CRM and website deploy separately; the CRM may get there first.
+    configure();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(404, { error: "Not found" })));
+    const caller = appRouter.createCaller(ctx(mockUser()));
+    await expect(caller.applications.portalLoginEvents()).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
+      message: expect.stringContaining("not been updated with portal sign-in logging"),
+    });
+  });
+
+  it("passes the website's own instruction through when its log table is missing", async () => {
+    configure();
+    const instruction = "Run the portal_login_events block of db/schema.sql against the website's database.";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(503, { error: instruction })));
+    const caller = appRouter.createCaller(ctx(mockUser()));
+    await expect(caller.applications.portalLoginEvents()).rejects.toMatchObject({
+      code: "SERVICE_UNAVAILABLE",
+      message: instruction,
+    });
+  });
+
+  it("refuses portal sign-in attempts to a signed-out user without calling the website", async () => {
+    configure();
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const caller = appRouter.createCaller(ctx(null));
+    await expect(caller.applications.portalLoginEvents()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("maps a delete of a missing application to NOT_FOUND", async () => {
     configure();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(404, { error: "Not found" })));
