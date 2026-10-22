@@ -95,6 +95,15 @@ const EMBEDDED_FORM_RESET_CSS = `
     text-align: left !important;
     text-transform: uppercase !important;
   }
+  /* The consent checkboxes' labels are sentences, not field names. */
+  .${EMBEDDED_FORM_CLASS} label[for="sms-consent"],
+  .${EMBEDDED_FORM_CLASS} label[for="contact-optin"] {
+    font-size: 0.75rem !important;
+    font-weight: 400 !important;
+    letter-spacing: 0 !important;
+    line-height: 1.625 !important;
+    text-transform: none !important;
+  }
   .${EMBEDDED_FORM_CLASS} input {
     background: rgba(249, 250, 251, 0.8) !important;
     border: 1px solid #e5e7eb !important;
@@ -355,6 +364,11 @@ export default function PublicLandingPage() {
   // An uploaded HTML page with the form switched off is rendered inline, as-is,
   // rather than as a pointer-events-none iframe behind a floating card.
   const renderHtmlInline = hasHtmlBackground && (formEmbedded || !formEnabled);
+  // Otherwise the uploaded HTML sits behind a floating form card. It is drawn
+  // into this document too, not into an <iframe>: iOS Safari lays an iframe out
+  // at its own width instead of the phone's, so the page's mobile media
+  // queries never fire and the desktop layout is crushed onto the screen.
+  const htmlBehindCard = hasHtmlBackground && !renderHtmlInline;
   // logoOnBackground only applies in non-embedded mode (embedded mode has the logo inside the form card in the HTML)
   const logoOnBackground = !!(page as any)?.logoOnHtmlBackground && hasHtmlBackground && !formEmbedded;
 
@@ -391,14 +405,14 @@ export default function PublicLandingPage() {
 
   // ─── Fetch HTML for embedded mode ───
   useEffect(() => {
-    if (!renderHtmlInline) { setFetchedHtml(null); setFormMountPoint(null); return; }
+    if (!hasHtmlBackground) { setFetchedHtml(null); setFormMountPoint(null); return; }
     const url = (page as any)?.backgroundHtmlUrl as string;
     if (!url) return;
     fetch(url)
       .then(r => r.text())
       .then(html => setFetchedHtml(html))
       .catch(() => setFetchedHtml(""));
-  }, [renderHtmlInline, (page as any)?.backgroundHtmlUrl]);
+  }, [hasHtmlBackground, (page as any)?.backgroundHtmlUrl]);
 
   // ─── Render uploaded HTML body and locate form mount point ───
   useEffect(() => {
@@ -407,8 +421,9 @@ export default function PublicLandingPage() {
     const baseUrl = new URL((page as any)?.backgroundHtmlUrl || window.location.href, window.location.origin).toString();
     const placeholder = '<div id="alta-crm-form-mount"></div>';
     let modified: string;
-    if (!formEnabled) {
-      // Form is off: publish the HTML as uploaded, dropping any placeholder.
+    if (!formEnabled || htmlBehindCard) {
+      // No form inside the HTML (it is off, or it floats above the page as a
+      // card): publish the HTML as uploaded, dropping any placeholder.
       modified = fetchedHtml.replace(/\{\{alta_form\}\}/g, "");
     } else {
       modified = fetchedHtml.includes("{{alta_form}}")
@@ -444,7 +459,7 @@ export default function PublicLandingPage() {
 
     runScripts(container, baseUrl);
 
-    const mountEl = container.querySelector("#alta-crm-form-mount") as HTMLElement | null;
+    const mountEl = htmlBehindCard ? null : (container.querySelector("#alta-crm-form-mount") as HTMLElement | null);
     setFormMountPoint(mountEl);
 
     return () => {
@@ -454,7 +469,7 @@ export default function PublicLandingPage() {
       container.innerHTML = "";
       setFormMountPoint(null);
     };
-  }, [fetchedHtml, foregroundLogos, logoSize, formEnabled, (page as any)?.backgroundHtmlUrl]);
+  }, [fetchedHtml, foregroundLogos, logoSize, formEnabled, htmlBehindCard, (page as any)?.backgroundHtmlUrl]);
 
   if (pageLoading) {
     return (
@@ -684,9 +699,9 @@ export default function PublicLandingPage() {
   return (
     <div className="min-h-screen relative">
       {/* ─── Full-bleed background ─── */}
-      {hasHtmlBackground && (
-        <div className="fixed inset-0 z-0">
-          <iframe src={(page as any).backgroundHtmlUrl} title="" aria-hidden="true" tabIndex={-1} className="h-full w-full border-0 pointer-events-none" />
+      {htmlBehindCard && (
+        <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none" aria-hidden="true">
+          <div ref={htmlContainerRef} className="w-full min-h-screen" />
         </div>
       )}
       {hasImageBackground && (
@@ -731,9 +746,10 @@ export default function PublicLandingPage() {
           </div>
         )}
 
-        {/* Registration form card */}
+        {/* Registration form card. Over uploaded HTML, the page's own CSS is
+            global, so the card gets the same reset as an embedded form. */}
         {formEnabled && (
-        <div className="w-full max-w-md">
+        <div className={`w-full max-w-md ${htmlBehindCard ? EMBEDDED_FORM_CLASS : ""}`}>
           {/* When logo is shown on the background, hide it inside the card to avoid duplication */}
           {logoOnBackground && foregroundLogos.length > 0
             ? (() => {
