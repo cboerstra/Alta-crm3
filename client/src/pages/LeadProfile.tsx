@@ -17,6 +17,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { toast } from "sonner";
+import { TextButton } from "@/components/TextButton";
 
 const stageColors: Record<string, string> = {
   new_lead: "bg-blue-100 text-blue-700",
@@ -152,6 +153,7 @@ export default function LeadProfile() {
                 {lead.phone && (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Phone className="h-4 w-4" /> {lead.phone}
+                    <TextButton phone={lead.phone} firstName={lead.firstName} />
                   </div>
                 )}
                 {lead.source && (

@@ -24,6 +24,7 @@ import { PortalSignInLog } from "@/components/PortalSignInLog";
 import { ApplicationEditDialog } from "@/components/ApplicationEditDialog";
 import { REVIEW_LABELS, ReviewStatusBadge, type ReviewStatus } from "@/components/ReviewStatus";
 import { AlertCircle, ArrowLeft, Download, FileText, RefreshCw, Trash2 } from "lucide-react";
+import { TextButton } from "@/components/TextButton";
 
 function when(iso: string): string {
   const d = new Date(iso);
@@ -309,7 +310,12 @@ export default function ApplicationDetail() {
               <CardHeader className="pb-2"><CardTitle className="text-base">Contact</CardTitle></CardHeader>
               <CardContent className="space-y-1 text-sm">
                 <div><a className="text-primary hover:underline" href={`mailto:${app.email}`}>{app.email}</a></div>
-                {app.phone && <div><a className="text-primary hover:underline" href={`tel:${app.phone}`}>{app.phone}</a></div>}
+                {app.phone && (
+                  <div className="flex items-center gap-2">
+                    <a className="text-primary hover:underline" href={`tel:${app.phone}`}>{app.phone}</a>
+                    <TextButton phone={app.phone} firstName={app.firstName} />
+                  </div>
+                )}
                 {app.ssnLast4 && <div className="text-muted-foreground">SSN ending {app.ssnLast4}</div>}
               </CardContent>
             </Card>
