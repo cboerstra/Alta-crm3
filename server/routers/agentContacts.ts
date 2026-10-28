@@ -2,7 +2,19 @@ import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { agentContacts } from "../../drizzle/schema";
-import { eq, like, or, and, desc, sql } from "drizzle-orm";
+import { eq, like, or, and, desc, sql, inArray } from "drizzle-orm";
+import { cleanTag } from "@shared/csv";
+
+/** Stored tags as a clean array, whatever shape the JSON column returns. */
+function tagList(value: unknown): string[] {
+  let v = value;
+  if (typeof v === "string") {
+    try { v = JSON.parse(v); } catch { return []; }
+  }
+  return Array.isArray(v) ? v.filter((t): t is string => typeof t === "string") : [];
+}
+
+const tagSchema = z.string().transform(cleanTag).pipe(z.string().min(1, "Tag is empty"));
 
 export const agentContactsRouter = router({
   list: protectedProcedure
@@ -93,12 +105,52 @@ export const agentContactsRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       const { id, ...data } = input;
-      if (data.optedOut === true) {
-        (data as any).optOutDate = new Date();
+      if (data.optedOut !== undefined) {
+        // Opting back in clears the date, so "opted out on" never outlives the opt-out.
+        (data as any).optOutDate = data.optedOut ? new Date() : null;
       }
+      if (data.tags) data.tags = Array.from(new Set(data.tags.map(cleanTag).filter(Boolean)));
       await db.update(agentContacts).set(data).where(eq(agentContacts.id, id));
       return { success: true };
     }),
+
+  /** Tag, untag, or opt in/out several contacts at once. */
+  bulkUpdate: protectedProcedure
+    .input(z.object({
+      ids: z.array(z.number()).min(1).max(5000),
+      addTag: tagSchema.optional(),
+      removeTag: tagSchema.optional(),
+      optedOut: z.boolean().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (input.optedOut !== undefined) {
+        await db.update(agentContacts)
+          .set({ optedOut: input.optedOut, optOutDate: input.optedOut ? new Date() : null })
+          .where(inArray(agentContacts.id, input.ids));
+      }
+      if (input.addTag || input.removeTag) {
+        const rows = await db.select({ id: agentContacts.id, tags: agentContacts.tags })
+          .from(agentContacts).where(inArray(agentContacts.id, input.ids));
+        for (const row of rows) {
+          let tags = tagList(row.tags);
+          if (input.addTag && !tags.includes(input.addTag)) tags = [...tags, input.addTag];
+          if (input.removeTag) tags = tags.filter((t) => t !== input.removeTag);
+          await db.update(agentContacts).set({ tags }).where(eq(agentContacts.id, row.id));
+        }
+      }
+      return { updated: input.ids.length };
+    }),
+
+  /** Every tag in use, with how many contacts carry it. */
+  tags: protectedProcedure.query(async () => {
+    const db = await getDb();
+    const rows = await db.select({ tags: agentContacts.tags }).from(agentContacts)
+      .where(sql`${agentContacts.tags} IS NOT NULL`);
+    const counts = new Map<string, number>();
+    for (const row of rows) for (const tag of tagList(row.tags)) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    return Array.from(counts, ([tag, count]) => ({ tag, count })).sort((a, b) => a.tag.localeCompare(b.tag));
+  }),
 
   delete: protectedProcedure
     .input(z.object({ ids: z.array(z.number()).min(1) }))
@@ -124,34 +176,46 @@ export const agentContactsRouter = router({
         tags: z.array(z.string()).optional(),
       })),
       batchLabel: z.string().optional(),
+      /** Applied to every contact in the file, including ones already on the list. */
+      tag: tagSchema.optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      const batchId = input.batchLabel || `import_${Date.now()}`;
+      const batchId = (input.batchLabel || `import_${Date.now()}`).slice(0, 64);
       let imported = 0;
       let skipped = 0;
+      let tagged = 0;
 
       for (const contact of input.contacts) {
-        const existing = await db.select({ id: agentContacts.id })
+        const existing = await db.select({ id: agentContacts.id, tags: agentContacts.tags })
           .from(agentContacts)
           .where(eq(agentContacts.email, contact.email))
           .limit(1);
 
         if (existing.length > 0) {
           skipped++;
+          // Already on the list: leave their details alone, but do mark them,
+          // or tagging an import would silently miss everyone you already had.
+          const tags = tagList(existing[0].tags);
+          if (input.tag && !tags.includes(input.tag)) {
+            await db.update(agentContacts).set({ tags: [...tags, input.tag] })
+              .where(eq(agentContacts.id, existing[0].id));
+            tagged++;
+          }
           continue;
         }
 
+        const tags = Array.from(new Set([...(contact.tags ?? []).map(cleanTag), ...(input.tag ? [input.tag] : [])])).filter(Boolean);
         await db.insert(agentContacts).values({
           ...contact,
           state: contact.state || "UT",
-          tags: contact.tags ?? [],
+          tags,
           importBatch: batchId,
         });
         imported++;
       }
 
-      return { imported, skipped, batchId };
+      return { imported, skipped, tagged, batchId };
     }),
 
   brokerages: protectedProcedure.query(async () => {

@@ -16,6 +16,7 @@ export interface SendEmailOptions {
   html: string;
   text?: string;
   attachmentUrl?: string; // public URL or /uploads/... path to attach as PDF
+  headers?: Record<string, string>;
 }
 
 /** Build a transporter for the given Gmail credentials. */
@@ -100,6 +101,7 @@ export async function sendEmail(
     subject: opts.subject,
     html: opts.html,
     text: opts.text ?? opts.html.replace(/<[^>]+>/g, ""),
+    headers: opts.headers,
   };
 
   // Attach PDF
