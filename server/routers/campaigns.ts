@@ -35,7 +35,11 @@ function footerLines(audience: string): string[] {
   const override = realEstate ? process.env.MAILING_ADDRESS_REAL_ESTATE : process.env.MAILING_ADDRESS_MORTGAGE;
   if (override?.trim()) return override.split("|").map((line) => line.trim()).filter(Boolean);
   return realEstate
-    ? ["Equity Real Estate - Clarke and Associates", "4824 S 6150 W, Hooper, UT 84315", "License: 5452345-SA00"]
+    ? [
+        "Equity Real Estate - Clarke and Associates",
+        "4824 S 6150 W, Hooper, UT 84315",
+        "Office License: 5498127-CN00 · Agent License: 5452345-SA00",
+      ]
     : ["Clarke and Associates dba Alta Mortgage Group", "4824 S 6150 W, Hooper, UT 84315"];
 }
 
