@@ -24,10 +24,17 @@ let activeSendJob: { campaignId: number; abort: boolean } | null = null;
  * campaign_recipients rows. Without this, a lead who unsubscribed from one
  * campaign was picked again for the next.
  */
-/** Shown in every campaign footer. Set MAILING_ADDRESS in .env to change it. */
-const MAILING_ADDRESS =
-  process.env.MAILING_ADDRESS?.trim() ||
-  "Clarke and Associates dba Alta Mortgage Group · 4824 S 6150 W, Hooper, UT 84315";
+/**
+ * The sender named in each campaign's footer, by which business is writing:
+ * Equity Real Estate to agents and real-estate prospects, Alta Mortgage
+ * Group to mortgage clients and prospects. Override either in .env.
+ */
+function mailingAddress(audience: string): string {
+  const realEstate = audience === "re_agent" || audience === "prospective_re_client";
+  return realEstate
+    ? process.env.MAILING_ADDRESS_REAL_ESTATE?.trim() || "Equity Real Estate · 4824 S 6150 W, Hooper, UT 84315"
+    : process.env.MAILING_ADDRESS_MORTGAGE?.trim() || "Clarke and Associates dba Alta Mortgage Group · 4824 S 6150 W, Hooper, UT 84315";
+}
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -433,7 +440,7 @@ async function sendBatches(campaignId: number, batchSize: number, delayMinutes: 
           const unsubLink = `${baseUrl}/unsubscribe?tid=${recipient.trackingId}`;
           // CAN-SPAM: every commercial email needs a working opt-out and the
           // sender's postal address.
-          html += `<p style="font-size:11px;color:#999;margin-top:30px;">If you no longer wish to receive these emails, <a href="${unsubLink}">unsubscribe here</a>.<br>${escapeHtml(MAILING_ADDRESS)}</p>`;
+          html += `<p style="font-size:11px;color:#999;margin-top:30px;">If you no longer wish to receive these emails, <a href="${unsubLink}">unsubscribe here</a>.<br>${escapeHtml(mailingAddress(campaign.audience))}</p>`;
 
           await sendGmailEmail(creds.gmailAddress, creds.appPassword, {
             from: `${campaign.fromName || "Scott Boerstra"} <${creds.gmailAddress}>`,
