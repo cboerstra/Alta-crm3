@@ -2,6 +2,7 @@ import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { unsubscribeByTrackingId } from "../unsubscribe";
+import { bulkUsage, estimateFinish, getBulkEmailSettings, getBulkSender, isUsable, remainingToday, usesBulkSender } from "../bulkEmail";
 import { emailCampaigns, campaignRecipients, agentContacts, mortgageClients, leads, integrations } from "../../drizzle/schema";
 import { eq, and, like, or, sql, desc, inArray } from "drizzle-orm";
 import { sendEmail as sendGmailEmail } from "../email";
@@ -85,7 +86,26 @@ export const campaignsRouter = router({
         stats[r.status as keyof typeof stats]++;
       }
 
-      return { ...rows[0], recipientStats: stats };
+      // Through the bulk sender, a campaign goes out over days: say how far along it is.
+      let pacing: null | {
+        sender: string; dailyLimit: number; sentLast24h: number; remainingToday: number;
+        nextSlotAt: Date | null; estimatedFinish: Date | null;
+      } = null;
+      const bulk = await getBulkEmailSettings();
+      if (usesBulkSender(rows[0].audience) && isUsable(bulk)) {
+        const usage = await bulkUsage();
+        const { remaining, nextSlotAt } = remainingToday(usage, bulk.dailyLimit);
+        pacing = {
+          sender: bulk.fromEmail,
+          dailyLimit: bulk.dailyLimit,
+          sentLast24h: usage.sent,
+          remainingToday: remaining,
+          nextSlotAt,
+          estimatedFinish: estimateFinish(stats.pending, bulk.dailyLimit, remaining),
+        };
+      }
+
+      return { ...rows[0], recipientStats: stats, pacing };
     }),
 
   create: protectedProcedure
@@ -216,8 +236,12 @@ export const campaignsRouter = router({
         throw new Error(`Campaign cannot be sent from status: ${campaign.status}`);
       }
 
-      const creds = await getGmailCredentials();
-      if (!creds) throw new Error("Gmail not configured. Set up Gmail integration first.");
+      // Real-estate campaigns go through the bulk sender when one is set up;
+      // everything else, and real-estate mail without one, through Gmail.
+      if (!(usesBulkSender(campaign.audience) && isUsable(await getBulkEmailSettings()))) {
+        const creds = await getGmailCredentials();
+        if (!creds) throw new Error("Gmail not configured. Set up Gmail integration first.");
+      }
 
       // Resuming a paused campaign carries on with the recipients it still owes.
       // Rebuilding the list here re-sent the email to everyone already reached
@@ -370,13 +394,15 @@ async function sendBatches(campaignId: number, batchSize: number, delayMinutes: 
   const db = await getDb();
   activeSendJob = { campaignId, abort: false };
 
+  let bulk: Awaited<ReturnType<typeof getBulkSender>> = null;
   try {
-    const creds = await getGmailCredentials();
-    if (!creds) throw new Error("Gmail credentials unavailable");
-
     const [campaign] = await db.select().from(emailCampaigns)
       .where(eq(emailCampaigns.id, campaignId)).limit(1);
     if (!campaign) throw new Error("Campaign not found");
+
+    bulk = usesBulkSender(campaign.audience) ? await getBulkSender() : null;
+    const creds = bulk ? null : await getGmailCredentials();
+    if (!bulk && !creds) throw new Error("Gmail credentials unavailable");
 
     const baseUrl = process.env.PUBLIC_URL || "https://altamortgagecrm.net";
 
@@ -389,6 +415,19 @@ async function sendBatches(campaignId: number, batchSize: number, delayMinutes: 
       const [statusCheck] = await db.select({ status: emailCampaigns.status })
         .from(emailCampaigns).where(eq(emailCampaigns.id, campaignId)).limit(1);
       if (statusCheck?.status !== "sending") break;
+
+      // Stay under the relay's daily cap: send what today allows, then wait
+      // for the 24-hour window to free up and carry on.
+      let take = batchSize;
+      if (bulk) {
+        const { remaining, nextSlotAt } = remainingToday(await bulkUsage(), bulk.dailyLimit);
+        if (remaining === 0 && nextSlotAt) {
+          console.log(`[Campaign ${campaignId}] Daily limit of ${bulk.dailyLimit} reached; resuming at ${nextSlotAt.toISOString()}`);
+          if (!(await waitUntil(nextSlotAt, campaignId))) break;
+          continue;
+        }
+        take = Math.min(batchSize, remaining);
+      }
 
       let batch: { id: number; trackingId: string | null; email: string; firstName: string; lastName: string }[];
       const pendingWhere = and(
@@ -403,21 +442,21 @@ async function sendBatches(campaignId: number, batchSize: number, delayMinutes: 
         }).from(campaignRecipients)
           .innerJoin(agentContacts, eq(campaignRecipients.agentContactId, agentContacts.id))
           // Re-checked every batch: someone who opts out mid-campaign gets nothing more.
-          .where(and(pendingWhere, eq(agentContacts.optedOut, false))).limit(batchSize);
+          .where(and(pendingWhere, eq(agentContacts.optedOut, false))).limit(take);
       } else if (campaign.audience === "past_mortgage") {
         batch = await db.select({
           id: campaignRecipients.id, trackingId: campaignRecipients.trackingId,
           email: mortgageClients.email, firstName: mortgageClients.firstName, lastName: mortgageClients.lastName,
         }).from(campaignRecipients)
           .innerJoin(mortgageClients, eq(campaignRecipients.mortgageClientId, mortgageClients.id))
-          .where(and(pendingWhere, eq(mortgageClients.optedOut, false))).limit(batchSize);
+          .where(and(pendingWhere, eq(mortgageClients.optedOut, false))).limit(take);
       } else {
         batch = await db.select({
           id: campaignRecipients.id, trackingId: campaignRecipients.trackingId,
           email: leads.email, firstName: leads.firstName, lastName: leads.lastName,
         }).from(campaignRecipients)
           .innerJoin(leads, eq(campaignRecipients.leadId, leads.id))
-          .where(and(pendingWhere, leadNotUnsubscribed)).limit(batchSize);
+          .where(and(pendingWhere, leadNotUnsubscribed)).limit(take);
       }
 
       if (batch.length === 0) {
@@ -435,11 +474,14 @@ async function sendBatches(campaignId: number, batchSize: number, delayMinutes: 
         if (activeSendJob?.abort) break;
 
         try {
-          let html = campaign.bodyHtml;
-          html = html.replace(/\{\{first_name\}\}/g, recipient.firstName || "");
-          html = html.replace(/\{\{last_name\}\}/g, recipient.lastName || "");
-          html = html.replace(/\{\{full_name\}\}/g,
-            [recipient.firstName, recipient.lastName].filter(Boolean).join(" ") || "");
+          // Same placeholders in the subject as the body: subjects went out
+          // reading "Hello {{first_name}}".
+          const personalize = (text: string) => text
+            .replace(/\{\{first_name\}\}/g, recipient.firstName || "")
+            .replace(/\{\{last_name\}\}/g, recipient.lastName || "")
+            .replace(/\{\{full_name\}\}/g, [recipient.firstName, recipient.lastName].filter(Boolean).join(" ") || "");
+          let html = personalize(campaign.bodyHtml);
+          const subject = personalize(campaign.subject).replace(/\s+/g, " ").trim();
 
           const trackPixel = `<img src="${baseUrl}/api/track/open?tid=${recipient.trackingId}" width="1" height="1" style="display:none" alt="" />`;
           html += trackPixel;
@@ -449,18 +491,32 @@ async function sendBatches(campaignId: number, batchSize: number, delayMinutes: 
           // sender's postal address.
           html += `<p style="font-size:11px;color:#999;margin-top:30px;">If you no longer wish to receive these emails, <a href="${unsubLink}">unsubscribe here</a>.<br>${footerLines(campaign.audience).map(escapeHtml).join("<br>")}</p>`;
 
-          await sendGmailEmail(creds.gmailAddress, creds.appPassword, {
-            from: `${campaign.fromName || "Scott Boerstra"} <${creds.gmailAddress}>`,
-            to: recipient.email,
-            subject: campaign.subject,
-            html,
-            // RFC 8058 one-click unsubscribe: Gmail and Yahoo show their own
-            // "Unsubscribe" button and POST here. Required of bulk senders.
-            headers: {
-              "List-Unsubscribe": `<${unsubLink}>`,
-              "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-            },
-          });
+          // RFC 8058 one-click unsubscribe: Gmail and Yahoo show their own
+          // "Unsubscribe" button and POST here. Required of bulk senders.
+          const headers = {
+            "List-Unsubscribe": `<${unsubLink}>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          };
+          if (bulk) {
+            const name = (campaign.fromName || bulk.fromName || "").replace(/[<>"]/g, "");
+            await bulk.transporter.sendMail({
+              from: name ? `${name} <${bulk.fromEmail}>` : bulk.fromEmail,
+              replyTo: bulk.replyTo,
+              to: recipient.email,
+              subject,
+              html,
+              text: html.replace(/<[^>]+>/g, ""),
+              headers,
+            });
+          } else {
+            await sendGmailEmail(creds!.gmailAddress, creds!.appPassword, {
+              from: `${campaign.fromName || "Scott Boerstra"} <${creds!.gmailAddress}>`,
+              to: recipient.email,
+              subject,
+              html,
+              headers,
+            });
+          }
 
           await db.update(campaignRecipients).set({
             status: "sent",
@@ -488,6 +544,43 @@ async function sendBatches(campaignId: number, batchSize: number, delayMinutes: 
       }
     }
   } finally {
+    bulk?.transporter.close();
     activeSendJob = null;
   }
+}
+
+/**
+ * Sleep until `until`, a minute at a time, so a pause or a deleted campaign
+ * takes effect promptly. False when the campaign stopped sending meanwhile.
+ */
+async function waitUntil(until: Date, campaignId: number): Promise<boolean> {
+  const db = await getDb();
+  while (Date.now() < until.getTime()) {
+    await new Promise((resolve) => setTimeout(resolve, Math.min(60_000, until.getTime() - Date.now())));
+    if (activeSendJob?.abort) return false;
+    const [row] = await db.select({ status: emailCampaigns.status })
+      .from(emailCampaigns).where(eq(emailCampaigns.id, campaignId)).limit(1);
+    if (row?.status !== "sending") return false;
+  }
+  return true;
+}
+
+/**
+ * Pick a sending campaign back up after a restart. A deploy restarts the
+ * server, and a campaign paced over several days would otherwise sit at
+ * "sending" with nothing sending it.
+ */
+export async function resumeSendingCampaigns(): Promise<void> {
+  if (activeSendJob) return;
+  const db = await getDb();
+  if (!db) return;
+  const sending = await db.select().from(emailCampaigns)
+    .where(eq(emailCampaigns.status, "sending")).orderBy(emailCampaigns.id);
+  if (sending.length === 0) return;
+  const [first, ...rest] = sending;
+  console.log(`[Campaign ${first.id}] Resuming after restart`);
+  if (rest.length) console.log(`[Campaigns] Also marked sending, not resumed: ${rest.map((c) => c.id).join(", ")}`);
+  sendBatches(first.id, first.batchSize, first.batchDelayMinutes).catch((err) => {
+    console.error(`[Campaign ${first.id}] Resume error:`, err);
+  });
 }

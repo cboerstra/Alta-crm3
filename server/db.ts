@@ -1688,6 +1688,26 @@ export async function runAutoMigrations(): Promise<void> {
   // next restart without a manual migration step.
   const marketingTables: { name: string; sql: string }[] = [
     {
+      name: "bulk_email_settings",
+      sql: `CREATE TABLE IF NOT EXISTS bulk_email_settings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        host VARCHAR(255) NULL,
+        port INT NOT NULL DEFAULT 587,
+        username VARCHAR(320) NULL,
+        password TEXT NULL,
+        fromEmail VARCHAR(320) NULL,
+        fromName VARCHAR(128) NULL,
+        replyTo VARCHAR(320) NULL,
+        dailyLimit INT NOT NULL DEFAULT 290,
+        enabled TINYINT(1) NOT NULL DEFAULT 0,
+        lastVerifiedAt TIMESTAMP NULL,
+        lastError TEXT NULL,
+        updatedBy INT NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`,
+    },
+    {
       name: "meta_settings",
       sql: `CREATE TABLE IF NOT EXISTS meta_settings (
         id INT AUTO_INCREMENT PRIMARY KEY,
