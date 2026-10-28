@@ -33,7 +33,7 @@ export default function Campaigns() {
   const [form, setForm] = useState({
     audience: "re_agent" as "re_agent" | "past_mortgage" | "prospective_mortgage" | "prospective_re_client",
     name: "", subject: "", bodyHtml: "", fromName: "Scott Boerstra",
-    filterBrokerage: "", filterCity: "", filterState: "", filterLoanType: "",
+    filterBrokerage: "", filterCity: "", filterState: "", filterLoanType: "", filterTag: "",
     batchSize: 50, batchDelayMinutes: 15,
   });
 
@@ -42,6 +42,7 @@ export default function Campaigns() {
     { id: showDetail! }, { enabled: showDetail !== null }
   );
   const brokerages = trpc.agentContacts.brokerages.useQuery();
+  const agentTags = trpc.agentContacts.tags.useQuery();
   const agentCities = trpc.agentContacts.cities.useQuery();
   const mcCities = trpc.mortgageClients.cities.useQuery();
   const loanTypes = trpc.mortgageClients.loanTypes.useQuery();
@@ -52,6 +53,7 @@ export default function Campaigns() {
     filterCity: form.filterCity || undefined,
     filterState: form.filterState || undefined,
     filterLoanType: form.filterLoanType || undefined,
+    filterTags: form.audience === "re_agent" && form.filterTag ? [form.filterTag] : undefined,
   }, { enabled: showCreate });
 
   const createMutation = trpc.campaigns.create.useMutation({
@@ -70,7 +72,7 @@ export default function Campaigns() {
   function resetForm() {
     setForm({
       audience: "re_agent", name: "", subject: "", bodyHtml: "", fromName: "Scott Boerstra",
-      filterBrokerage: "", filterCity: "", filterState: "", filterLoanType: "",
+      filterBrokerage: "", filterCity: "", filterState: "", filterLoanType: "", filterTag: "",
       batchSize: 50, batchDelayMinutes: 15,
     });
   }
@@ -164,7 +166,7 @@ export default function Campaigns() {
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium mb-1 block">Audience</label>
-                <Select value={form.audience} onValueChange={(v: any) => setForm(f => ({ ...f, audience: v, filterBrokerage: "", filterCity: "", filterLoanType: "" }))}>
+                <Select value={form.audience} onValueChange={(v: any) => setForm(f => ({ ...f, audience: v, filterBrokerage: "", filterCity: "", filterLoanType: "", filterTag: "" }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="re_agent">Real Estate Agent</SelectItem>
@@ -193,6 +195,18 @@ export default function Campaigns() {
               <div className="border-t pt-4">
                 <h3 className="text-sm font-medium mb-3">Recipient Filters</h3>
                 <div className="grid grid-cols-3 gap-3">
+                  {form.audience === "re_agent" && (
+                    <div>
+                      <label className="text-xs text-muted-foreground">Tag</label>
+                      <Select value={form.filterTag || "__all__"} onValueChange={v => setForm(f => ({ ...f, filterTag: v === "__all__" ? "" : v }))}>
+                        <SelectTrigger><SelectValue placeholder="Any tag" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">Any tag</SelectItem>
+                          {agentTags.data?.map(t => <SelectItem key={t.tag} value={t.tag}>{t.tag} ({t.count})</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   {form.audience === "re_agent" && (
                     <div>
                       <label className="text-xs text-muted-foreground">Brokerage</label>
@@ -246,6 +260,9 @@ export default function Campaigns() {
                   <p className="text-sm mt-2">
                     <Mail className="w-4 h-4 inline mr-1" />
                     <strong>{previewCount.data.count}</strong> matching {form.audience === "re_agent" ? "agents" : form.audience === "past_mortgage" ? "past clients" : "leads"}
+                    {(form.audience === "re_agent" || form.audience === "past_mortgage") && (
+                      <span className="text-muted-foreground"> · opted-out contacts are always left out, and every email carries an unsubscribe link</span>
+                    )}
                   </p>
                 )}
               </div>
@@ -271,6 +288,7 @@ export default function Campaigns() {
               <Button disabled={!form.name || !form.subject || !form.bodyHtml || createMutation.isPending}
                 onClick={() => createMutation.mutate({
                   ...form,
+                  filterTags: form.audience === "re_agent" && form.filterTag ? [form.filterTag] : undefined,
                   filterBrokerage: form.filterBrokerage || undefined,
                   filterCity: form.filterCity || undefined,
                   filterState: form.filterState || undefined,

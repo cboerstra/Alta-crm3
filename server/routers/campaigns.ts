@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
+import { unsubscribeByTrackingId } from "../unsubscribe";
 import { emailCampaigns, campaignRecipients, agentContacts, mortgageClients, leads, integrations } from "../../drizzle/schema";
 import { eq, and, like, or, sql, desc, inArray } from "drizzle-orm";
 import { sendEmail as sendGmailEmail } from "../email";
@@ -17,6 +18,36 @@ async function getGmailCredentials() {
 }
 
 let activeSendJob: { campaignId: number; abort: boolean } | null = null;
+
+/**
+ * Leads have no opted-out flag of their own; their unsubscribes live on the
+ * campaign_recipients rows. Without this, a lead who unsubscribed from one
+ * campaign was picked again for the next.
+ */
+/**
+ * The footer's sender lines, by which business is writing: Equity Real
+ * Estate to agents and real-estate prospects, Alta Mortgage Group to
+ * mortgage clients and prospects. Override either in .env, with "|"
+ * between lines.
+ */
+function footerLines(audience: string): string[] {
+  const realEstate = audience === "re_agent" || audience === "prospective_re_client";
+  const override = realEstate ? process.env.MAILING_ADDRESS_REAL_ESTATE : process.env.MAILING_ADDRESS_MORTGAGE;
+  if (override?.trim()) return override.split("|").map((line) => line.trim()).filter(Boolean);
+  return realEstate
+    ? [
+        "Equity Real Estate - Clarke and Associates",
+        "4824 S 6150 W, Hooper, UT 84315",
+        "Office License: 5498127-CN00 · Agent License: 5452345-SA00",
+      ]
+    : ["Clarke and Associates dba Alta Mortgage Group", "4824 S 6150 W, Hooper, UT 84315"];
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+const leadNotUnsubscribed = sql`NOT EXISTS (SELECT 1 FROM campaign_recipients cr WHERE cr.leadId = ${leads.id} AND cr.status = 'unsubscribed')`;
 
 export const campaignsRouter = router({
   list: protectedProcedure
@@ -162,7 +193,7 @@ export const campaignsRouter = router({
       }
 
       // prospective_mortgage or prospective_re_client — both target leads
-      const conditions: any[] = [];
+      const conditions: any[] = [leadNotUnsubscribed];
       if (input.filterCity) conditions.push(sql`1=1`); // leads don't have city yet
       if (input.filterSource) conditions.push(eq(leads.source, input.filterSource));
       if (input.filterStage) conditions.push(eq(leads.stage, input.filterStage as any));
@@ -187,6 +218,17 @@ export const campaignsRouter = router({
 
       const creds = await getGmailCredentials();
       if (!creds) throw new Error("Gmail not configured. Set up Gmail integration first.");
+
+      // Resuming a paused campaign carries on with the recipients it still owes.
+      // Rebuilding the list here re-sent the email to everyone already reached
+      // and erased who had unsubscribed from it.
+      if (campaign.status === "paused") {
+        await db.update(emailCampaigns).set({ status: "sending" }).where(eq(emailCampaigns.id, campaign.id));
+        sendBatches(campaign.id, campaign.batchSize, campaign.batchDelayMinutes).catch(err => {
+          console.error(`[Campaign ${campaign.id}] Batch send error:`, err);
+        });
+        return { recipientCount: campaign.totalRecipients ?? 0, status: "sending" };
+      }
 
       let recipients: { id: number; email: string; firstName: string; lastName: string }[];
 
@@ -219,7 +261,7 @@ export const campaignsRouter = router({
         }).from(mortgageClients).where(and(...conditions));
       } else {
         // prospective_mortgage or prospective_re_client — both target leads
-        const conditions: any[] = [];
+        const conditions: any[] = [leadNotUnsubscribed];
         if (campaign.filterTags && Array.isArray(campaign.filterTags) && (campaign.filterTags as string[]).length > 0) {
           for (const tag of campaign.filterTags as string[]) {
             conditions.push(sql`JSON_CONTAINS(${leads.quickNote}, ${JSON.stringify(tag)}, '$')`);
@@ -319,26 +361,7 @@ export const campaignsRouter = router({
   unsubscribe: publicProcedure
     .input(z.object({ trackingId: z.string() }))
     .mutation(async ({ input }) => {
-      const db = await getDb();
-      const [recipient] = await db.select().from(campaignRecipients)
-        .where(eq(campaignRecipients.trackingId, input.trackingId)).limit(1);
-
-      if (recipient) {
-        await db.update(campaignRecipients).set({ status: "unsubscribed" })
-          .where(eq(campaignRecipients.id, recipient.id));
-
-        if (recipient.agentContactId) {
-          await db.update(agentContacts).set({
-            optedOut: true, optOutDate: new Date(),
-          }).where(eq(agentContacts.id, recipient.agentContactId));
-        } else if (recipient.mortgageClientId) {
-          await db.update(mortgageClients).set({
-            optedOut: true, optOutDate: new Date(),
-          }).where(eq(mortgageClients.id, recipient.mortgageClientId));
-        }
-        // leads don't have an optedOut field — unsubscribe tracking via recipient status only
-      }
-
+      await unsubscribeByTrackingId(input.trackingId);
       return { success: true };
     }),
 });
@@ -379,21 +402,22 @@ async function sendBatches(campaignId: number, batchSize: number, delayMinutes: 
           email: agentContacts.email, firstName: agentContacts.firstName, lastName: agentContacts.lastName,
         }).from(campaignRecipients)
           .innerJoin(agentContacts, eq(campaignRecipients.agentContactId, agentContacts.id))
-          .where(pendingWhere).limit(batchSize);
+          // Re-checked every batch: someone who opts out mid-campaign gets nothing more.
+          .where(and(pendingWhere, eq(agentContacts.optedOut, false))).limit(batchSize);
       } else if (campaign.audience === "past_mortgage") {
         batch = await db.select({
           id: campaignRecipients.id, trackingId: campaignRecipients.trackingId,
           email: mortgageClients.email, firstName: mortgageClients.firstName, lastName: mortgageClients.lastName,
         }).from(campaignRecipients)
           .innerJoin(mortgageClients, eq(campaignRecipients.mortgageClientId, mortgageClients.id))
-          .where(pendingWhere).limit(batchSize);
+          .where(and(pendingWhere, eq(mortgageClients.optedOut, false))).limit(batchSize);
       } else {
         batch = await db.select({
           id: campaignRecipients.id, trackingId: campaignRecipients.trackingId,
           email: leads.email, firstName: leads.firstName, lastName: leads.lastName,
         }).from(campaignRecipients)
           .innerJoin(leads, eq(campaignRecipients.leadId, leads.id))
-          .where(pendingWhere).limit(batchSize);
+          .where(and(pendingWhere, leadNotUnsubscribed)).limit(batchSize);
       }
 
       if (batch.length === 0) {
@@ -421,13 +445,21 @@ async function sendBatches(campaignId: number, batchSize: number, delayMinutes: 
           html += trackPixel;
 
           const unsubLink = `${baseUrl}/unsubscribe?tid=${recipient.trackingId}`;
-          html += `<p style="font-size:11px;color:#999;margin-top:30px;">If you no longer wish to receive these emails, <a href="${unsubLink}">unsubscribe here</a>.</p>`;
+          // CAN-SPAM: every commercial email needs a working opt-out and the
+          // sender's postal address.
+          html += `<p style="font-size:11px;color:#999;margin-top:30px;">If you no longer wish to receive these emails, <a href="${unsubLink}">unsubscribe here</a>.<br>${footerLines(campaign.audience).map(escapeHtml).join("<br>")}</p>`;
 
           await sendGmailEmail(creds.gmailAddress, creds.appPassword, {
             from: `${campaign.fromName || "Scott Boerstra"} <${creds.gmailAddress}>`,
             to: recipient.email,
             subject: campaign.subject,
             html,
+            // RFC 8058 one-click unsubscribe: Gmail and Yahoo show their own
+            // "Unsubscribe" button and POST here. Required of bulk senders.
+            headers: {
+              "List-Unsubscribe": `<${unsubLink}>`,
+              "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            },
           });
 
           await db.update(campaignRecipients).set({

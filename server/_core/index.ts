@@ -469,30 +469,43 @@ async function startServer() {
     res.status(400).send("Missing url");
   });
 
-  app.get("/unsubscribe", async (req, res) => {
+  // Unsubscribe from a campaign email. Opening the link only shows a button:
+  // mail security scanners (Outlook Safe Links and similar) open every link in
+  // a message, and a link that unsubscribed on GET opted people out before
+  // they ever read the email. The button, and the one-click POST that Gmail
+  // and Yahoo send from the List-Unsubscribe header, do the unsubscribing.
+  const unsubscribePage = (title: string, body: string) =>
+    `<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title></head>` +
+    `<body style="font-family:-apple-system,Segoe UI,sans-serif;text-align:center;padding:60px 20px;color:#222">` +
+    `<h2>${title}</h2>${body}</body></html>`;
+
+  app.get("/unsubscribe", (req, res) => {
+    const tid = typeof req.query.tid === "string" ? req.query.tid : "";
+    if (!/^[a-zA-Z0-9]{8,64}$/.test(tid)) {
+      res.status(400).send(unsubscribePage("This unsubscribe link is incomplete", "<p>Reply to the email and ask to be removed, and we will take care of it.</p>"));
+      return;
+    }
+    res.set("X-Robots-Tag", "noindex").send(unsubscribePage(
+      "Unsubscribe from these emails?",
+      `<form method="post" action="/unsubscribe?tid=${tid}">` +
+        `<button type="submit" style="font-size:16px;padding:12px 28px;border-radius:8px;border:0;background:#1F7B47;color:#fff;cursor:pointer">Unsubscribe</button>` +
+      `</form><p style="color:#666;font-size:14px;margin-top:16px">You will stop receiving these emails from us.</p>`
+    ));
+  });
+
+  app.post("/unsubscribe", async (req, res) => {
+    const tid = typeof req.query.tid === "string" ? req.query.tid : "";
     try {
-      const tid = req.query.tid as string;
-      if (tid) {
-        const { getDb } = await import("../db");
-        const { campaignRecipients, agentContacts, mortgageClients } = await import("../../drizzle/schema");
-        const { eq } = await import("drizzle-orm");
-        const db = await getDb();
-        const [r] = await db.select().from(campaignRecipients)
-          .where(eq(campaignRecipients.trackingId, tid)).limit(1);
-        if (r) {
-          await db.update(campaignRecipients).set({ status: "unsubscribed" })
-            .where(eq(campaignRecipients.id, r.id));
-          if (r.agentContactId) {
-            await db.update(agentContacts).set({ optedOut: true, optOutDate: new Date() })
-              .where(eq(agentContacts.id, r.agentContactId));
-          } else if (r.mortgageClientId) {
-            await db.update(mortgageClients).set({ optedOut: true, optOutDate: new Date() })
-              .where(eq(mortgageClients.id, r.mortgageClientId));
-          }
-        }
-      }
-    } catch (e) { console.error("[Track] unsubscribe error:", e); }
-    res.send(`<html><body style="font-family:sans-serif;text-align:center;padding:60px"><h2>You have been unsubscribed</h2><p>You will no longer receive emails from us.</p></body></html>`);
+      const { unsubscribeByTrackingId } = await import("../unsubscribe");
+      await unsubscribeByTrackingId(tid);
+    } catch (e) {
+      console.error("[Track] unsubscribe error:", e);
+    }
+    // One-click (RFC 8058) senders only need a 2xx; a person gets the page.
+    res.set("X-Robots-Tag", "noindex").send(unsubscribePage(
+      "You have been unsubscribed",
+      "<p>You will no longer receive these emails from us.</p>"
+    ));
   });
 
   // Allow freehomesearchutah.com to load assets and call APIs cross-origin (landing page proxy)
