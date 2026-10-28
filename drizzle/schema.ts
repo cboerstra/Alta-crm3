@@ -605,6 +605,29 @@ export const metaSettings = mysqlTable("meta_settings", {
 export type MetaSettings = typeof metaSettings.$inferSelect;
 export type InsertMetaSettings = typeof metaSettings.$inferInsert;
 
+// ─── Bulk email sender (Brevo or any SMTP relay) ─────────────────────────────
+// Real-estate campaigns go out through this instead of Gmail, from the
+// brokerage's own domain, at a daily pace the relay allows. One row.
+export const bulkEmailSettings = mysqlTable("bulk_email_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  host: varchar("host", { length: 255 }),
+  port: int("port").default(587).notNull(),
+  username: varchar("username", { length: 320 }),
+  password: text("password"),                                // SMTP key; never sent to the browser
+  fromEmail: varchar("fromEmail", { length: 320 }),
+  fromName: varchar("fromName", { length: 128 }),
+  replyTo: varchar("replyTo", { length: 320 }),
+  dailyLimit: int("dailyLimit").default(290).notNull(),      // kept under the relay's cap
+  enabled: boolean("enabled").default(false).notNull(),
+  lastVerifiedAt: timestamp("lastVerifiedAt"),
+  lastError: text("lastError"),
+  updatedBy: int("updatedBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type BulkEmailSettings = typeof bulkEmailSettings.$inferSelect;
+
 // ─── Landing Page Templates ──────────────────────────────────────────────────
 // Reusable, branded starting points ("home value", "grant", "refi"…). A campaign
 // picks a template and the CRM stamps out a real landing page from it.

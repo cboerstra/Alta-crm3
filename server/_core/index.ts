@@ -565,6 +565,13 @@ async function startServer() {
       .catch((err) => console.error("[Startup] Template seed error:", err));
   }, 5_000);
 
+  // A campaign paced over several days outlives a deploy: pick it back up.
+  setTimeout(() => {
+    import("../routers/campaigns")
+      .then(({ resumeSendingCampaigns }) => resumeSendingCampaigns())
+      .catch((err) => console.error("[Startup] Campaign resume error:", err));
+  }, 15_000);
+
   // Email reminder scheduler: process pending reminders every 60 seconds
   setInterval(async () => {
     try {

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import MetaSettingsPanel from "@/components/settings/MetaSettingsPanel";
+import BulkEmailPanel from "@/components/settings/BulkEmailPanel";
 
 type MediaItem = {
   id: number;
@@ -1018,6 +1019,7 @@ export default function SettingsPage() {
               )}
             </CardContent>
           </Card>
+          <div className="mt-6"><BulkEmailPanel /></div>
         </TabsContent>
 
         {/* ─── General Tab ─── */}

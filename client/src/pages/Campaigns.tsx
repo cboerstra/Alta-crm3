@@ -43,6 +43,7 @@ export default function Campaigns() {
   );
   const brokerages = trpc.agentContacts.brokerages.useQuery();
   const agentTags = trpc.agentContacts.tags.useQuery();
+  const bulkUsage = trpc.bulkEmail.usage.useQuery();
   const agentCities = trpc.agentContacts.cities.useQuery();
   const mcCities = trpc.mortgageClients.cities.useQuery();
   const loanTypes = trpc.mortgageClients.loanTypes.useQuery();
@@ -265,6 +266,16 @@ export default function Campaigns() {
                     )}
                   </p>
                 )}
+                {previewCount.data && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {(form.audience === "re_agent" || form.audience === "prospective_re_client") && bulkUsage.data?.active
+                      ? <>Sends from <strong>{bulkUsage.data.fromEmail}</strong>, {bulkUsage.data.dailyLimit} per day
+                          {previewCount.data.count > bulkUsage.data.dailyLimit
+                            ? ` — about ${Math.ceil(previewCount.data.count / bulkUsage.data.dailyLimit)} days for everyone. It carries on by itself each day.`
+                            : "."}</>
+                      : "Sends from your Gmail account."}
+                  </p>
+                )}
               </div>
 
               <div className="border-t pt-4">
@@ -340,6 +351,22 @@ export default function Campaigns() {
                         v > 0 && <Badge key={k} variant="outline">{k}: {v}</Badge>
                       ))}
                     </div>
+                  </div>
+                )}
+                {detail.data.pacing && (
+                  <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-0.5">
+                    <p>Sending from <strong>{detail.data.pacing.sender}</strong>, up to {detail.data.pacing.dailyLimit} per day.</p>
+                    <p className="text-muted-foreground">
+                      {detail.data.pacing.sentLast24h} sent in the last 24 hours
+                      {detail.data.pacing.remainingToday === 0 && detail.data.pacing.nextSlotAt
+                        ? ` · today's limit is used; sending resumes ${new Date(detail.data.pacing.nextSlotAt).toLocaleString()}`
+                        : ` · ${detail.data.pacing.remainingToday} more allowed now`}
+                    </p>
+                    {detail.data.pacing.estimatedFinish && detail.data.recipientStats.pending > 0 && (
+                      <p className="text-muted-foreground">
+                        {detail.data.recipientStats.pending} still to send · expected to finish around {new Date(detail.data.pacing.estimatedFinish).toLocaleDateString()}
+                      </p>
+                    )}
                   </div>
                 )}
                 <div>
