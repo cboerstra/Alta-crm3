@@ -108,6 +108,52 @@ export const campaignsRouter = router({
       return { ...rows[0], recipientStats: stats, pacing };
     }),
 
+  /** Who a campaign went to, one row per recipient: status and when it was sent. */
+  recipients: protectedProcedure
+    .input(z.object({
+      campaignId: z.number(),
+      status: z.enum(["all", "pending", "sent", "opened", "clicked", "bounced", "unsubscribed"]).default("all"),
+      search: z.string().optional(),
+      limit: z.number().min(1).max(5000).default(50),
+      offset: z.number().min(0).default(0),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      // A recipient row points at an agent, a past client or a lead, by audience.
+      const email = sql<string>`COALESCE(${agentContacts.email}, ${mortgageClients.email}, ${leads.email})`;
+      const firstName = sql<string>`COALESCE(${agentContacts.firstName}, ${mortgageClients.firstName}, ${leads.firstName})`;
+      const lastName = sql<string>`COALESCE(${agentContacts.lastName}, ${mortgageClients.lastName}, ${leads.lastName})`;
+      const conditions: any[] = [eq(campaignRecipients.campaignId, input.campaignId)];
+      if (input.status !== "all") conditions.push(eq(campaignRecipients.status, input.status));
+      if (input.search?.trim()) {
+        const q = `%${input.search.trim()}%`;
+        conditions.push(sql`(${email} LIKE ${q} OR ${firstName} LIKE ${q} OR ${lastName} LIKE ${q})`);
+      }
+      const where = and(...conditions);
+      const base = () => db.select({
+        id: campaignRecipients.id,
+        email, firstName, lastName,
+        status: campaignRecipients.status,
+        sentAt: campaignRecipients.sentAt,
+        openedAt: campaignRecipients.openedAt,
+      }).from(campaignRecipients)
+        .leftJoin(agentContacts, eq(campaignRecipients.agentContactId, agentContacts.id))
+        .leftJoin(mortgageClients, eq(campaignRecipients.mortgageClientId, mortgageClients.id))
+        .leftJoin(leads, eq(campaignRecipients.leadId, leads.id));
+      const [rows, [count]] = await Promise.all([
+        // Sent first, newest first; then the ones still waiting.
+        base().where(where)
+          .orderBy(sql`${campaignRecipients.sentAt} IS NULL`, desc(campaignRecipients.sentAt), campaignRecipients.id)
+          .limit(input.limit).offset(input.offset),
+        db.select({ n: sql<number>`count(*)` }).from(campaignRecipients)
+          .leftJoin(agentContacts, eq(campaignRecipients.agentContactId, agentContacts.id))
+          .leftJoin(mortgageClients, eq(campaignRecipients.mortgageClientId, mortgageClients.id))
+          .leftJoin(leads, eq(campaignRecipients.leadId, leads.id))
+          .where(where),
+      ]);
+      return { rows, total: Number(count?.n ?? 0) };
+    }),
+
   create: protectedProcedure
     .input(z.object({
       audience: z.enum(["re_agent", "past_mortgage", "prospective_mortgage", "prospective_re_client"]).default("re_agent"),
