@@ -25,15 +25,18 @@ let activeSendJob: { campaignId: number; abort: boolean } | null = null;
  * campaign was picked again for the next.
  */
 /**
- * The sender named in each campaign's footer, by which business is writing:
- * Equity Real Estate to agents and real-estate prospects, Alta Mortgage
- * Group to mortgage clients and prospects. Override either in .env.
+ * The footer's sender lines, by which business is writing: Equity Real
+ * Estate to agents and real-estate prospects, Alta Mortgage Group to
+ * mortgage clients and prospects. Override either in .env, with "|"
+ * between lines.
  */
-function mailingAddress(audience: string): string {
+function footerLines(audience: string): string[] {
   const realEstate = audience === "re_agent" || audience === "prospective_re_client";
+  const override = realEstate ? process.env.MAILING_ADDRESS_REAL_ESTATE : process.env.MAILING_ADDRESS_MORTGAGE;
+  if (override?.trim()) return override.split("|").map((line) => line.trim()).filter(Boolean);
   return realEstate
-    ? process.env.MAILING_ADDRESS_REAL_ESTATE?.trim() || "Equity Real Estate · 4824 S 6150 W, Hooper, UT 84315"
-    : process.env.MAILING_ADDRESS_MORTGAGE?.trim() || "Clarke and Associates dba Alta Mortgage Group · 4824 S 6150 W, Hooper, UT 84315";
+    ? ["Equity Real Estate - Clarke and Associates", "4824 S 6150 W, Hooper, UT 84315", "License: 5452345-SA00"]
+    : ["Clarke and Associates dba Alta Mortgage Group", "4824 S 6150 W, Hooper, UT 84315"];
 }
 
 function escapeHtml(text: string): string {
@@ -440,7 +443,7 @@ async function sendBatches(campaignId: number, batchSize: number, delayMinutes: 
           const unsubLink = `${baseUrl}/unsubscribe?tid=${recipient.trackingId}`;
           // CAN-SPAM: every commercial email needs a working opt-out and the
           // sender's postal address.
-          html += `<p style="font-size:11px;color:#999;margin-top:30px;">If you no longer wish to receive these emails, <a href="${unsubLink}">unsubscribe here</a>.<br>${escapeHtml(mailingAddress(campaign.audience))}</p>`;
+          html += `<p style="font-size:11px;color:#999;margin-top:30px;">If you no longer wish to receive these emails, <a href="${unsubLink}">unsubscribe here</a>.<br>${footerLines(campaign.audience).map(escapeHtml).join("<br>")}</p>`;
 
           await sendGmailEmail(creds.gmailAddress, creds.appPassword, {
             from: `${campaign.fromName || "Scott Boerstra"} <${creds.gmailAddress}>`,
