@@ -116,6 +116,14 @@ export default function UserManagement() {
   const { data: stats } = trpc.userManagement.stats.useQuery();
   const { data: invites, isLoading: invitesLoading } = trpc.userManagement.listInvites.useQuery();
 
+  const { data: tfUserIds } = trpc.userManagement.twoFactorUserIds.useQuery();
+  const resetTwoFactor = trpc.userManagement.resetTwoFactor.useMutation({
+    onSuccess: () => {
+      toast.success("Two-factor authentication reset. They can sign in with their password and re-enroll.");
+      utils.userManagement.twoFactorUserIds.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
   const updateRole = trpc.userManagement.updateRole.useMutation({
     onSuccess: () => {
       utils.userManagement.list.invalidate();
@@ -453,6 +461,19 @@ export default function UserManagement() {
                                       >
                                         <Shield className="h-4 w-4 text-blue-500" />
                                         Demote to User
+                                      </DropdownMenuItem>
+                                    )}
+                                    {!isCurrentUser && tfUserIds?.includes(u.id) && (
+                                      <DropdownMenuItem
+                                        onClick={() => {
+                                          const pw = window.prompt(`Reset two-factor authentication for ${u.name || "this user"}?
+Enter YOUR password to confirm:`);
+                                          if (pw) resetTwoFactor.mutate({ userId: u.id, adminPassword: pw });
+                                        }}
+                                        className="gap-2"
+                                      >
+                                        <ShieldCheck className="h-4 w-4 text-amber-500" />
+                                        Reset two-factor
                                       </DropdownMenuItem>
                                     )}
                                     {!isCurrentUser && (

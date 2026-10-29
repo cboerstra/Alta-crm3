@@ -3,6 +3,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 import mysql2 from "mysql2/promise";
 import {
   InsertUser, users,
+  userTwoFactor,
   leads, InsertLead, Lead,
   webinars, InsertWebinar,
   landingPages, InsertLandingPage,
@@ -197,6 +198,48 @@ export async function getUserById(id: number) {
   if (!db) return null;
   const [user] = await db.select().from(users).where(eq(users.id, id)).limit(1);
   return user ?? null;
+}
+
+// ─── Two-factor auth ──────────────────────────────────────────────────────────
+export async function getTwoFactor(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection unavailable");
+  const [row] = await db.select().from(userTwoFactor).where(eq(userTwoFactor.userId, userId)).limit(1);
+  return row ?? null;
+}
+
+/** Start (or restart) enrollment: stores an unconfirmed secret, never enabled yet. */
+export async function saveTwoFactorPending(userId: number, secretEnc: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection unavailable");
+  await db
+    .insert(userTwoFactor)
+    .values({ userId, secretEnc, enabled: false, backupCodeHashes: null, lastUsedStep: null })
+    .onDuplicateKeyUpdate({ set: { secretEnc, enabled: false, backupCodeHashes: null, lastUsedStep: null, enabledAt: null } });
+}
+
+export async function enableTwoFactor(userId: number, backupCodeHashes: string[], lastUsedStep: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection unavailable");
+  await db
+    .update(userTwoFactor)
+    .set({ enabled: true, backupCodeHashes, lastUsedStep, enabledAt: new Date() })
+    .where(eq(userTwoFactor.userId, userId));
+}
+
+export async function updateTwoFactorState(
+  userId: number,
+  patch: { backupCodeHashes?: string[]; lastUsedStep?: number },
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection unavailable");
+  await db.update(userTwoFactor).set(patch).where(eq(userTwoFactor.userId, userId));
+}
+
+export async function deleteTwoFactor(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database connection unavailable");
+  await db.delete(userTwoFactor).where(eq(userTwoFactor.userId, userId));
 }
 
 export async function getAllUsers() {
@@ -1687,6 +1730,20 @@ export async function runAutoMigrations(): Promise<void> {
   // Created idempotently so an existing Hostinger database picks them up on the
   // next restart without a manual migration step.
   const marketingTables: { name: string; sql: string }[] = [
+    {
+      name: "user_two_factor",
+      sql: `CREATE TABLE IF NOT EXISTS user_two_factor (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        userId INT NOT NULL UNIQUE,
+        secretEnc TEXT NOT NULL,
+        enabled TINYINT(1) NOT NULL DEFAULT 0,
+        backupCodeHashes JSON NULL,
+        lastUsedStep INT NULL,
+        enabledAt TIMESTAMP NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`,
+    },
     {
       name: "bulk_email_settings",
       sql: `CREATE TABLE IF NOT EXISTS bulk_email_settings (

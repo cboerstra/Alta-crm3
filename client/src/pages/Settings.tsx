@@ -14,8 +14,9 @@ import {
   Settings, Video, Calendar, CheckCircle, AlertCircle,
   Upload, Image, Trash2, Edit, ImageIcon, FileImage,
   LayoutGrid, Tag, Loader2, X, MessageSquare, Phone, Eye, EyeOff, Send, Mail, Plus, ChevronDown, ChevronRight,
-  Megaphone,
+  Megaphone, ShieldCheck,
 } from "lucide-react";
+import SecurityPanel from "@/components/settings/SecurityPanel";
 import { toast } from "sonner";
 import MetaSettingsPanel from "@/components/settings/MetaSettingsPanel";
 import BulkEmailPanel from "@/components/settings/BulkEmailPanel";
@@ -398,6 +399,7 @@ export default function SettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="sms-templates" className="gap-1"><MessageSquare className="h-3.5 w-3.5" /> SMS &amp; Email Templates</TabsTrigger>
           <TabsTrigger value="meta-ads" className="gap-1"><Megaphone className="h-3.5 w-3.5" /> Meta Ads</TabsTrigger>
+          <TabsTrigger value="security" className="gap-1"><ShieldCheck className="h-3.5 w-3.5" /> Security</TabsTrigger>
           <TabsTrigger value="general" className="gap-1"><Settings className="h-3.5 w-3.5" /> General</TabsTrigger>
         </TabsList>
 
@@ -1460,6 +1462,10 @@ export default function SettingsPage() {
               })()}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="security">
+          <SecurityPanel />
         </TabsContent>
 
         <TabsContent value="general">

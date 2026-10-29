@@ -65,6 +65,14 @@ export function registerOAuthRoutes(app: Express) {
         ...(inviteRole ? { role: inviteRole } : {}),
       });
 
+      // OAuth can't satisfy our second factor, so an account with 2FA must use
+      // email + password + code instead of being a side door around it.
+      const oauthUser = await db.getUserByOpenId(userInfo.openId);
+      if (oauthUser && (await db.getTwoFactor(oauthUser.id))?.enabled) {
+        res.redirect(302, "/login?error=2fa_password_required");
+        return;
+      }
+
       const sessionToken = await sdk.createSessionToken(userInfo.openId, {
         name: userInfo.name || "",
         expiresInMs: ONE_YEAR_MS,
