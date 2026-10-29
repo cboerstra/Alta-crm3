@@ -458,3 +458,16 @@ WHERE TABLE_SCHEMA = 'u833783884_AltaCRM' AND TABLE_NAME = 'mortgage_clients';
 
 SELECT 'audience enum updated', `audience` FROM `email_campaigns` LIMIT 1;
 SELECT 'pageType enum updated', `pageType` FROM `landing_pages` LIMIT 1;
+
+-- Two-factor authentication (TOTP). Also created automatically on app start.
+CREATE TABLE IF NOT EXISTS `user_two_factor` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `userId` INT NOT NULL UNIQUE,
+  `secretEnc` TEXT NOT NULL,
+  `enabled` TINYINT(1) NOT NULL DEFAULT 0,
+  `backupCodeHashes` JSON NULL,
+  `lastUsedStep` INT NULL,
+  `enabledAt` TIMESTAMP NULL,
+  `createdAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
