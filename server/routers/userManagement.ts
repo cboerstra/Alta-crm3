@@ -140,7 +140,7 @@ export const userManagementRouter = router({
       };
 
       if (input.newPassword && input.newPassword.trim().length >= 6) {
-        updateData.passwordHash = await bcrypt.hash(input.newPassword, 10);
+        updateData.passwordHash = await bcrypt.hash(input.newPassword, 12);
       }
 
       await db.update(users).set(updateData as any).where(eq(users.id, input.userId));
