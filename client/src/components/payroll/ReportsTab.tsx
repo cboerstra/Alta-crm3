@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertTriangle, Printer } from "lucide-react";
 import { fmtDate, printElement, type PayrollOutputs } from "./format";
 import { DwsFileButton, W2FilesButton } from "./WageFiles";
+import { Form941PdfButton } from "./Form941Pdf";
 
 /** Amount as typed on a form: 1,234.56 */
 const amt = (cents: number) => (cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -117,7 +118,8 @@ function F941({ data }: { data: QData }) {
   const f = data.form941;
   const c = data.companyInfo;
   return (
-    <FormCard id="f941" title={`Form 941 — Q${f.quarter} ${f.year}`} subtitle={`${c.name} · EIN ${c.ein || "—"} · File at irs.gov (e-file through a provider) or mail · Due ${fmtDate(f.dueDate)}`}>
+    <FormCard id="f941" title={`Form 941 — Q${f.quarter} ${f.year}`} actions={<Form941PdfButton data={data} />}
+      subtitle={`${c.name} · EIN ${c.ein || "—"} · Mail the filled-in PDF or e-file through a provider · Due ${fmtDate(f.dueDate)}`}>
       <Tbl head={["Column 1", "Amount"]}>
         <Line n="1" label="Number of employees paid for the pay period including the 12th of the third month" value={String(f.line1)} />
         <Line n="2" label="Wages, tips, and other compensation" value={f.line2} />
