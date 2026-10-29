@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Printer } from "lucide-react";
+import { AlertTriangle, ExternalLink, Printer } from "lucide-react";
 import { fmtDate, printElement, type PayrollOutputs } from "./format";
 import { DwsFileButton, W2FilesButton } from "./WageFiles";
 import { Form941PdfButton } from "./Form941Pdf";
@@ -25,7 +25,31 @@ function Line({ n, label, value, wages, note }: { n: string; label: string; valu
   );
 }
 
-function FormCard({ id, title, subtitle, actions, children }: { id: string; title: string; subtitle: string; actions?: React.ReactNode; children: React.ReactNode }) {
+/** Where each quarterly report is paid or filed */
+const FILING_SITES = {
+  form941: [
+    { label: "EFTPS (pay)", href: "https://www.eftps.gov/eftps/" },
+    { label: "TaxBandits (e-file)", href: "https://www.taxbandits.com/" },
+    { label: "IRS mailing addresses", href: "https://www.irs.gov/filing/where-to-file-your-taxes-for-form-941" },
+  ],
+  utahWithholding: [{ label: "Utah TAP", href: "https://tap.utah.gov/" }],
+  utahForm3: [{ label: "DWS Employer Online Services", href: "https://jobs.utah.gov/ui/employer/" }],
+};
+
+function FilingLinks({ links }: { links: { label: string; href: string }[] }) {
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+      {links.map((l) => (
+        <a key={l.href} href={l.href} target="_blank" rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-sm text-brand-green hover:underline">
+          {l.label} <ExternalLink className="h-3 w-3" />
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function FormCard({ id, title, subtitle, links, actions, children }: { id: string; title: string; subtitle: string; links?: { label: string; href: string }[]; actions?: React.ReactNode; children: React.ReactNode }) {
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -33,6 +57,7 @@ function FormCard({ id, title, subtitle, actions, children }: { id: string; titl
           <div>
             <CardTitle className="text-base">{title}</CardTitle>
             <p className="text-sm text-muted-foreground">{subtitle}</p>
+            {links && <FilingLinks links={links} />}
           </div>
           <div className="flex shrink-0 gap-2">
             {actions}
@@ -118,7 +143,7 @@ function F941({ data }: { data: QData }) {
   const f = data.form941;
   const c = data.companyInfo;
   return (
-    <FormCard id="f941" title={`Form 941 — Q${f.quarter} ${f.year}`} actions={<Form941PdfButton data={data} />}
+    <FormCard id="f941" title={`Form 941 — Q${f.quarter} ${f.year}`} links={FILING_SITES.form941} actions={<Form941PdfButton data={data} />}
       subtitle={`${c.name} · EIN ${c.ein || "—"} · Mail the filled-in PDF or e-file through a provider · Due ${fmtDate(f.dueDate)}`}>
       <Tbl head={["Column 1", "Amount"]}>
         <Line n="1" label="Number of employees paid for the pay period including the 12th of the third month" value={String(f.line1)} />
@@ -166,7 +191,7 @@ function UtahWithholding({ data }: { data: QData }) {
   const u = data.utahWithholding;
   const c = data.companyInfo;
   return (
-    <FormCard id="utwh" title={`Utah withholding return — Q${u.quarter} ${u.year}`}
+    <FormCard id="utwh" title={`Utah withholding return — Q${u.quarter} ${u.year}`} links={FILING_SITES.utahWithholding}
       subtitle={`${c.name} · Utah account ${c.utahWithholdingAccount || "—"} · File in Taxpayer Access Point (tap.utah.gov) · Due ${fmtDate(u.dueDate)}${c.utahFilingFrequency !== "quarterly" ? ` · Note: this company is set to file ${c.utahFilingFrequency}` : ""}`}>
       <Tbl>
         <Line n="" label="Utah wages paid this quarter" value={u.utahWages} />
@@ -183,7 +208,7 @@ function Form3({ data }: { data: QData }) {
   const f = data.utahForm3;
   const c = data.companyInfo;
   return (
-    <FormCard id="form3" title={`Utah DWS Form 3 — Q${f.quarter} ${f.year}`} actions={<DwsFileButton data={data} />}
+    <FormCard id="form3" title={`Utah DWS Form 3 — Q${f.quarter} ${f.year}`} links={FILING_SITES.utahForm3} actions={<DwsFileButton data={data} />}
       subtitle={`${c.name} · DWS account ${c.utahUiAccount || "—"} · File at jobs.utah.gov (Employer Online Services) · Due ${fmtDate(f.dueDate)}`}>
       <Tbl>
         <Line n="1" label="Covered workers in pay period including the 12th — Month 1" value={String(f.workersBy12th[0])} />
