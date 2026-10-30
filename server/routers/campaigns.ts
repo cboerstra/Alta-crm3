@@ -50,6 +50,71 @@ function escapeHtml(text: string): string {
 
 const leadNotUnsubscribed = sql`NOT EXISTS (SELECT 1 FROM campaign_recipients cr WHERE cr.leadId = ${leads.id} AND cr.status = 'unsubscribed')`;
 
+type CampaignDb = Pick<NonNullable<Awaited<ReturnType<typeof getDb>>>, "select" | "insert" | "update" | "delete">;
+
+// Saving a draft loads a snapshot; sending never silently expands that audience.
+async function loadDraftRecipients(db: CampaignDb, campaign: typeof emailCampaigns.$inferSelect) {
+  let recipients: { id: number; email: string; firstName: string; lastName: string }[];
+
+  if (campaign.audience === "re_agent") {
+    const conditions = [eq(agentContacts.optedOut, false)];
+    if (campaign.filterBrokerage) conditions.push(eq(agentContacts.brokerage, campaign.filterBrokerage));
+    if (campaign.filterCity) conditions.push(eq(agentContacts.city, campaign.filterCity));
+    if (campaign.filterState) conditions.push(eq(agentContacts.state, campaign.filterState));
+    if (campaign.filterTags && Array.isArray(campaign.filterTags) && (campaign.filterTags as string[]).length > 0) {
+      for (const tag of campaign.filterTags as string[]) {
+        conditions.push(sql`JSON_CONTAINS(${agentContacts.tags}, ${JSON.stringify(tag)}, '$')`);
+      }
+    }
+    recipients = await db.select({
+      id: agentContacts.id, email: agentContacts.email,
+      firstName: agentContacts.firstName, lastName: agentContacts.lastName,
+    }).from(agentContacts).where(and(...conditions));
+  } else if (campaign.audience === "past_mortgage") {
+    const conditions = [eq(mortgageClients.optedOut, false)];
+    if (campaign.filterCity) conditions.push(eq(mortgageClients.city, campaign.filterCity));
+    if (campaign.filterState) conditions.push(eq(mortgageClients.state, campaign.filterState));
+    if (campaign.filterTags && Array.isArray(campaign.filterTags) && (campaign.filterTags as string[]).length > 0) {
+      for (const tag of campaign.filterTags as string[]) {
+        conditions.push(sql`JSON_CONTAINS(${mortgageClients.tags}, ${JSON.stringify(tag)}, '$')`);
+      }
+    }
+    recipients = await db.select({
+      id: mortgageClients.id, email: mortgageClients.email,
+      firstName: mortgageClients.firstName, lastName: mortgageClients.lastName,
+    }).from(mortgageClients).where(and(...conditions));
+  } else {
+    // prospective_mortgage or prospective_re_client — both target leads
+    const conditions: any[] = [leadNotUnsubscribed];
+    if (campaign.filterTags && Array.isArray(campaign.filterTags) && (campaign.filterTags as string[]).length > 0) {
+      for (const tag of campaign.filterTags as string[]) {
+        conditions.push(sql`JSON_CONTAINS(${leads.quickNote}, ${JSON.stringify(tag)}, '$')`);
+      }
+    }
+    recipients = await db.select({
+      id: leads.id, email: leads.email,
+      firstName: leads.firstName, lastName: leads.lastName,
+    }).from(leads).where(conditions.length ? and(...conditions) : undefined);
+  }
+
+  await db.delete(campaignRecipients).where(eq(campaignRecipients.campaignId, campaign.id));
+  const recipientRows = recipients.map(r => ({
+    campaignId: campaign.id,
+    agentContactId: campaign.audience === "re_agent" ? r.id : null,
+    mortgageClientId: campaign.audience === "past_mortgage" ? r.id : null,
+    leadId: (campaign.audience === "prospective_mortgage" || campaign.audience === "prospective_re_client") ? r.id : null,
+    trackingId: randomUUID().replace(/-/g, "").slice(0, 32),
+  }));
+
+  for (let i = 0; i < recipientRows.length; i += 100) {
+    await db.insert(campaignRecipients).values(recipientRows.slice(i, i + 100));
+  }
+
+  await db.update(emailCampaigns).set({ totalRecipients: recipients.length })
+    .where(eq(emailCampaigns.id, campaign.id));
+  return recipients.length;
+}
+
 export const campaignsRouter = router({
   list: protectedProcedure
     .input(z.object({
@@ -129,12 +194,18 @@ export const campaignsRouter = router({
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       const { filterLoanType, filterSource, filterStage, ...rest } = input;
-      const result = await db.insert(emailCampaigns).values({
-        ...rest,
-        createdBy: ctx.user.id,
-        filterTags: input.filterTags ?? null,
+      return db.transaction(async tx => {
+        const result = await tx.insert(emailCampaigns).values({
+          ...rest,
+          status: "draft",
+          createdBy: ctx.user.id,
+          filterTags: input.filterTags ?? null,
+        });
+        const id = result[0].insertId;
+        const [campaign] = await tx.select().from(emailCampaigns).where(eq(emailCampaigns.id, id)).limit(1);
+        const recipientCount = await loadDraftRecipients(tx, campaign);
+        return { id, recipientCount };
       });
-      return { id: result[0].insertId };
     }),
 
   update: protectedProcedure
@@ -156,22 +227,27 @@ export const campaignsRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       const { id, ...data } = input;
-      const [campaign] = await db.select({ status: emailCampaigns.status })
-        .from(emailCampaigns).where(eq(emailCampaigns.id, id)).limit(1);
-      if (!campaign) throw new Error("Campaign not found");
-      if (campaign.status !== "draft" && campaign.status !== "paused") {
-        throw new Error(campaign.status === "sending"
-          ? "Pause the campaign before editing it."
-          : `A ${campaign.status} campaign can't be edited.`);
-      }
-      // A paused campaign resumes with the recipient list built when it first sent.
-      const changesRecipients = ["audience", "filterTags", "filterBrokerage", "filterCity", "filterState"]
-        .some(k => data[k as keyof typeof data] !== undefined);
-      if (campaign.status === "paused" && changesRecipients) {
-        throw new Error("Recipients are fixed once a campaign starts sending; only its content and batch settings can change.");
-      }
-      await db.update(emailCampaigns).set(data).where(eq(emailCampaigns.id, id));
-      return { success: true };
+      return db.transaction(async tx => {
+        const [campaign] = await tx.select()
+          .from(emailCampaigns).where(eq(emailCampaigns.id, id)).limit(1).for("update");
+        if (!campaign) throw new Error("Campaign not found");
+        if (campaign.status !== "draft" && campaign.status !== "paused") {
+          throw new Error(campaign.status === "sending"
+            ? "Pause the campaign before editing it."
+            : `A ${campaign.status} campaign can't be edited.`);
+        }
+        // A paused campaign resumes with the recipient list built when it first sent.
+        const changesRecipients = ["audience", "filterTags", "filterBrokerage", "filterCity", "filterState"]
+          .some(k => data[k as keyof typeof data] !== undefined);
+        if (campaign.status === "paused" && changesRecipients) {
+          throw new Error("Recipients are fixed once a campaign starts sending; only its content and batch settings can change.");
+        }
+        await tx.update(emailCampaigns).set(data).where(eq(emailCampaigns.id, id));
+        const recipientCount = campaign.status === "draft"
+          ? await loadDraftRecipients(tx, { ...campaign, ...data })
+          : campaign.totalRecipients;
+        return { success: true, recipientCount };
+      });
     }),
 
   delete: protectedProcedure
@@ -269,77 +345,25 @@ export const campaignsRouter = router({
         return { recipientCount: campaign.totalRecipients ?? 0, status: "sending" };
       }
 
-      let recipients: { id: number; email: string; firstName: string; lastName: string }[];
-
-      if (campaign.audience === "re_agent") {
-        const conditions = [eq(agentContacts.optedOut, false)];
-        if (campaign.filterBrokerage) conditions.push(eq(agentContacts.brokerage, campaign.filterBrokerage));
-        if (campaign.filterCity) conditions.push(eq(agentContacts.city, campaign.filterCity));
-        if (campaign.filterState) conditions.push(eq(agentContacts.state, campaign.filterState));
-        if (campaign.filterTags && Array.isArray(campaign.filterTags) && (campaign.filterTags as string[]).length > 0) {
-          for (const tag of campaign.filterTags as string[]) {
-            conditions.push(sql`JSON_CONTAINS(${agentContacts.tags}, ${JSON.stringify(tag)}, '$')`);
-          }
-        }
-        recipients = await db.select({
-          id: agentContacts.id, email: agentContacts.email,
-          firstName: agentContacts.firstName, lastName: agentContacts.lastName,
-        }).from(agentContacts).where(and(...conditions));
-      } else if (campaign.audience === "past_mortgage") {
-        const conditions = [eq(mortgageClients.optedOut, false)];
-        if (campaign.filterCity) conditions.push(eq(mortgageClients.city, campaign.filterCity));
-        if (campaign.filterState) conditions.push(eq(mortgageClients.state, campaign.filterState));
-        if (campaign.filterTags && Array.isArray(campaign.filterTags) && (campaign.filterTags as string[]).length > 0) {
-          for (const tag of campaign.filterTags as string[]) {
-            conditions.push(sql`JSON_CONTAINS(${mortgageClients.tags}, ${JSON.stringify(tag)}, '$')`);
-          }
-        }
-        recipients = await db.select({
-          id: mortgageClients.id, email: mortgageClients.email,
-          firstName: mortgageClients.firstName, lastName: mortgageClients.lastName,
-        }).from(mortgageClients).where(and(...conditions));
-      } else {
-        // prospective_mortgage or prospective_re_client — both target leads
-        const conditions: any[] = [leadNotUnsubscribed];
-        if (campaign.filterTags && Array.isArray(campaign.filterTags) && (campaign.filterTags as string[]).length > 0) {
-          for (const tag of campaign.filterTags as string[]) {
-            conditions.push(sql`JSON_CONTAINS(${leads.quickNote}, ${JSON.stringify(tag)}, '$')`);
-          }
-        }
-        recipients = await db.select({
-          id: leads.id, email: leads.email,
-          firstName: leads.firstName, lastName: leads.lastName,
-        }).from(leads).where(conditions.length ? and(...conditions) : undefined);
-      }
-
-      if (recipients.length === 0) throw new Error("No matching recipients found");
-
-      await db.delete(campaignRecipients).where(eq(campaignRecipients.campaignId, campaign.id));
-
-      const recipientRows = recipients.map(r => ({
-        campaignId: campaign.id,
-        agentContactId: campaign.audience === "re_agent" ? r.id : null,
-        mortgageClientId: campaign.audience === "past_mortgage" ? r.id : null,
-        leadId: (campaign.audience === "prospective_mortgage" || campaign.audience === "prospective_re_client") ? r.id : null,
-        trackingId: randomUUID().replace(/-/g, "").slice(0, 32),
-      }));
-
-      for (let i = 0; i < recipientRows.length; i += 100) {
-        await db.insert(campaignRecipients).values(recipientRows.slice(i, i + 100));
-      }
-
-      await db.update(emailCampaigns).set({
-        status: "sending",
-        startedAt: new Date(),
-        totalRecipients: recipients.length,
-        totalSent: 0,
-      }).where(eq(emailCampaigns.id, campaign.id));
-
-      sendBatches(campaign.id, campaign.batchSize, campaign.batchDelayMinutes).catch(err => {
-        console.error(`[Campaign ${campaign.id}] Batch send error:`, err);
+      // The Save/Create operation owns the recipient snapshot. Older drafts
+      // without one must be saved first instead of expanding silently on Send.
+      const savedCampaign = await db.transaction(async tx => {
+        const [saved] = await tx.select().from(emailCampaigns)
+          .where(eq(emailCampaigns.id, campaign.id)).limit(1).for("update");
+        if (!saved || saved.status !== "draft") throw new Error("Campaign is no longer a draft.");
+        const [loaded] = await tx.select({ count: sql<number>`count(*)` }).from(campaignRecipients)
+          .where(eq(campaignRecipients.campaignId, saved.id));
+        const count = Number(loaded?.count ?? 0);
+        if (count === 0) throw new Error("No recipients loaded. Edit and save this campaign before sending.");
+        await tx.update(emailCampaigns).set({
+          status: "sending", startedAt: new Date(), totalRecipients: count, totalSent: 0,
+        }).where(eq(emailCampaigns.id, saved.id));
+        return { ...saved, totalRecipients: count };
       });
-
-      return { recipientCount: recipients.length, status: "sending" };
+      sendBatches(savedCampaign.id, savedCampaign.batchSize, savedCampaign.batchDelayMinutes).catch(err => {
+        console.error(`[Campaign ${savedCampaign.id}] Batch send error:`, err);
+      });
+      return { recipientCount: savedCampaign.totalRecipients, status: "sending" };
     }),
 
   pause: protectedProcedure
