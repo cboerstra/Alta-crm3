@@ -14,8 +14,16 @@ const TIME_SLOTS = [
   "15:00", "15:30", "16:00", "16:30",
 ];
 
+function formatSlot(slot: string) {
+  const [h, m] = slot.split(":").map(Number);
+  return `${h % 12 || 12}:${m.toString().padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+
 export default function PublicBooking() {
   const params = useParams<{ slug: string }>();
+  // Set by the "Request a tour" button on FreeHomeSearchUtah.com listings.
+  const home = useMemo(() => (new URLSearchParams(window.location.search).get("home") ?? "").trim().slice(0, 200), []);
+  const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
@@ -38,7 +46,7 @@ export default function PublicBooking() {
 
   const bookMutation = trpc.scheduling.book.useMutation({
     onSuccess: () => setSubmitted(true),
-    onError: () => setSubmitted(true),
+    onError: (err) => setError(err.message || "Something went wrong. Please call or text us instead."),
   });
 
   // Build calendar days for current month
@@ -126,9 +134,11 @@ export default function PublicBooking() {
             <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="h-8 w-8 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: "Raleway, sans-serif" }}>Consultation Booked!</h2>
+            <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: "Raleway, sans-serif" }}>{home ? "Tour Requested!" : "Consultation Booked!"}</h2>
             <p className="text-muted-foreground">
-              Your consultation has been confirmed. You'll receive a confirmation email shortly.
+              {home
+                ? `Thanks! ${availData.agent.name ?? "We"} will reach out to confirm your tour of ${home}.`
+                : "Your consultation has been confirmed. You'll receive a confirmation email shortly."}
             </p>
             {selectedDate && selectedTime && (
               <div className="mt-4 p-3 rounded-lg bg-muted/30 border border-border/30">
@@ -136,7 +146,7 @@ export default function PublicBooking() {
                   <Calendar className="h-4 w-4" />
                   <span>{selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</span>
                   <Clock className="h-4 w-4 ml-2" />
-                  <span>{selectedTime}</span>
+                  <span>{formatSlot(selectedTime)}</span>
                 </div>
               </div>
             )}
@@ -154,12 +164,13 @@ export default function PublicBooking() {
           <div className="flex items-center justify-center gap-2 mb-3">
             <Building2 className="h-7 w-7 text-[#C9A84C]" />
             <span className="text-white/80 text-sm font-medium tracking-widest uppercase" style={{ fontFamily: "Raleway, sans-serif" }}>
-              Clarke & Associates
+              {home ? "FreeHomeSearchUtah.com" : "Clarke & Associates"}
             </span>
           </div>
           <h1 className="text-2xl md:text-3xl font-bold text-white" style={{ fontFamily: "Raleway, sans-serif" }}>
-            Book a Consultation
+            {home ? "Request a Tour" : "Book a Consultation"}
           </h1>
+          {home && <p className="text-white text-lg mt-1">{home}</p>}
           {availData.agent.name && (
             <p className="text-white/70 mt-1">with {availData.agent.name}</p>
           )}
@@ -237,7 +248,7 @@ export default function PublicBooking() {
                         className="text-sm"
                         onClick={() => setSelectedTime(slot)}
                       >
-                        {slot}
+                        {formatSlot(slot)}
                       </Button>
                     ))}
                   </div>
@@ -254,7 +265,7 @@ export default function PublicBooking() {
                     <h3 className="text-sm font-semibold">
                       {selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                     </h3>
-                    <p className="text-xs text-muted-foreground">{selectedTime} · 30 minutes</p>
+                    <p className="text-xs text-muted-foreground">{formatSlot(selectedTime)} · 30 minutes</p>
                   </div>
                 </div>
                 <div className="space-y-4 mt-4">
@@ -267,7 +278,7 @@ export default function PublicBooking() {
                     <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-1" />
                   </div>
                   <div>
-                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone</Label>
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone{home ? " *" : ""}</Label>
                     <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-1" />
                   </div>
                   <div>
@@ -277,8 +288,9 @@ export default function PublicBooking() {
                   <Button
                     className="w-full h-12 text-base font-semibold text-white"
                     style={{ backgroundColor: "#2A5B3F" }}
-                    disabled={!form.name || !form.email || bookMutation.isPending}
+                    disabled={!form.name || !form.email || (!!home && !form.phone.trim()) || bookMutation.isPending}
                     onClick={() => {
+                      setError(null);
                       const [h, m] = selectedTime!.split(":").map(Number);
                       const scheduledAt = new Date(selectedDate!);
                       scheduledAt.setHours(h, m, 0, 0);
@@ -289,11 +301,13 @@ export default function PublicBooking() {
                         guestPhone: form.phone || undefined,
                         scheduledAt: scheduledAt.getTime(),
                         notes: form.notes || undefined,
+                        home: home || undefined,
                       });
                     }}
                   >
-                    {bookMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : "Confirm Booking"}
+                    {bookMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : home ? "Request Tour" : "Confirm Booking"}
                   </Button>
+                  {error && <p className="text-sm text-red-600 text-center">{error}</p>}
                 </div>
               </div>
             )}
