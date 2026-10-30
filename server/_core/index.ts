@@ -80,6 +80,20 @@ async function startServer() {
   // Behind Hostinger's reverse proxy: trust one hop so req.ip is the real client (rate limiting).
   app.set("trust proxy", 1);
   app.use(securityHeaders);
+  // Allow freehomesearchutah.com to load assets and call APIs cross-origin (landing page proxy).
+  // Registered before every route, including /uploads, which proxied pages fetch their HTML designs from.
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin && (origin === "https://freehomesearchutah.com")) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Vary", "Origin");
+    }
+    if (req.method === "OPTIONS") { res.sendStatus(204); return; }
+    next();
+  });
   // Brute-force protection: 10 login attempts / 15 min per IP, 5 registrations / hour per IP.
   // tRPC batches calls into one URL (e.g. /api/trpc/auth.me,auth.login), so match by substring.
   const limitTrpc = (proc: string, windowMs: number, max: number): RequestHandler => {
@@ -519,19 +533,6 @@ async function startServer() {
       "You have been unsubscribed",
       "<p>You will no longer receive these emails from us.</p>"
     ));
-  });
-
-  // Allow freehomesearchutah.com to load assets and call APIs cross-origin (landing page proxy)
-  app.use((req, res, next) => {
-    const origin = req.headers.origin;
-    if (origin && (origin === "https://freehomesearchutah.com")) {
-      res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-      res.setHeader("Access-Control-Allow-Credentials", "true");
-    }
-    if (req.method === "OPTIONS") { res.sendStatus(204); return; }
-    next();
   });
 
   // tRPC API
