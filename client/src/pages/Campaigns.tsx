@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Play, Pause, Eye, Trash2, Mail, Send, BarChart3 } from "lucide-react";
+import { Plus, Play, Pause, Eye, Trash2, Mail, Send, BarChart3, Pencil } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
   draft: "secondary",
@@ -29,6 +29,8 @@ export default function Campaigns() {
   const utils = trpc.useUtils();
   const [showCreate, setShowCreate] = useState(false);
   const [showDetail, setShowDetail] = useState<number | null>(null);
+  const [editing, setEditing] = useState<{ id: number; status: string } | null>(null);
+  const recipientsLocked = editing?.status === "paused";
   const [form, setForm] = useState({
     audience: "re_agent" as "re_agent" | "past_mortgage" | "prospective_mortgage" | "prospective_re_client",
     name: "", subject: "", bodyHtml: "", fromName: "Scott Boerstra",
@@ -54,10 +56,14 @@ export default function Campaigns() {
     filterState: form.filterState || undefined,
     filterLoanType: form.filterLoanType || undefined,
     filterTags: form.audience === "re_agent" && form.filterTag ? [form.filterTag] : undefined,
-  }, { enabled: showCreate });
+  }, { enabled: showCreate && !recipientsLocked });
 
   const createMutation = trpc.campaigns.create.useMutation({
-    onSuccess: () => { utils.campaigns.invalidate(); setShowCreate(false); resetForm(); },
+    onSuccess: () => { utils.campaigns.invalidate(); closeForm(); },
+  });
+  const updateMutation = trpc.campaigns.update.useMutation({
+    onSuccess: () => { utils.campaigns.invalidate(); closeForm(); },
+    onError: (err) => alert(err.message),
   });
   const sendMutation = trpc.campaigns.send.useMutation({
     onSuccess: () => utils.campaigns.invalidate(),
@@ -74,6 +80,43 @@ export default function Campaigns() {
       audience: "re_agent", name: "", subject: "", bodyHtml: "", fromName: "Scott Boerstra",
       filterBrokerage: "", filterCity: "", filterState: "", filterLoanType: "", filterTag: "",
       batchSize: 50, batchDelayMinutes: 15,
+    });
+  }
+
+  function closeForm() {
+    setShowCreate(false);
+    setEditing(null);
+    resetForm();
+  }
+
+  async function openEdit(id: number) {
+    const c = await utils.campaigns.getById.fetch({ id });
+    if (!c) return;
+    const tags = Array.isArray(c.filterTags) ? (c.filterTags as string[]) : [];
+    setForm({
+      audience: c.audience as typeof form.audience,
+      name: c.name, subject: c.subject, bodyHtml: c.bodyHtml, fromName: c.fromName ?? "",
+      filterBrokerage: c.filterBrokerage ?? "", filterCity: c.filterCity ?? "", filterState: c.filterState ?? "",
+      filterLoanType: "", filterTag: tags[0] ?? "",
+      batchSize: c.batchSize, batchDelayMinutes: c.batchDelayMinutes,
+    });
+    setEditing({ id, status: c.status });
+    setShowCreate(true);
+  }
+
+  function saveEdit() {
+    if (!editing) return;
+    const content = {
+      id: editing.id, name: form.name, subject: form.subject, bodyHtml: form.bodyHtml, fromName: form.fromName,
+      batchSize: form.batchSize, batchDelayMinutes: form.batchDelayMinutes,
+    };
+    updateMutation.mutate(recipientsLocked ? content : {
+      ...content,
+      audience: form.audience,
+      filterTags: form.audience === "re_agent" && form.filterTag ? [form.filterTag] : [],
+      filterBrokerage: form.filterBrokerage || null,
+      filterCity: form.filterCity || null,
+      filterState: form.filterState || null,
     });
   }
 
@@ -121,6 +164,11 @@ export default function Campaigns() {
                     <Button variant="ghost" size="sm" onClick={() => setShowDetail(c.id)}>
                       <Eye className="w-4 h-4" />
                     </Button>
+                    {(c.status === "draft" || c.status === "paused") && (
+                      <Button variant="ghost" size="sm" title="Edit campaign" onClick={() => openEdit(c.id)}>
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                    )}
                     {c.status === "draft" && (
                       <Button variant="ghost" size="sm" onClick={() => {
                         if (confirm(`Send campaign "${c.name}" to all matching recipients?`))
@@ -159,13 +207,18 @@ export default function Campaigns() {
       </div>
 
       {/* Create Campaign Dialog */}
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog open={showCreate} onOpenChange={open => { if (!open) closeForm(); }}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Create Email Campaign</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editing ? "Edit Email Campaign" : "Create Email Campaign"}</DialogTitle></DialogHeader>
           <div className="space-y-4">
+            {recipientsLocked && (
+              <p className="rounded-md border bg-muted/40 p-3 text-sm">
+                This campaign is paused. Changes to the subject, body and batch settings apply to the emails it still has to send. The audience and recipient filters can't change once sending has started.
+              </p>
+            )}
             <div>
               <label className="text-sm font-medium mb-1 block">Audience</label>
-              <Select value={form.audience} onValueChange={(v: any) => setForm(f => ({ ...f, audience: v, filterBrokerage: "", filterCity: "", filterLoanType: "", filterTag: "" }))}>
+              <Select disabled={recipientsLocked} value={form.audience} onValueChange={(v: any) => setForm(f => ({ ...f, audience: v, filterBrokerage: "", filterCity: "", filterLoanType: "", filterTag: "" }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="re_agent">Real Estate Agent</SelectItem>
@@ -191,7 +244,7 @@ export default function Campaigns() {
               </p>
             </div>
 
-            <div className="border-t pt-4">
+            {!recipientsLocked && (<div className="border-t pt-4">
               <h3 className="text-sm font-medium mb-3">Recipient Filters</h3>
               <div className="grid grid-cols-3 gap-3">
                 {form.audience === "re_agent" && (
@@ -274,7 +327,7 @@ export default function Campaigns() {
                     : "Sends from your Gmail account."}
                 </p>
               )}
-            </div>
+            </div>)}
 
             <div className="border-t pt-4">
               <h3 className="text-sm font-medium mb-3">Batch Settings</h3>
@@ -293,7 +346,12 @@ export default function Campaigns() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button variant="outline" onClick={closeForm}>Cancel</Button>
+            {editing ? (
+              <Button disabled={!form.name || !form.subject || !form.bodyHtml || updateMutation.isPending} onClick={saveEdit}>
+                {updateMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            ) : (
             <Button disabled={!form.name || !form.subject || !form.bodyHtml || createMutation.isPending}
               onClick={() => createMutation.mutate({
                 ...form,
@@ -305,6 +363,7 @@ export default function Campaigns() {
               })}>
               {createMutation.isPending ? "Creating..." : "Create Campaign"}
             </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
