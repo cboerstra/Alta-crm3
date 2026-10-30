@@ -140,9 +140,10 @@ export const campaignsRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
-      name: z.string().optional(),
-      subject: z.string().optional(),
-      bodyHtml: z.string().optional(),
+      audience: z.enum(["re_agent", "past_mortgage", "prospective_mortgage", "prospective_re_client"]).optional(),
+      name: z.string().min(1).optional(),
+      subject: z.string().min(1).optional(),
+      bodyHtml: z.string().min(1).optional(),
       fromName: z.string().optional(),
       landingPageId: z.number().nullable().optional(),
       filterTags: z.array(z.string()).optional(),
@@ -155,6 +156,20 @@ export const campaignsRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
       const { id, ...data } = input;
+      const [campaign] = await db.select({ status: emailCampaigns.status })
+        .from(emailCampaigns).where(eq(emailCampaigns.id, id)).limit(1);
+      if (!campaign) throw new Error("Campaign not found");
+      if (campaign.status !== "draft" && campaign.status !== "paused") {
+        throw new Error(campaign.status === "sending"
+          ? "Pause the campaign before editing it."
+          : `A ${campaign.status} campaign can't be edited.`);
+      }
+      // A paused campaign resumes with the recipient list built when it first sent.
+      const changesRecipients = ["audience", "filterTags", "filterBrokerage", "filterCity", "filterState"]
+        .some(k => data[k as keyof typeof data] !== undefined);
+      if (campaign.status === "paused" && changesRecipients) {
+        throw new Error("Recipients are fixed once a campaign starts sending; only its content and batch settings can change.");
+      }
       await db.update(emailCampaigns).set(data).where(eq(emailCampaigns.id, id));
       return { success: true };
     }),
