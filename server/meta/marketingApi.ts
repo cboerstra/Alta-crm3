@@ -81,6 +81,9 @@ export function buildTargetingSpec(t: MetaTargeting | undefined | null): Record<
     geo_locations: geo,
     age_min: targeting.ageMin ?? 25,
     age_max: targeting.ageMax ?? 65,
+    // Housing ad sets with set targeting must state this explicitly or Meta
+    // rejects them. 0 keeps delivery inside the targeting configured here.
+    targeting_automation: { advantage_audience: 0 },
   };
   if (targeting.genders?.length) spec.genders = targeting.genders;
   if (targeting.interests?.length) {
@@ -95,6 +98,9 @@ export async function createMetaCampaign(
   creds: MetaCredentials,
   input: { name: string; objective: string; status?: "PAUSED" | "ACTIVE"; specialAdCategories?: string[] }
 ): Promise<{ id: string }> {
+  // Mortgage advertising is a regulated category on Meta. Declaring it is
+  // mandatory — omitting it gets the ad rejected, or the account flagged.
+  const specialAdCategories = input.specialAdCategories ?? ["HOUSING"];
   return graphRequest<{ id: string }>({
     path: `${normalizeAdAccountId(creds.adAccountId)}/campaigns`,
     method: "POST",
@@ -104,9 +110,11 @@ export async function createMetaCampaign(
       name: input.name,
       objective: input.objective,
       status: input.status ?? "PAUSED",
-      // Mortgage advertising is a regulated category on Meta. Declaring it is
-      // mandatory — omitting it gets the ad rejected, or the account flagged.
-      special_ad_categories: input.specialAdCategories ?? ["HOUSING"],
+      special_ad_categories: specialAdCategories,
+      // Meta requires the country whenever a special ad category is declared.
+      ...(specialAdCategories.length > 0 ? { special_ad_category_country: ["US"] } : {}),
+      // Budgets live on the ad set, and Meta requires this flag in that case.
+      is_adset_budget_sharing_enabled: false,
     },
   });
 }
@@ -211,7 +219,8 @@ export async function createMetaAdCreative(
     page_id: creds.pageId,
     link_data: linkData,
   };
-  if (creds.instagramActorId) objectStorySpec.instagram_actor_id = creds.instagramActorId;
+  // Meta replaced instagram_actor_id with instagram_user_id in v22.
+  if (creds.instagramActorId) objectStorySpec.instagram_user_id = creds.instagramActorId;
 
   return graphRequest<{ id: string }>({
     path: `${normalizeAdAccountId(creds.adAccountId)}/adcreatives`,
