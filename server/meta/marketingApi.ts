@@ -79,7 +79,7 @@ export function buildTargetingSpec(t: MetaTargeting | undefined | null): Record<
 
   const spec: Record<string, unknown> = {
     geo_locations: geo,
-    age_min: targeting.ageMin ?? 25,
+    age_min: targeting.ageMin ?? 18,
     age_max: targeting.ageMax ?? 65,
     // Housing ad sets with set targeting must state this explicitly or Meta
     // rejects them. 0 keeps delivery inside the targeting configured here.

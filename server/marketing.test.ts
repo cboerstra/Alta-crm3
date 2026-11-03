@@ -265,6 +265,12 @@ describe("Marketing API requests", () => {
 });
 
 describe("Marketing API helpers", () => {
+  it("defaults to the full age range housing ads require", () => {
+    const spec = buildTargetingSpec(null) as any;
+    expect(spec.age_min).toBe(18);
+    expect(spec.age_max).toBe(65);
+  });
+
   it("states the Advantage+ audience choice in targeting", () => {
     const spec = buildTargetingSpec(null) as any;
     expect(spec.targeting_automation).toEqual({ advantage_audience: 0 });
