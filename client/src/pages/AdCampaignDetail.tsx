@@ -13,9 +13,10 @@ import {
 } from "@/components/ui/dialog";
 import {
   ArrowLeft, Loader2, Upload, Play, Pause, RefreshCw, ExternalLink, Copy,
-  AlertTriangle, CheckCircle2, DollarSign, Users, TrendingUp, Target,
+  AlertTriangle, CheckCircle2, DollarSign, Users, TrendingUp, Target, Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
+import { canEditCampaign } from "@shared/adCampaignRules";
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
@@ -150,6 +151,11 @@ export default function CampaignDetail() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap shrink-0">
+          {canEditCampaign(campaign) && (
+            <Button variant="outline" size="sm" onClick={() => navigate(`/ad-campaigns?edit=${campaignId}`)}>
+              <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
+            </Button>
+          )}
           <Button
             variant="outline" size="sm"
             onClick={() => {

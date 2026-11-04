@@ -24,6 +24,7 @@ import {
   CampaignPublishError,
 } from "../meta/publisher";
 import { draftCampaignWithAI } from "../marketingAi";
+import { canEditCampaign, lockedFieldsInUpdate } from "@shared/adCampaignRules";
 
 const objectiveEnum = z.enum([
   "OUTCOME_LEADS",
@@ -247,14 +248,45 @@ export const adCampaignsRouter = router({
       const { id, dailyBudget, lifetimeBudget, targeting, creative, ...rest } = input;
       const existing = await getAdCampaignById(id);
       if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "Campaign not found" });
+      if (!canEditCampaign(existing) && lockedFieldsInUpdate(input).length > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This campaign is already published to Meta, so only its budget can be changed here.",
+        });
+      }
+
+      const nextDaily = dailyBudget !== undefined ? dailyBudget : existing.dailyBudget;
+      const nextLifetime = lifetimeBudget !== undefined ? lifetimeBudget : existing.lifetimeBudget;
+      const nextEndDate = input.endDate !== undefined ? input.endDate : existing.endDate;
+      if (!nextDaily && !nextLifetime) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Set a daily or lifetime budget" });
+      }
+      if (nextLifetime && !nextEndDate) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "A lifetime budget needs an end date" });
+      }
 
       const data: Record<string, unknown> = { ...rest };
+      // The UTM tag follows the name until someone sets it themselves.
+      if (
+        input.name && input.name !== existing.name && input.utmCampaign === undefined &&
+        existing.utmCampaign === toUtmCampaign(existing.name)
+      ) {
+        data.utmCampaign = toUtmCampaign(input.name);
+      }
       if (dailyBudget !== undefined) data.dailyBudget = dailyBudget != null ? String(dailyBudget) : null;
       if (lifetimeBudget !== undefined) data.lifetimeBudget = lifetimeBudget != null ? String(lifetimeBudget) : null;
       if (targeting !== undefined) data.targeting = targeting;
       if (creative !== undefined) data.creative = creative;
 
       await updateAdCampaign(id, data as any);
+
+      // A replaced page must stop crediting its leads to this campaign.
+      if (input.landingPageId !== undefined && existing.landingPageId && existing.landingPageId !== input.landingPageId) {
+        const previous = await getLandingPageById(existing.landingPageId);
+        if (previous?.adCampaignId === id) {
+          await updateLandingPage(existing.landingPageId, { adCampaignId: null });
+        }
+      }
 
       if (input.landingPageId) {
         await updateLandingPage(input.landingPageId, { adCampaignId: id });
