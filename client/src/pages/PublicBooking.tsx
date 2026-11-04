@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { captureAttribution, toSubmitPayload } from "@/lib/attribution";
+import { tourSuccessUrl } from "@shared/tourSuccessUrl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,7 +51,13 @@ export default function PublicBooking() {
   });
 
   const bookMutation = trpc.scheduling.book.useMutation({
-    onSuccess: () => setSubmitted(true),
+    onSuccess: () => {
+      setSubmitted(true);
+      // Home tours finish on FreeHomeSearchUtah.com. The confirmation below shows while that page loads.
+      if (home && selectedDate && selectedTime) {
+        window.location.assign(tourSuccessUrl(home, selectedDate, selectedTime, src || undefined));
+      }
+    },
     onError: (err) => setError(err.message || "Something went wrong. Please call or text us instead."),
   });
 
@@ -77,6 +84,8 @@ export default function PublicBooking() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (date < today) return false;
+    // Tours need time to be confirmed, so they can't be booked online for today.
+    if (home && date.getTime() === today.getTime()) return false;
     return availData.availability.some((a) => a.dayOfWeek === dayOfWeek);
   };
 
@@ -162,7 +171,7 @@ export default function PublicBooking() {
             <h2 className="text-2xl font-bold mb-2" style={home ? undefined : { fontFamily: "Raleway, sans-serif" }}>{home ? "Tour Scheduled!" : "Consultation Booked!"}</h2>
             <p className="text-muted-foreground">
               {home
-                ? `Thanks! ${availData.agent.name ?? "We"} will reach out to confirm your tour of ${home}.`
+                ? `Thanks! ${availData.agent.name ?? "We"} will call or text within 2 hours during the day to confirm your tour of ${home}.`
                 : "Your consultation has been confirmed. You'll receive a confirmation email shortly."}
             </p>
             {selectedDate && selectedTime && (

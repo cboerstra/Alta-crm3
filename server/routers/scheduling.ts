@@ -7,7 +7,7 @@ import {
 } from "../db";
 import { attributionInputSchema, clientIpFromRequest, normalizeAttribution, type AttributionInput } from "../meta/attribution";
 import { trackCapturedLead, type TrackedLandingPage } from "../meta/leadTracking";
-import { sendTourInvite, tourCampaign } from "../tourRequest";
+import { isAfterTodayInUtah, sendTourInvite, tourCampaign } from "../tourRequest";
 
 export const schedulingRouter = router({
   getMyAvailability: protectedProcedure
@@ -119,6 +119,7 @@ async function bookTour(agent: Agent, input: {
   if (!phone) throw new Error("Please add a phone number so we can confirm your tour.");
   const [firstName, ...rest] = input.guestName.trim().split(/\s+/);
   const start = new Date(input.scheduledAt);
+  if (!isAfterTodayInUtah(start)) throw new Error("Tours can't be booked online for today. Please call or text to arrange one.");
   const page = input.src ? await getLandingPageBySlug(input.src) : undefined;
 
   const leadId = await createLead({
