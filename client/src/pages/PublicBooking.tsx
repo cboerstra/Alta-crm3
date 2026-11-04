@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
+import { captureAttribution, toSubmitPayload } from "@/lib/attribution";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +24,9 @@ export default function PublicBooking() {
   const params = useParams<{ slug: string }>();
   // Set by the "Request a tour" button on FreeHomeSearchUtah.com listings.
   const home = useMemo(() => (new URLSearchParams(window.location.search).get("home") ?? "").trim().slice(0, 200), []);
+  // src is the slug of the landing page that sent the visitor here.
+  const src = useMemo(() => new URLSearchParams(window.location.search).get("src") ?? "", []);
+  const attribution = useMemo(() => (home ? toSubmitPayload(captureAttribution()) : undefined), [home]);
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -302,6 +306,8 @@ export default function PublicBooking() {
                         scheduledAt: scheduledAt.getTime(),
                         notes: form.notes || undefined,
                         home: home || undefined,
+                        src: src || undefined,
+                        attribution,
                       });
                     }}
                   >
