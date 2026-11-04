@@ -42,6 +42,11 @@ export function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
+// leads.campaign is varchar(128); an address from the link can be up to 200 characters.
+export function tourCampaign(home: string): string {
+  return `freehomesearchutah.com — Tour: ${home}`.slice(0, 128);
+}
+
 export function tourTitle(t: TourRequest): string {
   return `Tour: ${t.home} — ${t.guestName}${t.guestPhone ? `, ${t.guestPhone}` : ""}`;
 }
