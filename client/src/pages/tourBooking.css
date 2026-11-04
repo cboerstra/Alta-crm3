@@ -1,0 +1,213 @@
+/* Mirrors the palette and fonts in FreeHomeSearchUtah.com's assets/css/style.css. */
+.fhsu-booking {
+  --fb-blue: #1345fe;
+  --fb-blue-dark: #0b30c4;
+  --fb-blue-tint: #e8eeff;
+  --fb-navy: #0d155d;
+  --fb-green: #8db304;
+  --fb-green-dark: #5e7a00;
+  --fb-lime-tint: #f1fbdc;
+  --fb-orange: #f26a12;
+  --fb-soft: #f4f6fb;
+
+  /* Point the shared UI components at the site's colors, for this page only. */
+  --background: #fff;
+  --foreground: var(--fb-navy);
+  --card: #fff;
+  --card-foreground: var(--fb-navy);
+  --primary: var(--fb-blue);
+  --primary-foreground: #fff;
+  --muted: var(--fb-soft);
+  --muted-foreground: #55607a;
+  --accent: var(--fb-blue-tint);
+  --accent-foreground: var(--fb-navy);
+  --border: #e1e5ef;
+  --input: #cfd5e3;
+  --ring: var(--fb-blue);
+
+  color-scheme: light;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--fb-soft);
+  color: var(--fb-navy);
+  font-family: Heebo, Arial, sans-serif;
+}
+
+.fhsu-booking h1,
+.fhsu-booking h2,
+.fhsu-booking h3 {
+  font-family: Manrope, Arial, sans-serif;
+  color: var(--fb-navy);
+}
+
+.fb-wrap {
+  width: min(1200px, calc(100% - 40px));
+  margin: 0 auto;
+}
+
+.fb-topbar {
+  background: var(--fb-navy);
+  font-size: 14px;
+}
+.fb-topbar .fb-wrap {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px 22px;
+  padding: 7px 0;
+}
+.fb-topbar a {
+  color: #fff;
+  text-decoration: none;
+}
+.fb-topbar a:hover {
+  text-decoration: underline;
+}
+
+.fb-header {
+  background: #fff;
+}
+.fb-header::after {
+  content: "";
+  display: block;
+  height: 5px;
+  background: linear-gradient(90deg, var(--fb-green) 0 33%, var(--fb-blue) 33% 66%, var(--fb-orange) 66% 100%);
+}
+.fb-header .fb-wrap {
+  padding: 12px 0;
+}
+.fb-header img {
+  display: block;
+  width: min(300px, 72vw);
+  height: auto;
+}
+
+.fb-main {
+  flex: 1;
+  padding: clamp(28px, 5vw, 56px) 20px;
+}
+.fb-column {
+  width: min(672px, 100%);
+  margin: 0 auto;
+}
+
+.fb-eyebrow {
+  margin: 0 0 8px;
+  color: var(--fb-blue);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.fb-intro {
+  margin-bottom: 24px;
+  text-align: center;
+}
+.fb-intro h1 {
+  margin: 0 0 8px;
+  font-size: clamp(30px, 5vw, 42px);
+  font-weight: 800;
+  line-height: 1.15;
+}
+.fb-home {
+  margin: 0;
+  font-family: Manrope, Arial, sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+}
+.fb-agent {
+  margin: 2px 0 0;
+  color: #55607a;
+}
+
+.fhsu-booking .fb-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(13, 21, 93, 0.09);
+}
+
+.fhsu-booking .tour-day:not(:disabled):hover {
+  background: var(--fb-blue-tint);
+  color: var(--fb-blue);
+}
+.fhsu-booking .tour-day:not(:disabled) {
+  color: var(--fb-navy);
+  font-weight: 600;
+}
+
+.fhsu-booking .tour-slot {
+  border: 2px solid var(--fb-blue);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--fb-blue);
+  font-family: Manrope, Arial, sans-serif;
+  font-weight: 700;
+}
+.fhsu-booking .tour-slot:hover {
+  background: var(--fb-blue);
+  color: #fff;
+}
+
+.fhsu-booking .tour-primary {
+  border-radius: 999px;
+  background: var(--fb-blue);
+  color: #fff;
+  font-family: Manrope, Arial, sans-serif;
+  font-weight: 700;
+}
+.fhsu-booking .tour-primary:hover:not(:disabled) {
+  background: var(--fb-blue-dark);
+}
+
+.fhsu-booking input,
+.fhsu-booking textarea {
+  border-radius: 10px;
+  color: var(--fb-navy);
+}
+
+.fb-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: var(--fb-lime-tint);
+  color: var(--fb-green-dark);
+}
+
+.fb-spinner {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+  color: var(--fb-blue);
+}
+.fb-notfound {
+  padding: 48px 0;
+  text-align: center;
+}
+
+.fb-footer {
+  background: var(--fb-navy);
+  color: #d3d8f2;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.fb-footer .fb-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 28px;
+  padding: 28px 0;
+}
+.fb-footer p {
+  margin: 0;
+}
+.fb-footer strong {
+  color: #fff;
+}
+.fb-footer a {
+  color: #fff;
+}
