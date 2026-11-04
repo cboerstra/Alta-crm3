@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { captureAttribution, toSubmitPayload } from "@/lib/attribution";
+import { tourSuccessUrl } from "@shared/tourSuccessUrl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,7 +51,13 @@ export default function PublicBooking() {
   });
 
   const bookMutation = trpc.scheduling.book.useMutation({
-    onSuccess: () => setSubmitted(true),
+    onSuccess: () => {
+      setSubmitted(true);
+      // Home tours finish on FreeHomeSearchUtah.com. The confirmation below shows while that page loads.
+      if (home && selectedDate && selectedTime) {
+        window.location.assign(tourSuccessUrl(home, selectedDate, selectedTime, src || undefined));
+      }
+    },
     onError: (err) => setError(err.message || "Something went wrong. Please call or text us instead."),
   });
 
