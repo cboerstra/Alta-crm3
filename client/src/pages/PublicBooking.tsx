@@ -134,7 +134,7 @@ export default function PublicBooking() {
             <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="h-8 w-8 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: "Raleway, sans-serif" }}>{home ? "Tour Requested!" : "Consultation Booked!"}</h2>
+            <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: "Raleway, sans-serif" }}>{home ? "Tour Scheduled!" : "Consultation Booked!"}</h2>
             <p className="text-muted-foreground">
               {home
                 ? `Thanks! ${availData.agent.name ?? "We"} will reach out to confirm your tour of ${home}.`
@@ -168,7 +168,7 @@ export default function PublicBooking() {
             </span>
           </div>
           <h1 className="text-2xl md:text-3xl font-bold text-white" style={{ fontFamily: "Raleway, sans-serif" }}>
-            {home ? "Request a Tour" : "Book a Consultation"}
+            {home ? "Schedule a Personal Tour" : "Book a Consultation"}
           </h1>
           {home && <p className="text-white text-lg mt-1">{home}</p>}
           {availData.agent.name && (
@@ -305,7 +305,7 @@ export default function PublicBooking() {
                       });
                     }}
                   >
-                    {bookMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : home ? "Request Tour" : "Confirm Booking"}
+                    {bookMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : home ? "Schedule Tour" : "Confirm Booking"}
                   </Button>
                   {error && <p className="text-sm text-red-600 text-center">{error}</p>}
                 </div>

@@ -1278,11 +1278,17 @@ export async function notifyAdminsBySms(message: string): Promise<void> {
       admins.map(async (admin) => {
         let toPhone = admin.phone!.trim().replace(/[\s\-().]/g, "");
         if (!toPhone.startsWith("+")) toPhone = `+1${toPhone}`;
-        await fetch("https://api.telnyx.com/v2/messages", {
+        const res = await fetch("https://api.telnyx.com/v2/messages", {
           method: "POST",
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({ from: fromPhone, to: toPhone, text: message }),
         });
+        // Telnyx refuses numbers that texted STOP ("This user has been marked as blocked");
+        // without this the admin alert just never arrives.
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({})) as { errors?: Array<{ detail?: string }> };
+          console.error(`[notifyAdminsBySms] Telnyx refused text to ${admin.name ?? admin.id} (${res.status}): ${err.errors?.[0]?.detail ?? "no detail"}`);
+        }
       }),
     );
   } catch (err) {
