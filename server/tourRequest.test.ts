@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTourIcs, googleCalendarLink, escapeHtml, type TourRequest } from "./tourRequest";
+import { buildTourIcs, googleCalendarLink, escapeHtml, isAfterTodayInUtah, type TourRequest } from "./tourRequest";
 
 const tour: TourRequest = {
   bookingId: 42,
@@ -49,6 +49,20 @@ describe("googleCalendarLink", () => {
     expect(url.searchParams.get("dates")).toBe("20261103T173000Z/20261103T180000Z");
     expect(url.searchParams.get("location")).toBe("3380 W 3275 N, Plain City");
     expect(url.searchParams.get("text")).toContain("Jane Smith");
+  });
+});
+
+describe("isAfterTodayInUtah", () => {
+  // 2026-11-04 at 11 PM in Utah, which is already 2026-11-05 in UTC.
+  const now = new Date("2026-11-05T06:00:00Z");
+
+  it("rejects later today and earlier dates", () => {
+    expect(isAfterTodayInUtah(new Date("2026-11-05T06:30:00Z"), now)).toBe(false);
+    expect(isAfterTodayInUtah(new Date("2026-11-03T18:00:00Z"), now)).toBe(false);
+  });
+
+  it("allows tomorrow in Utah", () => {
+    expect(isAfterTodayInUtah(new Date("2026-11-05T16:00:00Z"), now)).toBe(true);
   });
 });
 

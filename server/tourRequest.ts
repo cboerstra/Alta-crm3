@@ -42,6 +42,12 @@ export function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
+/** True when a tour starts after today, going by the date in Utah. */
+export function isAfterTodayInUtah(start: Date, now = new Date()): boolean {
+  const utahDate = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "America/Denver" });
+  return utahDate(start) > utahDate(now);
+}
+
 // leads.campaign is varchar(128); an address from the link can be up to 200 characters.
 export function tourCampaign(home: string): string {
   return `freehomesearchutah.com — Tour: ${home}`.slice(0, 128);

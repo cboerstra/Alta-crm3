@@ -77,6 +77,8 @@ export default function PublicBooking() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (date < today) return false;
+    // Tours need time to be confirmed, so they can't be booked online for today.
+    if (home && date.getTime() === today.getTime()) return false;
     return availData.availability.some((a) => a.dayOfWeek === dayOfWeek);
   };
 
@@ -162,7 +164,7 @@ export default function PublicBooking() {
             <h2 className="text-2xl font-bold mb-2" style={home ? undefined : { fontFamily: "Raleway, sans-serif" }}>{home ? "Tour Scheduled!" : "Consultation Booked!"}</h2>
             <p className="text-muted-foreground">
               {home
-                ? `Thanks! ${availData.agent.name ?? "We"} will reach out to confirm your tour of ${home}.`
+                ? `Thanks! ${availData.agent.name ?? "We"} will call or text within 2 hours during the day to confirm your tour of ${home}.`
                 : "Your consultation has been confirmed. You'll receive a confirmation email shortly."}
             </p>
             {selectedDate && selectedTime && (
