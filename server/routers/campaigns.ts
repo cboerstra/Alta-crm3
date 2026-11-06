@@ -3,7 +3,8 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
 import { unsubscribeByTrackingId } from "../unsubscribe";
 import { bulkUsage, estimateFinish, getBulkEmailSettings, getBulkSender, isUsable, remainingToday, usesBulkSender } from "../bulkEmail";
-import { emailCampaigns, campaignRecipients, agentContacts, mortgageClients, leads, integrations } from "../../drizzle/schema";
+import { anySendJobActive, claimRecipient, classifySendFailure, finishSendJob, isSendJobLive, releaseRecipient, startSendJob, stopSendJob, type SendJob } from "../campaignSend";
+import { emailCampaigns, campaignRecipients, agentContacts, mortgageClients, leads, integrations, bulkEmailSettings } from "../../drizzle/schema";
 import { eq, and, like, or, sql, desc, inArray } from "drizzle-orm";
 import { sendEmail as sendGmailEmail } from "../email";
 import { randomUUID } from "crypto";
@@ -17,8 +18,6 @@ async function getGmailCredentials() {
   if (!enabled) return null;
   return { gmailAddress: row.accountEmail, appPassword: row.accessToken };
 }
-
-let activeSendJob: { campaignId: number; abort: boolean } | null = null;
 
 /**
  * Leads have no opted-out flag of their own; their unsubscribes live on the
@@ -370,9 +369,7 @@ export const campaignsRouter = router({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (activeSendJob?.campaignId === input.id) {
-        activeSendJob.abort = true;
-      }
+      stopSendJob(input.id);
       await db.update(emailCampaigns).set({ status: "paused" })
         .where(eq(emailCampaigns.id, input.id));
       return { success: true };
@@ -430,8 +427,8 @@ export const campaignsRouter = router({
 });
 
 async function sendBatches(campaignId: number, batchSize: number, delayMinutes: number) {
+  const job = startSendJob(campaignId);
   const db = await getDb();
-  activeSendJob = { campaignId, abort: false };
 
   let bulk: Awaited<ReturnType<typeof getBulkSender>> = null;
   try {
@@ -446,8 +443,8 @@ async function sendBatches(campaignId: number, batchSize: number, delayMinutes: 
     const baseUrl = process.env.PUBLIC_URL || "https://altamortgagecrm.net";
 
     while (true) {
-      if (activeSendJob?.abort) {
-        console.log(`[Campaign ${campaignId}] Paused by user`);
+      if (!isSendJobLive(job)) {
+        console.log(`[Campaign ${campaignId}] Send loop stopped`);
         break;
       }
 
@@ -462,7 +459,7 @@ async function sendBatches(campaignId: number, batchSize: number, delayMinutes: 
         const { remaining, nextSlotAt } = remainingToday(await bulkUsage(), bulk.dailyLimit);
         if (remaining === 0 && nextSlotAt) {
           console.log(`[Campaign ${campaignId}] Daily limit of ${bulk.dailyLimit} reached; resuming at ${nextSlotAt.toISOString()}`);
-          if (!(await waitUntil(nextSlotAt, campaignId))) break;
+          if (!(await waitUntil(nextSlotAt, job))) break;
           continue;
         }
         take = Math.min(batchSize, remaining);
@@ -510,7 +507,10 @@ async function sendBatches(campaignId: number, batchSize: number, delayMinutes: 
       console.log(`[Campaign ${campaignId}] Sending batch of ${batch.length}`);
 
       for (const recipient of batch) {
-        if (activeSendJob?.abort) break;
+        if (!isSendJobLive(job)) break;
+        // Re-checked per email: another campaign may be using the same allowance.
+        if (bulk && remainingToday(await bulkUsage(), bulk.dailyLimit).remaining === 0) break;
+        if (!(await claimRecipient(db, recipient.id))) continue;
 
         try {
           // Same placeholders in the subject as the body: subjects went out
@@ -557,17 +557,27 @@ async function sendBatches(campaignId: number, batchSize: number, delayMinutes: 
             });
           }
 
-          await db.update(campaignRecipients).set({
-            status: "sent",
-            sentAt: new Date(),
-          }).where(eq(campaignRecipients.id, recipient.id));
-
           await db.update(emailCampaigns).set({
             totalSent: sql`totalSent + 1`,
           }).where(eq(emailCampaigns.id, campaignId));
 
         } catch (err) {
           console.error(`[Campaign ${campaignId}] Failed to send to ${recipient.email}:`, err);
+          // The relay refusing mail, such as over its daily limit, says nothing
+          // about this person. Pause rather than marking the whole list bounced.
+          if (classifySendFailure(err) === "stop") {
+            await releaseRecipient(db, recipient.id);
+            stopSendJob(campaignId);
+            await db.update(emailCampaigns).set({ status: "paused" })
+              .where(eq(emailCampaigns.id, campaignId));
+            if (bulk) {
+              await db.update(bulkEmailSettings)
+                .set({ lastError: `Campaign ${campaignId} paused: ${(err as Error).message}`.slice(0, 1000) });
+            }
+            console.error(`[Campaign ${campaignId}] Paused: the mail server is refusing mail`);
+            break;
+          }
+          // sentAt stays set, so a failed attempt still counts toward the daily limit.
           await db.update(campaignRecipients).set({ status: "bounced" })
             .where(eq(campaignRecipients.id, recipient.id));
           await db.update(emailCampaigns).set({
@@ -577,14 +587,14 @@ async function sendBatches(campaignId: number, batchSize: number, delayMinutes: 
       }
 
       // Delay between batches
-      if (!activeSendJob?.abort) {
+      if (isSendJobLive(job)) {
         console.log(`[Campaign ${campaignId}] Waiting ${delayMinutes} minutes before next batch`);
-        await new Promise(resolve => setTimeout(resolve, delayMinutes * 60 * 1000));
+        if (!(await waitUntil(new Date(Date.now() + delayMinutes * 60 * 1000), job))) break;
       }
     }
   } finally {
     bulk?.transporter.close();
-    activeSendJob = null;
+    finishSendJob(job);
   }
 }
 
@@ -592,13 +602,13 @@ async function sendBatches(campaignId: number, batchSize: number, delayMinutes: 
  * Sleep until `until`, a minute at a time, so a pause or a deleted campaign
  * takes effect promptly. False when the campaign stopped sending meanwhile.
  */
-async function waitUntil(until: Date, campaignId: number): Promise<boolean> {
+async function waitUntil(until: Date, job: SendJob): Promise<boolean> {
   const db = await getDb();
   while (Date.now() < until.getTime()) {
     await new Promise((resolve) => setTimeout(resolve, Math.min(60_000, until.getTime() - Date.now())));
-    if (activeSendJob?.abort) return false;
+    if (!isSendJobLive(job)) return false;
     const [row] = await db.select({ status: emailCampaigns.status })
-      .from(emailCampaigns).where(eq(emailCampaigns.id, campaignId)).limit(1);
+      .from(emailCampaigns).where(eq(emailCampaigns.id, job.campaignId)).limit(1);
     if (row?.status !== "sending") return false;
   }
   return true;
@@ -610,7 +620,7 @@ async function waitUntil(until: Date, campaignId: number): Promise<boolean> {
  * "sending" with nothing sending it.
  */
 export async function resumeSendingCampaigns(): Promise<void> {
-  if (activeSendJob) return;
+  if (anySendJobActive()) return;
   const db = await getDb();
   if (!db) return;
   const sending = await db.select().from(emailCampaigns)
