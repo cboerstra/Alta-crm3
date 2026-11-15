@@ -645,6 +645,32 @@ export const bulkEmailSettings = mysqlTable("bulk_email_settings", {
 
 export type BulkEmailSettings = typeof bulkEmailSettings.$inferSelect;
 
+// ─── Meta Custom Audiences ───────────────────────────────────────────────────
+// Who a retargeting ad set shows to or leaves out. `definition` says how the
+// audience is built (see server/meta/audiences.ts); `metaAudienceId` is the
+// audience in the ad account once created there.
+export const metaAudiences = mysqlTable("meta_audiences", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  kind: mysqlEnum("kind", ["website", "crm_list"]).notNull(),
+  definition: json("definition").notNull(),
+  metaAudienceId: varchar("metaAudienceId", { length: 64 }),
+  status: mysqlEnum("status", ["pending", "ready", "syncing", "error"]).default("pending").notNull(),
+  /** Contacts sent on the last customer-list sync. */
+  memberCount: int("memberCount"),
+  /** Meta's size estimate; both null until Meta reports one. */
+  sizeLow: int("sizeLow"),
+  sizeHigh: int("sizeHigh"),
+  lastSyncedAt: timestamp("lastSyncedAt"),
+  lastError: text("lastError"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type MetaAudience = typeof metaAudiences.$inferSelect;
+export type InsertMetaAudience = typeof metaAudiences.$inferInsert;
+
 // ─── Landing Page Templates ──────────────────────────────────────────────────
 // Reusable, branded starting points ("home value", "grant", "refi"…). A campaign
 // picks a template and the CRM stamps out a real landing page from it.

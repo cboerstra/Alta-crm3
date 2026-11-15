@@ -37,6 +37,9 @@ export type MetaTargeting = {
   ageMax?: number;
   genders?: number[];       // 1 = male, 2 = female; omit for all
   interests?: Array<{ id: string; name?: string }>;
+  /** Meta Custom Audience ids to show to, and to leave out. */
+  customAudiences?: string[];
+  excludedCustomAudiences?: string[];
   /** Raw passthrough for anything the helper above doesn't model. */
   raw?: Record<string, unknown>;
 };
@@ -88,6 +91,10 @@ export function buildTargetingSpec(t: MetaTargeting | undefined | null): Record<
   if (targeting.genders?.length) spec.genders = targeting.genders;
   if (targeting.interests?.length) {
     spec.flexible_spec = [{ interests: targeting.interests.map((i) => ({ id: i.id, name: i.name })) }];
+  }
+  if (targeting.customAudiences?.length) spec.custom_audiences = targeting.customAudiences.map((id) => ({ id }));
+  if (targeting.excludedCustomAudiences?.length) {
+    spec.excluded_custom_audiences = targeting.excludedCustomAudiences.map((id) => ({ id }));
   }
   return { ...spec, ...(targeting.raw ?? {}) };
 }

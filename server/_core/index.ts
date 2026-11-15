@@ -633,6 +633,17 @@ async function startServer() {
   };
   setInterval(syncMetaMetrics, 60 * 60_000);
   setTimeout(syncMetaMetrics, 30_000);
+
+  // CRM-list audiences re-upload to Meta about once a day; checked hourly.
+  setInterval(async () => {
+    try {
+      const { syncDueAudiences } = await import("../audienceSync");
+      const n = await syncDueAudiences();
+      if (n > 0) console.log(`[Meta Audiences] Synced ${n} audience(s)`);
+    } catch (err) {
+      console.error("[Meta Audiences] Sync error:", err);
+    }
+  }, 60 * 60_000);
 }
 
 startServer().catch(console.error);
