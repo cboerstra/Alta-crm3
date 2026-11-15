@@ -205,6 +205,14 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
     throw new CampaignPublishError("creative", "Add ad copy (primary text) before publishing");
   }
 
+  const zipTargets = ((campaign.targeting ?? {}) as MetaTargeting).zips ?? [];
+  if (zipTargets.length > 0) {
+    throw new CampaignPublishError(
+      "targeting",
+      "Housing ads can't target ZIP codes. Edit the campaign and choose a target area (a town and a radius of 15 miles or more), then publish again.",
+    );
+  }
+
   // CRM audience ids → Meta audience ids, checked before anything is created in Meta.
   const storedTargeting = (campaign.targeting ?? {}) as MetaTargeting & {
     includeAudienceIds?: number[];

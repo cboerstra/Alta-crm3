@@ -50,6 +50,12 @@ const targetingSchema = z.object({
   genders: z.array(z.number()).optional(),
   interests: z.array(z.object({ id: z.string(), name: z.string().optional() })).optional(),
   raw: z.record(z.string(), z.unknown()).optional(),
+  customLocations: z.array(z.object({
+    name: z.string().optional(),
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+    radius: z.number().min(15, "Housing ads need a radius of at least 15 miles").max(50),
+  })).optional(),
   /** CRM audience ids (meta_audiences.id), resolved to Meta ids at publish. */
   includeAudienceIds: z.array(z.number().int()).optional(),
   excludeAudienceIds: z.array(z.number().int()).optional(),

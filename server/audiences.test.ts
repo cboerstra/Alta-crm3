@@ -54,3 +54,26 @@ describe("buildTargetingSpec audiences", () => {
     expect(spec).not.toHaveProperty("excluded_custom_audiences");
   });
 });
+
+describe("buildTargetingSpec housing geography", () => {
+  it("targets areas with a 15-mile minimum and never sends ZIP codes", () => {
+    const spec = buildTargetingSpec({
+      countries: ["US"],
+      zips: ["US:84401"],
+      customLocations: [
+        { name: "Ogden", latitude: 41.223, longitude: -111.9738, radius: 25 },
+        { name: "Tiny", latitude: 41, longitude: -112, radius: 5 },
+      ],
+    }) as any;
+    expect(spec.geo_locations.zips).toBeUndefined();
+    expect(spec.geo_locations.countries).toBeUndefined();
+    expect(spec.geo_locations.custom_locations).toEqual([
+      { latitude: 41.223, longitude: -111.9738, radius: 25, distance_unit: "mile" },
+      { latitude: 41, longitude: -112, radius: 15, distance_unit: "mile" },
+    ]);
+  });
+
+  it("falls back to the country only when nothing narrower is set", () => {
+    expect((buildTargetingSpec({ countries: ["US"] }) as any).geo_locations).toEqual({ countries: ["US"] });
+  });
+});

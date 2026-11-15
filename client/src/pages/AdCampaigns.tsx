@@ -20,6 +20,8 @@ import {
 import { toast } from "sonner";
 import { useLocation, useSearch } from "wouter";
 import { AudiencePicker } from "@/components/AudiencePicker";
+import { DEFAULT_TARGET_AREAS, MIN_HOUSING_RADIUS_MILES, type TargetArea } from "@shared/metaGeo";
+import { TargetAreaPicker } from "@/components/TargetAreaPicker";
 import { AdMediaPicker, type AdMediaType } from "@/components/AdMediaPicker";
 import { campaignSection, canEditCampaign, type CampaignSection } from "@shared/adCampaignRules";
 
@@ -64,7 +66,8 @@ type DraftState = {
   videoUrl: string;
   thumbnailUrl: string;
   callToAction: string;
-  zips: string;
+  /** Target areas: towns from UTAH_AREAS with a radius in miles (housing ads need 15+). Meta reaches anyone in any of them. */
+  areas: TargetArea[];
   includeAudienceIds: number[];
   excludeAudienceIds: number[];
 };
@@ -74,7 +77,8 @@ const EMPTY_DRAFT: DraftState = {
   dailyBudget: "35", lifetimeBudget: "", endDate: "",
   landingPageId: "", templateId: "", newPageTitle: "",
   sequenceId: "", primaryText: "", headline: "", adDescription: "",
-  imageUrl: "", mediaType: "image", videoUrl: "", thumbnailUrl: "", callToAction: "LEARN_MORE", zips: "",
+  imageUrl: "", mediaType: "image", videoUrl: "", thumbnailUrl: "", callToAction: "LEARN_MORE",
+  areas: DEFAULT_TARGET_AREAS,
   includeAudienceIds: [], excludeAudienceIds: [],
 };
 
@@ -112,24 +116,28 @@ function toDraftState(c: any): DraftState {
     videoUrl: creative.videoUrl ?? "",
     thumbnailUrl: creative.thumbnailUrl ?? "",
     callToAction: creative.callToAction ?? "LEARN_MORE",
-    zips: (c.targeting?.zips ?? []).map((z: string) => z.replace(/^US:/, "")).join(", "),
+    // Older campaigns stored ZIP codes, which Meta forbids for housing ads; they open on the default area.
+    areas: c.targeting?.customLocations?.length
+      ? c.targeting.customLocations.map((l: any) => ({ name: l.name ?? "Dropped pin", latitude: l.latitude, longitude: l.longitude, radius: l.radius }))
+      : DEFAULT_TARGET_AREAS,
     includeAudienceIds: c.targeting?.includeAudienceIds ?? [],
     excludeAudienceIds: c.targeting?.excludeAudienceIds ?? [],
   };
 }
 
-/** Keeps targeting the form doesn't show, such as cities or age range, when ZIPs or audiences change. */
-function editedTargeting(existing: any, draft: Pick<DraftState, "zips" | "includeAudienceIds" | "excludeAudienceIds">) {
-  const zips = parseZips(draft.zips);
-  const { zips: _z, includeAudienceIds: _i, excludeAudienceIds: _e, ...kept } = existing ?? {};
-  const next: Record<string, unknown> = { ...kept };
-  if (zips.length > 0) {
-    if (!existing) Object.assign(next, { countries: ["US"], ageMin: 18, ageMax: 65 });
-    next.zips = zips;
-  }
+/**
+ * Keeps targeting the form doesn't show (age range, audiences' extras) and sets
+ * the target area. ZIP codes and a whole-country setting are dropped: Meta's
+ * housing category forbids ZIPs, and a country would widen the area to all of it.
+ */
+function editedTargeting(existing: any, draft: Pick<DraftState, "areas" | "includeAudienceIds" | "excludeAudienceIds">) {
+  const { zips: _z, countries: _c, customLocations: _l, includeAudienceIds: _i, excludeAudienceIds: _e, ...kept } = existing ?? {};
+  const next: Record<string, unknown> = { ageMin: 18, ageMax: 65, ...kept };
+  const areas = draft.areas.map((a) => ({ ...a, radius: Math.max(MIN_HOUSING_RADIUS_MILES, a.radius) }));
+  if (areas.length) next.customLocations = areas;
   if (draft.includeAudienceIds.length) next.includeAudienceIds = draft.includeAudienceIds;
   if (draft.excludeAudienceIds.length) next.excludeAudienceIds = draft.excludeAudienceIds;
-  return Object.keys(next).length > 0 ? next : null;
+  return next;
 }
 
 /**
@@ -303,7 +311,6 @@ export default function Campaigns() {
       headline: d.creative?.headline ?? "",
       adDescription: d.creative?.description ?? "",
       callToAction: d.creative?.callToAction ?? "LEARN_MORE",
-      zips: (d.targeting?.zips ?? []).join(", "),
       templateId: result.matchedTemplateId ? String(result.matchedTemplateId) : prev.templateId,
       newPageTitle: d.landingPage?.title ?? prev.newPageTitle,
     }));
@@ -654,18 +661,7 @@ export default function Campaigns() {
               <p className="text-xs text-muted-foreground">
                 Set one or the other. A lifetime budget requires an end date — Meta rejects it otherwise.
               </p>
-              <div className="space-y-1.5">
-                <Label>Target ZIP codes</Label>
-                <Input
-                  value={draft.zips}
-                  onChange={(e) => setDraft({ ...draft, zips: e.target.value })}
-                  placeholder="84401, 84403, 84404"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Comma separated. Mortgage ads run under Meta's housing category, which blocks
-                  targeting by age, gender and tight radiuses — geography stays broad on purpose.
-                </p>
-              </div>
+              <TargetAreaPicker areas={draft.areas} onChange={(areas) => setDraft({ ...draft, areas })} />
               <AudiencePicker
                 include={draft.includeAudienceIds}
                 exclude={draft.excludeAudienceIds}

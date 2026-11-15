@@ -292,9 +292,9 @@ describe("Marketing API helpers", () => {
     expect(spec.geo_locations.countries).toEqual(["US"]);
   });
 
-  it("shapes zips the way the Graph API wants them", () => {
+  it("never sends ZIP codes, which Meta rejects for housing ads", () => {
     const spec = buildTargetingSpec({ zips: ["US:84401", "US:84403"] }) as any;
-    expect(spec.geo_locations.zips).toEqual([{ key: "US:84401" }, { key: "US:84403" }]);
+    expect(spec.geo_locations.zips).toBeUndefined();
   });
 
   it("sums every lead-shaped action from an insights row", () => {

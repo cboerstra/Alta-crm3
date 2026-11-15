@@ -17,6 +17,7 @@
  * without someone explicitly activating it.
  */
 
+import { MIN_HOUSING_RADIUS_MILES } from "../../shared/metaGeo";
 import { graphRequest } from "./graph";
 
 export type MetaCredentials = {
@@ -32,6 +33,8 @@ export type MetaTargeting = {
   /** Meta geo "key" values for cities/regions/zips, e.g. { zips: ["US:84401"] } */
   zips?: string[];
   regions?: string[];
+  /** A point and radius in miles; housing ads need at least 15 miles. */
+  customLocations?: Array<{ name?: string; latitude: number; longitude: number; radius: number }>;
   cities?: Array<{ key: string; radius?: number; distance_unit?: "mile" | "kilometer" }>;
   ageMin?: number;
   ageMax?: number;
@@ -73,14 +76,26 @@ export function toMinorUnits(dollars: number | string): number {
 export function buildTargetingSpec(t: MetaTargeting | undefined | null): Record<string, unknown> {
   const targeting = t ?? {};
   const geo: Record<string, unknown> = {};
-  if (targeting.countries?.length) geo.countries = targeting.countries;
-  if (targeting.zips?.length) geo.zips = targeting.zips.map((key) => ({ key }));
+  // A whole country only when nothing narrower is set; Meta would otherwise
+  // deliver to the union, i.e. the entire country.
+  const narrower = !!(targeting.customLocations?.length || targeting.cities?.length || targeting.regions?.length);
+  if (targeting.countries?.length && !narrower) geo.countries = targeting.countries;
+  // ZIP codes are never sent: the Housing special ad category rejects them
+  // (#2909042). The publisher stops a campaign that still has them.
   if (targeting.regions?.length) geo.regions = targeting.regions.map((key) => ({ key }));
   if (targeting.cities?.length) {
     geo.cities = targeting.cities.map((c) => ({
       key: c.key,
-      radius: c.radius ?? 15,
+      radius: Math.max(MIN_HOUSING_RADIUS_MILES, c.radius ?? MIN_HOUSING_RADIUS_MILES),
       distance_unit: c.distance_unit ?? "mile",
+    }));
+  }
+  if (targeting.customLocations?.length) {
+    geo.custom_locations = targeting.customLocations.map((l) => ({
+      latitude: l.latitude,
+      longitude: l.longitude,
+      radius: Math.max(MIN_HOUSING_RADIUS_MILES, l.radius),
+      distance_unit: "mile",
     }));
   }
   if (Object.keys(geo).length === 0) geo.countries = ["US"];
