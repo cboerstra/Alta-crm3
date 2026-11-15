@@ -20,6 +20,7 @@ export const MODEL_CHOICES: Record<AiProvider, { id: string; label: string }[]> 
     { id: "claude-haiku-5-5", label: "Claude Haiku 5.5 (fastest, cheapest)" },
   ],
   openai: [
+    { id: "gpt-6-astra", label: "GPT-6 Astra (newest)" },
     { id: "gpt-5", label: "GPT-5" },
     { id: "gpt-5-mini", label: "GPT-5 mini" },
   ],
