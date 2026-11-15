@@ -1730,12 +1730,25 @@ export async function runAutoMigrations(): Promise<void> {
     { table: "landing_pages", column: "capiEnabled", sql: "ALTER TABLE `landing_pages` ADD COLUMN `capiEnabled` tinyint(1) DEFAULT 1" },
     { table: "landing_pages", column: "conversionEventName", sql: "ALTER TABLE `landing_pages` ADD COLUMN `conversionEventName` varchar(64) DEFAULT 'Lead'" },
     { table: "landing_pages", column: "conversionValue", sql: "ALTER TABLE `landing_pages` ADD COLUMN `conversionValue` DECIMAL(12,2) DEFAULT NULL" },
+    // ── Media library folders ─────────────────────────────────────────────
+    { table: "media_library", column: "folderId", sql: "ALTER TABLE `media_library` ADD COLUMN `folderId` int DEFAULT NULL" },
   ];
 
   // ── Marketing engine tables ──────────────────────────────────────────────
   // Created idempotently so an existing Hostinger database picks them up on the
   // next restart without a manual migration step.
   const marketingTables: { name: string; sql: string }[] = [
+    {
+      name: "media_folders",
+      sql: `CREATE TABLE IF NOT EXISTS media_folders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(256) NOT NULL,
+        kind ENUM('shared','campaign','custom') NOT NULL DEFAULT 'custom',
+        adCampaignId INT NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_media_folders_campaign (adCampaignId)
+      )`,
+    },
     {
       name: "meta_audiences",
       sql: `CREATE TABLE IF NOT EXISTS meta_audiences (
@@ -2032,6 +2045,13 @@ export async function runAutoMigrations(): Promise<void> {
         console.error(`[Auto-Migration] ${t.name} table:`, msg);
       }
     }
+  }
+
+  // Media library: allow video files (Reels). MODIFY keeps existing values.
+  try {
+    await (db as any).execute("ALTER TABLE `media_library` MODIFY COLUMN `fileType` ENUM('logo','image','background','other','video') NOT NULL DEFAULT 'image'");
+  } catch (err) {
+    console.error("[Auto-Migration] media_library.fileType:", err instanceof Error ? err.message : String(err));
   }
 
   // Create sms_reminders table if it doesn't exist (Hostinger migration)

@@ -8,7 +8,7 @@ Details below come from altamortgagegroup.net and the live Plain City landing pa
 - **Phone:** (801) 628-9400
 - **Service area:** Weber, Davis, Box Elder and Morgan counties
 - **Assistance:** Utah Housing Corporation, up to 6% down payment / closing cost help (FirstHome, HomeAgain)
-- **Live page:** Plain City Special Financing, 3380 W 3275 N, $519,900, 3 bed / 3 bath, 1,949 sq ft, built 2022, MLS #2188074
+- **Live page:** Plain City Special Financing, 3380 W 3275 N, $519,900, 3 bed / 2.5 bath, 1,949 sq ft, built 2022, MLS #2188074
 
 ---
 
@@ -68,7 +68,7 @@ Every ad's description line: **Alta Mortgage Group · NMLS 565137 · Equal Housi
 ### Campaign 1: Plain City home (page visitors)
 
 **Variation 1: Still available**
-- Primary text: Still thinking about the Plain City home? 3380 W 3275 N is still available: 3 bed, 3 bath, 1,949 sq ft, built in 2022. Special financing is available on this home. Get the details before someone else does.
+- Primary text: Still thinking about the Plain City home? 3380 W 3275 N is still available: 3 bed, 2.5 bath, 1,949 sq ft, built in 2022. Special financing is available on this home. Get the details before someone else does.
 - Headline: Special Financing on This Plain City Home
 - Button: Learn More
 

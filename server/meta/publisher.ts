@@ -53,6 +53,11 @@ export function getPublicBaseUrl(): string {
   return raw.replace(/\/+$/, "");
 }
 
+/** Pages hosted on FreeHomeSearchUtah.com are served there, so ads must link there too. */
+export function landingPageSiteUrl(hostSite: string | null | undefined, crmBaseUrl: string): string {
+  return hostSite === "freehomesearchutah" ? "https://freehomesearchutah.com" : crmBaseUrl;
+}
+
 /** Uploaded files are stored as /uploads/…; Meta needs the full public address to download them. */
 export function absoluteMediaUrl(url: string | undefined, baseUrl: string): string | undefined {
   if (!url) return undefined;
@@ -187,7 +192,7 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
   }
 
   const destinationUrl = buildDestinationUrl({
-    baseUrl,
+    baseUrl: landingPageSiteUrl((page as any).hostSite, baseUrl),
     slug: page.slug,
     utmSource: campaign.utmSource,
     utmMedium: campaign.utmMedium,
@@ -198,6 +203,14 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
   const creativeInput = (campaign.creative ?? {}) as Partial<MetaCreative>;
   if (!creativeInput.primaryText) {
     throw new CampaignPublishError("creative", "Add ad copy (primary text) before publishing");
+  }
+
+  const zipTargets = ((campaign.targeting ?? {}) as MetaTargeting).zips ?? [];
+  if (zipTargets.length > 0) {
+    throw new CampaignPublishError(
+      "targeting",
+      "Housing ads can't target ZIP codes. Edit the campaign and choose a target area (a town and a radius of 15 miles or more), then publish again.",
+    );
   }
 
   // CRM audience ids → Meta audience ids, checked before anything is created in Meta.

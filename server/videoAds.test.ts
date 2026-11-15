@@ -40,3 +40,14 @@ describe("video ad creative", () => {
     expect(absoluteMediaUrl(undefined, "https://a")).toBeUndefined();
   });
 });
+
+import { buildDestinationUrl, landingPageSiteUrl } from "./meta/publisher";
+describe("landing page site", () => {
+  it("links FreeHomeSearchUtah pages to that site", () => {
+    const base = landingPageSiteUrl("freehomesearchutah", "https://altamortgagecrm.net");
+    expect(buildDestinationUrl({ baseUrl: base, slug: "plain-city-tour", utmSource: "facebook" }))
+      .toMatch(/^https:\/\/freehomesearchutah\.com\/lp\/plain-city-tour\?/);
+    expect(landingPageSiteUrl("altamortgagecrm", "https://altamortgagecrm.net")).toBe("https://altamortgagecrm.net");
+    expect(landingPageSiteUrl(null, "https://altamortgagecrm.net")).toBe("https://altamortgagecrm.net");
+  });
+});
