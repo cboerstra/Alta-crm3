@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { trpc } from "@/lib/trpc";
+import { useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,12 +15,13 @@ import {
   Settings, Video, Calendar, CheckCircle, AlertCircle,
   Upload, Image, Trash2, Edit, ImageIcon, FileImage,
   LayoutGrid, Tag, Loader2, X, MessageSquare, Phone, Eye, EyeOff, Send, Mail, Plus, ChevronDown, ChevronRight,
-  Megaphone, ShieldCheck,
+  Megaphone, ShieldCheck, Sparkles,
 } from "lucide-react";
 import SecurityPanel from "@/components/settings/SecurityPanel";
 import { toast } from "sonner";
 import MetaSettingsPanel from "@/components/settings/MetaSettingsPanel";
 import BulkEmailPanel from "@/components/settings/BulkEmailPanel";
+import AiSettingsPanel from "@/components/settings/AiSettingsPanel";
 
 type MediaItem = {
   id: number;
@@ -46,6 +48,7 @@ const SMS_TEMPLATE_DEFAULTS: Record<string, string> = {
 };
 
 export default function SettingsPage() {
+  const initialTab = new URLSearchParams(useSearch()).get("tab") || "media";
   const { data: status, refetch: refetchStatus } = trpc.integrations.getStatus.useQuery();
   const { data: mediaItems, isLoading: mediaLoading, refetch: refetchMedia } = trpc.media.list.useQuery();
   const { data: smsTemplateList, isLoading: templatesLoading, refetch: refetchTemplates } = trpc.smsTemplates.list.useQuery();
@@ -370,7 +373,7 @@ export default function SettingsPage() {
         <p className="text-muted-foreground text-sm mt-1">Manage integrations, media library, and preferences</p>
       </div>
 
-      <Tabs defaultValue="media" className="space-y-4">
+      <Tabs defaultValue={initialTab} className="space-y-4">
         <TabsList className="bg-muted/30 flex-wrap h-auto gap-1">
           <TabsTrigger value="media" className="gap-1"><Image className="h-3.5 w-3.5" /> Media Library</TabsTrigger>
           <TabsTrigger value="zoom" className="gap-1 relative">
@@ -399,9 +402,15 @@ export default function SettingsPage() {
           </TabsTrigger>
           <TabsTrigger value="sms-templates" className="gap-1"><MessageSquare className="h-3.5 w-3.5" /> SMS &amp; Email Templates</TabsTrigger>
           <TabsTrigger value="meta-ads" className="gap-1"><Megaphone className="h-3.5 w-3.5" /> Meta Ads</TabsTrigger>
+          <TabsTrigger value="ai" className="gap-1"><Sparkles className="h-3.5 w-3.5" /> AI</TabsTrigger>
           <TabsTrigger value="security" className="gap-1"><ShieldCheck className="h-3.5 w-3.5" /> Security</TabsTrigger>
           <TabsTrigger value="general" className="gap-1"><Settings className="h-3.5 w-3.5" /> General</TabsTrigger>
         </TabsList>
+
+        {/* ─── AI Tab ─── */}
+        <TabsContent value="ai">
+          <AiSettingsPanel />
+        </TabsContent>
 
         {/* ─── Meta Ads Tab ─── */}
         <TabsContent value="meta-ads">

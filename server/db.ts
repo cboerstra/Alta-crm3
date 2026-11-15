@@ -1770,6 +1770,21 @@ export async function runAutoMigrations(): Promise<void> {
       )`,
     },
     {
+      name: "ai_settings",
+      sql: `CREATE TABLE IF NOT EXISTS ai_settings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        provider VARCHAR(32) NOT NULL DEFAULT 'anthropic',
+        apiKey TEXT NULL,
+        model VARCHAR(128) NULL,
+        enabled TINYINT(1) NOT NULL DEFAULT 1,
+        lastVerifiedAt TIMESTAMP NULL,
+        lastError TEXT NULL,
+        updatedBy INT NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`,
+    },
+    {
       name: "bulk_email_settings",
       sql: `CREATE TABLE IF NOT EXISTS bulk_email_settings (
         id INT AUTO_INCREMENT PRIMARY KEY,
