@@ -509,14 +509,31 @@ export const mediaLibrary = mysqlTable("media_library", {
   fileName: varchar("fileName", { length: 512 }).notNull(),
   fileUrl: text("fileUrl").notNull(),
   fileKey: text("fileKey").notNull(),
-  fileType: mysqlEnum("fileType", ["logo", "image", "background", "other"]).default("image").notNull(),
+  fileType: mysqlEnum("fileType", ["logo", "image", "background", "other", "video"]).default("image").notNull(),
   mimeType: varchar("mimeType", { length: 128 }),
   fileSize: int("fileSize"),
   label: varchar("label", { length: 256 }),
+  /** media_folders.id; null = not filed in a folder. */
+  folderId: int("folderId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type MediaItem = typeof mediaLibrary.$inferSelect;
+
+/**
+ * Folders in the media library. "shared" holds brand assets every campaign uses,
+ * "campaign" folders are made automatically, one per ad campaign, and "custom"
+ * folders are whatever staff create.
+ */
+export const mediaFolders = mysqlTable("media_folders", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 256 }).notNull(),
+  kind: mysqlEnum("kind", ["shared", "campaign", "custom"]).default("custom").notNull(),
+  adCampaignId: int("adCampaignId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type MediaFolder = typeof mediaFolders.$inferSelect;
 export type InsertMediaItem = typeof mediaLibrary.$inferInsert;
 
 // ─── Pending Invites ─────────────────────────────────────────────────────────

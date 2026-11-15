@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,17 +20,7 @@ import SecurityPanel from "@/components/settings/SecurityPanel";
 import { toast } from "sonner";
 import MetaSettingsPanel from "@/components/settings/MetaSettingsPanel";
 import BulkEmailPanel from "@/components/settings/BulkEmailPanel";
-
-type MediaItem = {
-  id: number;
-  fileName: string;
-  fileUrl: string;
-  fileType: string;
-  mimeType: string | null;
-  fileSize: number | null;
-  label: string | null;
-  createdAt: Date;
-};
+import MediaLibraryPanel from "@/components/settings/MediaLibraryPanel";
 
 // Module-level constant so it's available in mutation callbacks (before component renders)
 const SMS_TEMPLATE_DEFAULTS: Record<string, string> = {
@@ -47,7 +37,6 @@ const SMS_TEMPLATE_DEFAULTS: Record<string, string> = {
 
 export default function SettingsPage() {
   const { data: status, refetch: refetchStatus } = trpc.integrations.getStatus.useQuery();
-  const { data: mediaItems, isLoading: mediaLoading, refetch: refetchMedia } = trpc.media.list.useQuery();
   const { data: smsTemplateList, isLoading: templatesLoading, refetch: refetchTemplates } = trpc.smsTemplates.list.useQuery();
 
   const [zoomForm, setZoomForm] = useState({ accountId: "", clientId: "", clientSecret: "", accountEmail: "" });
@@ -166,12 +155,6 @@ export default function SettingsPage() {
   });
 
   // Media upload state
-  const [uploading, setUploading] = useState(false);
-  const [editingMedia, setEditingMedia] = useState<MediaItem | null>(null);
-  const [editLabel, setEditLabel] = useState("");
-  const [editType, setEditType] = useState<string>("image");
-  const [filterType, setFilterType] = useState<string>("all");
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const connectZoom = trpc.integrations.connectZoom.useMutation({
     onSuccess: () => { toast.success("Zoom connected"); refetchStatus(); },
@@ -259,101 +242,6 @@ export default function SettingsPage() {
     onError: (e: any) => toast.error(e.message),
   });
 
-  // ─── Media helpers ──────────────────────────────────────────────────────────
-  const uploadMedia = trpc.media.upload.useMutation({
-    onSuccess: () => { toast.success("File uploaded to media library"); refetchMedia(); setUploading(false); },
-    onError: (e: any) => { toast.error(e.message); setUploading(false); },
-  });
-
-  const updateMedia = trpc.media.update.useMutation({
-    onSuccess: () => { toast.success("Media updated"); refetchMedia(); setEditingMedia(null); },
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const deleteMedia = trpc.media.delete.useMutation({
-    onSuccess: () => { toast.success("Media deleted"); refetchMedia(); },
-    onError: (e: any) => toast.error(e.message),
-  });
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files?.length) return;
-    setUploading(true);
-    const uploads = Array.from(files);
-    let completed = 0;
-    for (const file of uploads) {
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name} is too large (max 10MB)`);
-        completed++;
-        if (completed === uploads.length) setUploading(false);
-        continue;
-      }
-      try {
-        // Step 1: Upload the file to the server via multipart POST
-        const formData = new FormData();
-        formData.append("file", file);
-        const res = await fetch("/api/upload", { method: "POST", body: formData });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: res.statusText }));
-          throw new Error(err.error ?? "Upload failed");
-        }
-        const { url, filename, size } = await res.json();
-        // Step 2: Save the file metadata to the database
-        const isLogo = file.name.toLowerCase().includes("logo");
-        uploadMedia.mutate({
-          fileUrl: url,
-          fileKey: filename,
-          fileName: file.name,
-          contentType: file.type,
-          fileSize: size ?? file.size,
-          fileType: isLogo ? "logo" : "image",
-          label: file.name.replace(/\.[^.]+$/, ""),
-        });
-      } catch (err: any) {
-        toast.error(`Failed to upload ${file.name}: ${err.message}`);
-        setUploading(false);
-      }
-      completed++;
-      if (completed === uploads.length) {
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      }
-    }
-  };
-
-  const openEditDialog = (item: MediaItem) => {
-    setEditingMedia(item);
-    setEditLabel(item.label || "");
-    setEditType(item.fileType);
-  };
-
-  const filteredMedia = mediaItems?.filter(
-    (item: MediaItem) => filterType === "all" || item.fileType === filterType
-  ) ?? [];
-
-  const formatFileSize = (bytes: number | null) => {
-    if (!bytes) return "";
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const typeIcon = (type: string) => {
-    switch (type) {
-      case "logo": return <Tag className="h-3 w-3" />;
-      case "background": return <FileImage className="h-3 w-3" />;
-      default: return <ImageIcon className="h-3 w-3" />;
-    }
-  };
-
-  const typeBadgeColor = (type: string) => {
-    switch (type) {
-      case "logo": return "bg-amber-100 text-amber-700 border-amber-200";
-      case "background": return "bg-blue-100 text-blue-700 border-blue-200";
-      case "image": return "bg-green-100 text-green-700 border-green-200";
-      default: return "bg-gray-100 text-gray-700 border-gray-200";
-    }
-  };
-
   const telnyxConnected = status?.telnyx?.connected;
   const gmailConnected = status?.gmail?.connected;
   const gmailDetails = gmailConnected && "gmailAddress" in status!.gmail! ? status!.gmail as {
@@ -410,103 +298,7 @@ export default function SettingsPage() {
 
         {/* ─── Media Library Tab ─── */}
         <TabsContent value="media">
-          <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base" style={{ fontFamily: "Raleway, sans-serif" }}>
-                    Corporate Media Library
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Upload logos, images, and artwork to use across your landing pages.
-                  </p>
-                </div>
-                <Button
-                  className="bg-brand-green hover:bg-brand-green-dark text-white gap-1.5"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading}
-                >
-                  {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                  Upload Files
-                </Button>
-                <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileUpload} />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2 mb-4">
-                <LayoutGrid className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Filter:</span>
-                {["all", "logo", "image", "background"].map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setFilterType(type)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                      filterType === type ? "bg-brand-green text-white" : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
-                    {type === "all" ? "All" : type.charAt(0).toUpperCase() + type.slice(1) + "s"}
-                  </button>
-                ))}
-                <span className="text-xs text-muted-foreground ml-auto">{filteredMedia.length} item{filteredMedia.length !== 1 ? "s" : ""}</span>
-              </div>
-              <div
-                className="mb-6 border-2 border-dashed rounded-xl p-6 text-center cursor-pointer hover:border-brand-green/50 hover:bg-brand-green/5 transition-colors"
-                onClick={() => fileInputRef.current?.click()}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const dt = e.dataTransfer;
-                  if (dt.files?.length && fileInputRef.current) {
-                    Object.defineProperty(fileInputRef.current, "files", { value: dt.files, configurable: true });
-                    handleFileUpload({ target: { files: dt.files } } as any);
-                  }
-                }}
-              >
-                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
-                <p className="text-sm text-muted-foreground">Click or drag files here to upload logos, images, and artwork</p>
-                <p className="text-xs text-muted-foreground/60 mt-1">Supports JPG, PNG, SVG, WebP — Max 10MB per file</p>
-              </div>
-              {mediaLoading ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {[1, 2, 3, 4, 5].map(i => <div key={i} className="aspect-square rounded-lg bg-muted animate-pulse" />)}
-                </div>
-              ) : filteredMedia.length === 0 ? (
-                <div className="text-center py-12">
-                  <Image className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
-                  <p className="text-muted-foreground">
-                    {filterType === "all" ? "No media uploaded yet." : `No ${filterType}s found.`}
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                  {filteredMedia.map((item: MediaItem) => (
-                    <div key={item.id} className="group relative rounded-lg border overflow-hidden hover:shadow-md transition-shadow bg-white">
-                      <div className="aspect-square bg-[#f8f8f8] flex items-center justify-center p-3">
-                        <img src={item.fileUrl} alt={item.label || item.fileName} className="max-w-full max-h-full object-contain" />
-                      </div>
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                        <Button size="sm" variant="secondary" className="h-8 w-8 p-0" onClick={() => openEditDialog(item)}>
-                          <Edit className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button size="sm" variant="secondary" className="h-8 w-8 p-0 text-destructive" onClick={() => deleteMedia.mutate({ id: item.id })}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                      <div className="p-2 border-t">
-                        <p className="text-xs font-medium truncate" title={item.label || item.fileName}>{item.label || item.fileName}</p>
-                        <div className="flex items-center justify-between mt-1">
-                          <Badge variant="outline" className={`text-[10px] gap-0.5 ${typeBadgeColor(item.fileType)}`}>
-                            {typeIcon(item.fileType)}{item.fileType}
-                          </Badge>
-                          <span className="text-[10px] text-muted-foreground">{formatFileSize(item.fileSize)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <MediaLibraryPanel />
         </TabsContent>
 
         {/* ─── Zoom Tab ─── */}
@@ -1502,50 +1294,6 @@ export default function SettingsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* ─── Edit Media Dialog ─── */}
-      <Dialog open={!!editingMedia} onOpenChange={(open) => !open && setEditingMedia(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle style={{ fontFamily: "Raleway, sans-serif" }}>Edit Media</DialogTitle>
-          </DialogHeader>
-          {editingMedia && (
-            <div className="space-y-4">
-              <div className="aspect-video bg-[#f8f8f8] rounded-lg overflow-hidden flex items-center justify-center p-4 border">
-                <img src={editingMedia.fileUrl} alt={editingMedia.label || editingMedia.fileName} className="max-w-full max-h-full object-contain" />
-              </div>
-              <div>
-                <Label>Label</Label>
-                <Input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} placeholder="Enter a descriptive label" />
-              </div>
-              <div>
-                <Label>Type</Label>
-                <Select value={editType} onValueChange={setEditType}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="logo">Logo</SelectItem>
-                    <SelectItem value="image">Image</SelectItem>
-                    <SelectItem value="background">Background</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p>File: {editingMedia.fileName}</p>
-                <p>Size: {formatFileSize(editingMedia.fileSize)}</p>
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setEditingMedia(null)}>Cancel</Button>
-                <Button
-                  className="bg-brand-green hover:bg-brand-green-dark text-white"
-                  onClick={() => updateMedia.mutate({ id: editingMedia.id, label: editLabel, fileType: editType as any })}
-                >
-                  Save Changes
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
