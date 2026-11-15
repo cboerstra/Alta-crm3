@@ -50,6 +50,9 @@ const targetingSchema = z.object({
   genders: z.array(z.number()).optional(),
   interests: z.array(z.object({ id: z.string(), name: z.string().optional() })).optional(),
   raw: z.record(z.string(), z.unknown()).optional(),
+  /** CRM audience ids (meta_audiences.id), resolved to Meta ids at publish. */
+  includeAudienceIds: z.array(z.number().int()).optional(),
+  excludeAudienceIds: z.array(z.number().int()).optional(),
 });
 
 const creativeSchema = z.object({

@@ -29,6 +29,7 @@ import {
   upsertAdCampaignMetric,
 } from "../marketingDb";
 import { getLandingPageById } from "../db";
+import { resolveMetaAudienceIds } from "../audienceSync";
 import type { AdCampaign } from "../../drizzle/schema";
 
 export class CampaignPublishError extends Error {
@@ -156,6 +157,23 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
     throw new CampaignPublishError("creative", "Add ad copy (primary text) before publishing");
   }
 
+  // CRM audience ids → Meta audience ids, checked before anything is created in Meta.
+  const storedTargeting = (campaign.targeting ?? {}) as MetaTargeting & {
+    includeAudienceIds?: number[];
+    excludeAudienceIds?: number[];
+  };
+  const { includeAudienceIds, excludeAudienceIds, ...metaTargeting } = storedTargeting;
+  let targeting: MetaTargeting | null = campaign.targeting ? metaTargeting : null;
+  try {
+    const include = await resolveMetaAudienceIds(includeAudienceIds ?? []);
+    const exclude = await resolveMetaAudienceIds(excludeAudienceIds ?? []);
+    if (include.length || exclude.length) {
+      targeting = { ...metaTargeting, customAudiences: include, excludedCustomAudiences: exclude };
+    }
+  } catch (err) {
+    throw new CampaignPublishError("audiences", err instanceof Error ? err.message : String(err));
+  }
+
   await updateAdCampaign(campaignId, { syncStatus: "syncing", syncError: null });
 
   try {
@@ -181,7 +199,7 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
         lifetimeBudget: campaign.lifetimeBudget ? Number(campaign.lifetimeBudget) : null,
         startTime: campaign.startDate,
         endTime: campaign.endDate,
-        targeting: (campaign.targeting ?? null) as MetaTargeting | null,
+        targeting,
         bidStrategy: campaign.bidStrategy ?? undefined,
         pixelId: (page as any).metaPixelId || settings.pixelId,
         conversionEvent: (page as any).conversionEventName || "Lead",

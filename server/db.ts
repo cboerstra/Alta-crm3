@@ -1737,6 +1737,25 @@ export async function runAutoMigrations(): Promise<void> {
   // next restart without a manual migration step.
   const marketingTables: { name: string; sql: string }[] = [
     {
+      name: "meta_audiences",
+      sql: `CREATE TABLE IF NOT EXISTS meta_audiences (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        kind ENUM('website','crm_list') NOT NULL,
+        definition JSON NOT NULL,
+        metaAudienceId VARCHAR(64) NULL,
+        status ENUM('pending','ready','syncing','error') NOT NULL DEFAULT 'pending',
+        memberCount INT NULL,
+        sizeLow INT NULL,
+        sizeHigh INT NULL,
+        lastSyncedAt TIMESTAMP NULL,
+        lastError TEXT NULL,
+        createdBy INT NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updatedAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )`,
+    },
+    {
       name: "user_two_factor",
       sql: `CREATE TABLE IF NOT EXISTS user_two_factor (
         id INT AUTO_INCREMENT PRIMARY KEY,

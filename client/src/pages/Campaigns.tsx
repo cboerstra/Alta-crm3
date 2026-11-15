@@ -1,3 +1,4 @@
+import CampaignRecipients from "@/components/CampaignRecipients";
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -208,7 +209,7 @@ export default function Campaigns() {
 
       {/* Create Campaign Dialog */}
       <Dialog open={showCreate} onOpenChange={open => { if (!open) closeForm(); }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editing ? "Edit Email Campaign" : "Create Email Campaign"}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             {recipientsLocked && (
@@ -430,6 +431,7 @@ export default function Campaigns() {
                 <p className="text-sm text-muted-foreground mb-1">Batch Settings</p>
                 <p className="text-sm">{detail.data.batchSize} emails per batch, {detail.data.batchDelayMinutes} min delay</p>
               </div>
+              <CampaignRecipients campaignId={detail.data.id} campaignName={detail.data.name} />
             </div>
           )}
         </DialogContent>

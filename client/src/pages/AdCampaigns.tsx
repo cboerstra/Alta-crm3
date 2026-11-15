@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLocation, useSearch } from "wouter";
+import { AudiencePicker } from "@/components/AudiencePicker";
 import { campaignSection, canEditCampaign, type CampaignSection } from "@shared/adCampaignRules";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -60,6 +61,8 @@ type DraftState = {
   imageUrl: string;
   callToAction: string;
   zips: string;
+  includeAudienceIds: number[];
+  excludeAudienceIds: number[];
 };
 
 const EMPTY_DRAFT: DraftState = {
@@ -68,6 +71,7 @@ const EMPTY_DRAFT: DraftState = {
   landingPageId: "", templateId: "", newPageTitle: "",
   sequenceId: "", primaryText: "", headline: "", adDescription: "",
   imageUrl: "", callToAction: "LEARN_MORE", zips: "",
+  includeAudienceIds: [], excludeAudienceIds: [],
 };
 
 const parseZips = (text: string) =>
@@ -102,17 +106,23 @@ function toDraftState(c: any): DraftState {
     imageUrl: creative.imageUrl ?? "",
     callToAction: creative.callToAction ?? "LEARN_MORE",
     zips: (c.targeting?.zips ?? []).map((z: string) => z.replace(/^US:/, "")).join(", "),
+    includeAudienceIds: c.targeting?.includeAudienceIds ?? [],
+    excludeAudienceIds: c.targeting?.excludeAudienceIds ?? [],
   };
 }
 
-/** Keeps targeting the form doesn't show, such as cities or age range, when ZIP codes change. */
-function editedTargeting(existing: any, zipText: string) {
-  const zips = parseZips(zipText);
-  const { zips: _oldZips, ...kept } = existing ?? {};
+/** Keeps targeting the form doesn't show, such as cities or age range, when ZIPs or audiences change. */
+function editedTargeting(existing: any, draft: Pick<DraftState, "zips" | "includeAudienceIds" | "excludeAudienceIds">) {
+  const zips = parseZips(draft.zips);
+  const { zips: _z, includeAudienceIds: _i, excludeAudienceIds: _e, ...kept } = existing ?? {};
+  const next: Record<string, unknown> = { ...kept };
   if (zips.length > 0) {
-    return { ...(existing ? kept : { countries: ["US"], ageMin: 18, ageMax: 65 }), zips };
+    if (!existing) Object.assign(next, { countries: ["US"], ageMin: 18, ageMax: 65 });
+    next.zips = zips;
   }
-  return Object.keys(kept).length > 0 ? kept : null;
+  if (draft.includeAudienceIds.length) next.includeAudienceIds = draft.includeAudienceIds;
+  if (draft.excludeAudienceIds.length) next.excludeAudienceIds = draft.excludeAudienceIds;
+  return Object.keys(next).length > 0 ? next : null;
 }
 
 /** Keeps the uploaded image reference unless the image address was changed. */
@@ -335,7 +345,7 @@ export default function Campaigns() {
           dailyBudget: daily,
           lifetimeBudget: lifetime,
           endDate: draft.endDate ? new Date(draft.endDate) : null,
-          targeting: editedTargeting(editing.targeting, draft.zips),
+          targeting: editedTargeting(editing.targeting, draft),
           creative: editedCreative(editing.creative, draft),
         });
         toast.success("Campaign saved");
@@ -348,8 +358,6 @@ export default function Campaigns() {
         return;
       }
 
-      const zips = parseZips(draft.zips);
-
       const result = await createAdCampaign.mutateAsync({
         name: draft.name.trim(),
         description: draft.description.trim() || undefined,
@@ -359,7 +367,7 @@ export default function Campaigns() {
         dailyBudget: daily,
         lifetimeBudget: lifetime,
         endDate: draft.endDate ? new Date(draft.endDate) : null,
-        targeting: zips.length > 0 ? { countries: ["US"], zips, ageMin: 18, ageMax: 65 } : null,
+        targeting: editedTargeting(null, draft) as any,
         creative: draft.primaryText
           ? {
               primaryText: draft.primaryText,
@@ -651,6 +659,13 @@ export default function Campaigns() {
                   targeting by age, gender and tight radiuses — geography stays broad on purpose.
                 </p>
               </div>
+              <AudiencePicker
+                include={draft.includeAudienceIds}
+                exclude={draft.excludeAudienceIds}
+                onChange={(include, exclude) =>
+                  setDraft({ ...draft, includeAudienceIds: include, excludeAudienceIds: exclude })
+                }
+              />
             </TabsContent>
 
             <TabsContent value="page" className="space-y-4 pt-4">
