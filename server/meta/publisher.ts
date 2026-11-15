@@ -53,6 +53,11 @@ export function getPublicBaseUrl(): string {
   return raw.replace(/\/+$/, "");
 }
 
+/** Pages hosted on FreeHomeSearchUtah.com are served there, so ads must link there too. */
+export function landingPageSiteUrl(hostSite: string | null | undefined, crmBaseUrl: string): string {
+  return hostSite === "freehomesearchutah" ? "https://freehomesearchutah.com" : crmBaseUrl;
+}
+
 /** Uploaded files are stored as /uploads/…; Meta needs the full public address to download them. */
 export function absoluteMediaUrl(url: string | undefined, baseUrl: string): string | undefined {
   if (!url) return undefined;
@@ -187,7 +192,7 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
   }
 
   const destinationUrl = buildDestinationUrl({
-    baseUrl,
+    baseUrl: landingPageSiteUrl((page as any).hostSite, baseUrl),
     slug: page.slug,
     utmSource: campaign.utmSource,
     utmMedium: campaign.utmMedium,

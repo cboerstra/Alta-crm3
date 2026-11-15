@@ -1,7 +1,8 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { captureAttribution, toSubmitPayload } from "@/lib/attribution";
 import { tourSuccessUrl } from "@shared/tourSuccessUrl";
+import { initPixel, trackConversion, trackPageView } from "@/lib/metaPixel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,12 +51,31 @@ export default function PublicBooking() {
     endDate,
   });
 
+  // Visitors from an ad's landing page carry its pixel here, so a booked tour
+  // reaches Meta from the browser too. The server sends the same event (same
+  // eventID) through the Conversions API, and Meta counts it once.
+  const { data: pixelConfig } = trpc.marketing.publicPixelConfig.useQuery(
+    { slug: src },
+    { enabled: !!src && !!home, staleTime: 5 * 60_000 },
+  );
+  useEffect(() => {
+    if (!pixelConfig?.enabled || !pixelConfig.pixelId) return;
+    initPixel(pixelConfig.pixelId);
+    trackPageView();
+  }, [pixelConfig?.enabled, pixelConfig?.pixelId]);
+
   const bookMutation = trpc.scheduling.book.useMutation({
     onSuccess: () => {
       setSubmitted(true);
+      const eventId = attribution?.eventId;
+      if (pixelConfig?.enabled && eventId) {
+        trackConversion(pixelConfig.eventName || "Lead", eventId, { content_name: home, content_category: "home_tour" });
+      }
       // Home tours finish on FreeHomeSearchUtah.com. The confirmation below shows while that page loads.
       if (home && selectedDate && selectedTime) {
-        window.location.assign(tourSuccessUrl(home, selectedDate, selectedTime, src || undefined));
+        const next = tourSuccessUrl(home, selectedDate, selectedTime, src || undefined);
+        // A moment for the pixel request to leave before the page changes.
+        setTimeout(() => window.location.assign(next), pixelConfig?.enabled ? 400 : 0);
       }
     },
     onError: (err) => setError(err.message || "Something went wrong. Please call or text us instead."),
