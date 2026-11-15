@@ -61,6 +61,9 @@ const creativeSchema = z.object({
   description: z.string().optional(),
   imageUrl: z.string().optional(),
   imageHash: z.string().optional(),
+  videoUrl: z.string().optional(),
+  videoId: z.string().optional(),
+  thumbnailUrl: z.string().optional(),
   callToAction: z.string().optional(),
 });
 

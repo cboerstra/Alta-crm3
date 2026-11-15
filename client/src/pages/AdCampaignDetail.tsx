@@ -423,6 +423,23 @@ export default function CampaignDetail() {
                 {(campaign.creative as any).description && (
                   <p className="text-xs text-muted-foreground">{(campaign.creative as any).description}</p>
                 )}
+                {(campaign.creative as any).videoUrl ? (
+                  <div className="pt-1">
+                    <video
+                      src={(campaign.creative as any).videoUrl}
+                      poster={(campaign.creative as any).thumbnailUrl || undefined}
+                      controls
+                      playsInline
+                      className="w-40 aspect-[9/16] rounded-md border bg-black object-contain"
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Video ad: runs in Facebook and Instagram Reels, Stories and Feed.
+                      {(campaign.creative as any).videoId ? " Uploaded to Meta." : ""}
+                    </p>
+                  </div>
+                ) : (campaign.creative as any).imageUrl ? (
+                  <img src={(campaign.creative as any).imageUrl} alt="Ad image" className="mt-1 max-h-48 rounded-md border object-contain" />
+                ) : null}
               </CardContent>
             </Card>
           )}
