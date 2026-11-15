@@ -322,6 +322,9 @@ export default function PublicLandingPage() {
       } else {
         window.sessionStorage.removeItem(`lp:${params.slug}:joinUrl`);
       }
+      try {
+        window.sessionStorage.setItem(`lp:${params.slug}:webinar`, data.webinarId ? "1" : "0");
+      } catch { /* storage blocked: the thanks page falls back to neutral wording */ }
       navigate(`/lp/${params.slug}/thanks`);
     },
   });
@@ -655,7 +658,7 @@ export default function PublicLandingPage() {
           <div className="flex items-start gap-2.5">
             <Checkbox id="contact-optin" checked={contactOptIn} onCheckedChange={(v) => setContactOptIn(v === true)} className="mt-0.5" />
             <label htmlFor="contact-optin" className="text-xs text-gray-500 leading-relaxed cursor-pointer" style={embeddedConsentLabelStyle}>
-              {page.optInLabel || "I agree to receive communications about this event and future opportunities"}
+              {page.optInLabel || (page.webinarId ? "I agree to receive communications about this event and future opportunities" : "I agree to receive communications about my request and future opportunities")}
             </label>
           </div>
         )}
@@ -835,7 +838,7 @@ export default function PublicLandingPage() {
                         <div className="flex items-start gap-2.5">
                           <Checkbox id="contact-optin" checked={contactOptIn} onCheckedChange={(v) => setContactOptIn(v === true)} className="mt-0.5" />
                           <label htmlFor="contact-optin" className="text-xs text-gray-500 leading-relaxed cursor-pointer">
-                            {page.optInLabel || "I agree to receive communications about this event and future opportunities"}
+                            {page.optInLabel || (page.webinarId ? "I agree to receive communications about this event and future opportunities" : "I agree to receive communications about my request and future opportunities")}
                           </label>
                         </div>
                       )}

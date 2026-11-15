@@ -3,7 +3,11 @@ import { useParams } from "wouter";
 
 export default function PublicLandingThanks() {
   const params = useParams<{ slug: string }>();
-  const joinUrl = window.sessionStorage.getItem(`lp:${params.slug}:joinUrl`);
+  const read = (key: string) => {
+    try { return window.sessionStorage.getItem(`lp:${params.slug}:${key}`); } catch { return null; }
+  };
+  const joinUrl = read("joinUrl");
+  const isWebinar = !!joinUrl || read("webinar") === "1";
 
   return (
     <div className="min-h-screen bg-[#F8F4EC] flex items-center justify-center px-4 py-12">
@@ -11,9 +15,11 @@ export default function PublicLandingThanks() {
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#B8924A]/15">
           <CheckCircle className="h-8 w-8 text-[#B8924A]" />
         </div>
-        <h1 className="mb-2 text-2xl font-bold text-gray-900">You're Registered!</h1>
+        <h1 className="mb-2 text-2xl font-bold text-gray-900">{isWebinar ? "You're Registered!" : "Thank You!"}</h1>
         <p className="mb-4 text-gray-600">
-          Thank you for signing up. You'll receive a confirmation email shortly with all the details.
+          {isWebinar
+            ? "Thank you for signing up. You'll receive a confirmation email shortly with all the details."
+            : "We received your request. Check your email for a confirmation; we'll be in touch shortly."}
         </p>
         {joinUrl && (
           <div className="mt-4 rounded-lg border border-[#B8924A]/30 bg-[#B8924A]/10 p-4">

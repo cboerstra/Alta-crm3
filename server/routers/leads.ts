@@ -14,6 +14,13 @@ import { attributionInputSchema, clientIpFromRequest, normalizeAttribution } fro
 import { trackCapturedLead, reportLeadConversion } from "../meta/leadTracking";
 import { runTrigger } from "../automations/engine";
 
+/** Plain text typed in the editor keeps its line breaks once a logo makes the email HTML. */
+export function plainTextToHtml(text: string): string {
+  if (/<[a-z][\s\S]*>/i.test(text)) return text;
+  const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.7;color:#333;max-width:600px;">${escaped.replace(/\n/g, "<br>")}</div>`;
+}
+
 const stageEnum = z.enum([
   "new_lead", "registered", "attended", "no_show",
   "consultation_booked", "under_contract", "closed",
@@ -429,7 +436,7 @@ Score the lead 0-100 based on engagement, intent signals, and pipeline progress.
             type: "registration_confirmation",
             scheduledAt: new Date(),
             subject: resolveNonWebinar(page.confirmationEmailSubject),
-            body: nonWebinarLogoHtml + resolveNonWebinar(page.confirmationEmailBody ?? "Thank you for your interest!"),
+            body: nonWebinarLogoHtml + plainTextToHtml(resolveNonWebinar(page.confirmationEmailBody ?? "Thank you for your interest!")),
             attachmentUrl: page.confirmationPdfUrl ?? undefined,
           });
         }
