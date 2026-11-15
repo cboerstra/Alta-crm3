@@ -36,12 +36,15 @@ const caller = schedulingRouter.createCaller({
   user: null,
 } as any);
 
+// Booking must be after today in Utah, so book 3 days out (17:00 UTC = late morning in Utah).
+const bookingDay = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+
 const tour = {
   agentSlug: "scott-boerstra",
   guestName: "Jane Smith",
   guestEmail: "jane@example.com",
   guestPhone: "801-555-1234",
-  scheduledAt: Date.UTC(2026, 10, 7, 17, 0),
+  scheduledAt: Date.UTC(bookingDay.getUTCFullYear(), bookingDay.getUTCMonth(), bookingDay.getUTCDate(), 17, 0),
   home: "3380 W 3275 N, Plain City",
 };
 

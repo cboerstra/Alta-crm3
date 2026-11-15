@@ -639,6 +639,24 @@ export const metaSettings = mysqlTable("meta_settings", {
 export type MetaSettings = typeof metaSettings.$inferSelect;
 export type InsertMetaSettings = typeof metaSettings.$inferInsert;
 
+// ─── AI provider (Claude or OpenAI) ─────────────────────────────────────────
+// The key the CRM's AI features (campaign drafting, lead scoring) use. One row.
+// When unset, invokeLLM falls back to the BUILT_IN_FORGE_* environment.
+export const aiSettings = mysqlTable("ai_settings", {
+  id: int("id").autoincrement().primaryKey(),
+  provider: varchar("provider", { length: 32 }).default("anthropic").notNull(), // anthropic | openai
+  apiKey: text("apiKey"),
+  model: varchar("model", { length: 128 }),
+  enabled: boolean("enabled").default(true).notNull(),
+  lastVerifiedAt: timestamp("lastVerifiedAt"),
+  lastError: text("lastError"),
+  updatedBy: int("updatedBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AiSettings = typeof aiSettings.$inferSelect;
+
 // ─── Bulk email sender (Brevo or any SMTP relay) ─────────────────────────────
 // Real-estate campaigns go out through this instead of Gmail, from the
 // brokerage's own domain, at a daily pace the relay allows. One row.
