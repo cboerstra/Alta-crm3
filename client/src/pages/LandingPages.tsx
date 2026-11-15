@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { GOAL_PRESETS, detectGoal, hasWebinarMismatch, type PageGoal } from "@/lib/landingPageGoals";
 import { Plus, FileText, Copy, Trash2, Edit, Upload, Image, FileIcon, X, Eye, Calendar, Clock, AlertCircle, Link as LinkIcon, Check, ImagePlus, Users, FileCode2, Wand2, Info } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -45,6 +46,8 @@ type FormState = {
   showOptIn: boolean;
   confirmationEmailSubject: string;
   confirmationEmailBody: string;
+  /** Editor-only: what the page is for. Not saved; worked out again from the email when a page is opened. */
+  pageGoal: PageGoal;
   formEnabled: boolean;
   smsConsentEnabled: boolean;
   headScripts: string;
@@ -59,48 +62,16 @@ type MediaSelection = {
   sortOrder: number;
 };
 
-const DEFAULT_EMAIL_SUBJECT = "You're Registered — {{webinarTitle}}";
-const DEFAULT_EMAIL_BODY = `Dear {{firstName}} {{lastName}},
-
-Thank you for registering for {{webinarTitle}}! We are thrilled to have you join us and look forward to sharing valuable insights with you.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-YOUR EVENT DETAILS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  Event:      {{webinarTitle}}
-  Date/Time:  {{date}}
-  Join Link:  {{joinUrl}}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-To join the webinar, simply click your personal join link above at the scheduled date and time. We recommend joining 5 minutes early to ensure your audio and video are working properly.
-
-WHAT TO EXPECT:
-• Expert guidance on navigating today's real estate market
-• Answers to your most important homebuying questions
-• Exclusive resources available only to registered attendees
-
-If you have any questions prior to the event, please do not hesitate to reply to this email — our team is happy to assist.
-
-We look forward to seeing you there!
-
-Warm regards,
-
-The Clarke & Associates Team
-Clarke & Associates CRM
-
-P.S. Add this event to your calendar now so you don't miss it. Your join link is: {{joinUrl}}`;
-
 const defaultForm: FormState = {
   title: "", slug: "", headline: "", subheadline: "", bodyText: "",
-  ctaText: "Register Now", campaignTag: "", sourceTag: "",
+  ctaText: GOAL_PRESETS.info.ctaText, campaignTag: "", sourceTag: "",
   webinarId: undefined, isActive: true, accentColor: "#C9A84C", textColor: "#FFFFFF",
   enabledFields: ["firstName", "lastName", "email", "phone"],
-  optInLabel: "I agree to receive communications about this event and future opportunities",
+  optInLabel: GOAL_PRESETS.info.optInLabel,
   showOptIn: true,
-  confirmationEmailSubject: DEFAULT_EMAIL_SUBJECT,
-  confirmationEmailBody: DEFAULT_EMAIL_BODY,
+  confirmationEmailSubject: GOAL_PRESETS.info.confirmationEmailSubject,
+  confirmationEmailBody: GOAL_PRESETS.info.confirmationEmailBody,
+  pageGoal: "info",
   formEnabled: true,
   smsConsentEnabled: true,
   headScripts: "",
@@ -479,10 +450,13 @@ export default function LandingPages() {
   }
 
   function openEdit(page: any) {
+    const pageGoal = detectGoal(page);
+    const goalPreset = GOAL_PRESETS[pageGoal];
     setForm({
+      pageGoal,
       title: page.title, slug: page.slug,
       headline: page.headline || "", subheadline: page.subheadline || "",
-      bodyText: page.bodyText || "", ctaText: page.ctaText || "Register Now",
+      bodyText: page.bodyText || "", ctaText: page.ctaText || goalPreset.ctaText,
       campaignTag: page.campaignTag || "", sourceTag: page.sourceTag || "",
       webinarId: page.webinarId || undefined, isActive: page.isActive,
       accentColor: page.accentColor || "#C9A84C",
@@ -491,10 +465,10 @@ export default function LandingPages() {
       formEnabled: page.formEnabled ?? true,
       smsConsentEnabled: page.smsConsentEnabled ?? true,
       headScripts: page.headScripts || "",
-      optInLabel: page.optInLabel || "I agree to receive communications about this event and future opportunities",
+      optInLabel: page.optInLabel || goalPreset.optInLabel,
       showOptIn: page.showOptIn ?? true,
-      confirmationEmailSubject: page.confirmationEmailSubject || DEFAULT_EMAIL_SUBJECT,
-      confirmationEmailBody: page.confirmationEmailBody || DEFAULT_EMAIL_BODY,
+      confirmationEmailSubject: page.confirmationEmailSubject || goalPreset.confirmationEmailSubject,
+      confirmationEmailBody: page.confirmationEmailBody || goalPreset.confirmationEmailBody,
       pageType: page.pageType || "prospective_mortgage",
       purpose: page.purpose || "advertising",
       hostSite: page.hostSite || "altamortgagecrm",
@@ -978,7 +952,7 @@ export default function LandingPages() {
                     value={form.headline}
                     onChange={(e) => setForm({ ...form, headline: e.target.value })}
                     onBlur={() => markTouched("headline")}
-                    placeholder="Join Our Free Webinar"
+                    placeholder="Special Financing Available"
                     className={showError("headline") ? "border-red-400 focus-visible:ring-red-400" : ""}
                   />
                   {showError("headline") && <FieldError message={validationErrors.headline} />}
@@ -989,7 +963,7 @@ export default function LandingPages() {
                 </div>
                 <div>
                   <Label>Body Text / Description</Label>
-                  <Textarea value={form.bodyText} onChange={(e) => setForm({ ...form, bodyText: e.target.value })} placeholder="Detailed description of the event..." rows={4} />
+                  <Textarea value={form.bodyText} onChange={(e) => setForm({ ...form, bodyText: e.target.value })} placeholder="What the visitor gets and why it matters..." rows={4} />
                 </div>
                 <div>
                   <Label>CTA Button Text</Label>
@@ -1005,6 +979,72 @@ export default function LandingPages() {
                     <Input value={form.campaignTag} onChange={(e) => setForm({ ...form, campaignTag: e.target.value })} placeholder="spring-2026" />
                   </div>
                 </div>
+                <div className="space-y-1.5 rounded-lg border p-3">
+                  <Label>Page goal</Label>
+                  <Select
+                    value={form.pageGoal}
+                    onValueChange={(v) => {
+                      const goal = v as PageGoal;
+                      const preset = GOAL_PRESETS[goal];
+                      setForm({
+                        ...form,
+                        pageGoal: goal,
+                        ctaText: preset.ctaText,
+                        optInLabel: preset.optInLabel,
+                        confirmationEmailSubject: preset.confirmationEmailSubject,
+                        confirmationEmailBody: preset.confirmationEmailBody,
+                        webinarId: goal === "webinar" ? form.webinarId : undefined,
+                      });
+                    }}
+                  >
+                    <SelectTrigger aria-label="Page goal"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(GOAL_PRESETS) as PageGoal[]).map((g) => (
+                        <SelectItem key={g} value={g}>{GOAL_PRESETS[g].label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {GOAL_PRESETS[form.pageGoal].hint} Changing it resets the button text, consent line and confirmation email below.
+                  </p>
+                </div>
+                {form.pageGoal !== "webinar" ? (
+                  <div className="space-y-3 rounded-lg border p-3">
+                    <div>
+                      <Label className="font-semibold">Confirmation email</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Sent right after someone submits the form. Use {"{{firstName}}"}, {"{{lastName}}"} or {"{{fullName}}"} to personalize.
+                      </p>
+                    </div>
+                    {hasWebinarMismatch(form) && (
+                      <div className="flex flex-col gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 sm:flex-row sm:items-center sm:justify-between">
+                        <span>This email talks about a webinar, but this page isn't one. Leads would get "You're Registered" with blank event details.</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="shrink-0"
+                          onClick={() => setForm({
+                            ...form,
+                            confirmationEmailSubject: GOAL_PRESETS[form.pageGoal].confirmationEmailSubject,
+                            confirmationEmailBody: GOAL_PRESETS[form.pageGoal].confirmationEmailBody,
+                            optInLabel: GOAL_PRESETS[form.pageGoal].optInLabel,
+                          })}
+                        >
+                          Use the {GOAL_PRESETS[form.pageGoal].label.toLowerCase()} email
+                        </Button>
+                      </div>
+                    )}
+                    <div>
+                      <Label>Subject</Label>
+                      <Input value={form.confirmationEmailSubject} onChange={(e) => setForm({ ...form, confirmationEmailSubject: e.target.value })} />
+                    </div>
+                    <div>
+                      <Label>Message</Label>
+                      <Textarea value={form.confirmationEmailBody} onChange={(e) => setForm({ ...form, confirmationEmailBody: e.target.value })} rows={9} />
+                    </div>
+                  </div>
+                ) : (
                 <div>
                   <Label>Link to Webinar</Label>
                   <Select value={form.webinarId?.toString() ?? "none"} onValueChange={(v) => setForm({ ...form, webinarId: v === "none" ? undefined : Number(v) })}>
@@ -1088,6 +1128,7 @@ export default function LandingPages() {
                     </div>
                   )}
                 </div>
+                )}
                 <div>
                   <Label>Accent Color</Label>
                   <div className="flex items-center gap-2">
