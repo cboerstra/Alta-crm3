@@ -262,6 +262,23 @@ async function startServer() {
     },
   });
 
+  // Multer for ad videos (Reels): MP4/MOV/M4V up to 250 MB
+  const videoUpload = multer({
+    storage: multer.diskStorage({
+      destination: (_req, _file, cb) => cb(null, uploadsDir),
+      filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 9)}${ext}`);
+      },
+    }),
+    limits: { fileSize: 250 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      if ([".mp4", ".mov", ".m4v"].includes(ext)) cb(null, true);
+      else cb(new Error(`Upload an MP4 or MOV video (got ${ext || file.mimetype || "unknown"})`));
+    },
+  });
+
   // Multer for PDF uploads (separate instance with larger limit and PDF filter)
   const pdfUpload = multer({
     storage: multer.diskStorage({
@@ -361,6 +378,12 @@ async function startServer() {
       console.error("[Upload-HTML] Error:", err);
       res.status(500).json({ error: err.message ?? "Upload failed" });
     }
+  });
+
+  // POST /api/upload-video — authenticated ad video upload (up to 250MB)
+  app.post("/api/upload-video", requireSession, wrapUpload(videoUpload.single("file")), (req, res) => {
+    if (!req.file) { res.status(400).json({ error: "No file provided" }); return; }
+    res.json({ url: `/uploads/${req.file.filename}`, filename: req.file.filename, size: req.file.size });
   });
 
   // POST /api/upload — authenticated multipart upload

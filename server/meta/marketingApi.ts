@@ -50,6 +50,11 @@ export type MetaCreative = {
   description?: string;
   imageUrl?: string;
   imageHash?: string;
+  /** Video ad (Reels, Stories, Feed): a public MP4/MOV address, or the id once uploaded to Meta. */
+  videoUrl?: string;
+  videoId?: string;
+  /** Cover image for the video; Meta's own thumbnail is used when absent. */
+  thumbnailUrl?: string;
   callToAction?: string;    // LEARN_MORE, SIGN_UP, GET_QUOTE…
   destinationUrl: string;
 };
@@ -200,12 +205,97 @@ export async function uploadAdImage(creds: MetaCredentials, imageUrl: string): P
   return first?.hash;
 }
 
+/** Hand Meta a public video address; Meta downloads and processes it. Returns the video id. */
+export async function uploadAdVideo(creds: MetaCredentials, videoUrl: string, name?: string): Promise<string> {
+  const res = await graphRequest<{ id: string }>({
+    path: `${normalizeAdAccountId(creds.adAccountId)}/advideos`,
+    method: "POST",
+    accessToken: creds.accessToken,
+    apiVersion: creds.apiVersion,
+    timeoutMs: 120_000,
+    body: { file_url: videoUrl, name },
+  });
+  return res.id;
+}
+
+export type VideoStatus = "ready" | "processing" | "error";
+
+/** Where Meta is with a video: an ad can only use it once it is ready. */
+export async function getAdVideoStatus(creds: MetaCredentials, videoId: string): Promise<{ status: VideoStatus; message?: string }> {
+  const res = await graphRequest<{ status?: { video_status?: string; processing_phase?: { errors?: Array<{ message?: string }> } } }>({
+    path: videoId,
+    accessToken: creds.accessToken,
+    apiVersion: creds.apiVersion,
+    query: { fields: "status" },
+  });
+  const raw = res.status?.video_status;
+  if (raw === "ready") return { status: "ready" };
+  if (raw === "error") return { status: "error", message: res.status?.processing_phase?.errors?.[0]?.message };
+  return { status: "processing" };
+}
+
+/** Meta's preferred auto-generated thumbnail, used as the cover when none was uploaded. */
+export async function getAdVideoThumbnail(creds: MetaCredentials, videoId: string): Promise<string | undefined> {
+  const res = await graphRequest<{ data?: Array<{ uri?: string; is_preferred?: boolean }> }>({
+    path: `${videoId}/thumbnails`,
+    accessToken: creds.accessToken,
+    apiVersion: creds.apiVersion,
+  });
+  const thumbs = res.data ?? [];
+  return (thumbs.find((t) => t.is_preferred) ?? thumbs[0])?.uri;
+}
+
+/**
+ * The object_story_spec for a video ad. Placed by Advantage+ placements in
+ * Facebook and Instagram Reels, Stories and Feed; a vertical 9:16 video fits Reels best.
+ */
+export function buildVideoStorySpec(
+  pageId: string,
+  creative: MetaCreative & { videoId: string },
+  cover: { imageUrl?: string; imageHash?: string },
+  instagramUserId?: string | null,
+): Record<string, unknown> {
+  const videoData: Record<string, unknown> = {
+    video_id: creative.videoId,
+    message: creative.primaryText,
+    call_to_action: { type: creative.callToAction ?? "LEARN_MORE", value: { link: creative.destinationUrl } },
+  };
+  if (creative.headline) videoData.title = creative.headline;
+  if (creative.description) videoData.link_description = creative.description;
+  if (cover.imageHash) videoData.image_hash = cover.imageHash;
+  else if (cover.imageUrl) videoData.image_url = cover.imageUrl;
+  const spec: Record<string, unknown> = { page_id: pageId, video_data: videoData };
+  if (instagramUserId) spec.instagram_user_id = instagramUserId;
+  return spec;
+}
+
 export async function createMetaAdCreative(
   creds: MetaCredentials,
   input: { name: string; creative: MetaCreative }
 ): Promise<{ id: string }> {
   if (!creds.pageId) {
     throw new Error("A Facebook Page must be connected before an ad creative can be created");
+  }
+
+  if (input.creative.videoId) {
+    let cover: { imageUrl?: string; imageHash?: string } = {};
+    if (input.creative.thumbnailUrl) cover.imageHash = await uploadAdImage(creds, input.creative.thumbnailUrl);
+    if (!cover.imageHash) cover = { imageUrl: await getAdVideoThumbnail(creds, input.creative.videoId) };
+    if (!cover.imageHash && !cover.imageUrl) {
+      throw new Error("Meta hasn't made a cover image for the video yet. Upload a cover image or publish again in a minute.");
+    }
+    return graphRequest<{ id: string }>({
+      path: `${normalizeAdAccountId(creds.adAccountId)}/adcreatives`,
+      method: "POST",
+      accessToken: creds.accessToken,
+      apiVersion: creds.apiVersion,
+      body: {
+        name: input.name,
+        object_story_spec: buildVideoStorySpec(
+          creds.pageId, input.creative as MetaCreative & { videoId: string }, cover, creds.instagramActorId,
+        ),
+      },
+    });
   }
 
   let imageHash = input.creative.imageHash;

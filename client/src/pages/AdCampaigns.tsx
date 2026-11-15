@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { useLocation, useSearch } from "wouter";
 import { AudiencePicker } from "@/components/AudiencePicker";
+import { AdMediaPicker, type AdMediaType } from "@/components/AdMediaPicker";
 import { campaignSection, canEditCampaign, type CampaignSection } from "@shared/adCampaignRules";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -59,6 +60,9 @@ type DraftState = {
   headline: string;
   adDescription: string;
   imageUrl: string;
+  mediaType: AdMediaType;
+  videoUrl: string;
+  thumbnailUrl: string;
   callToAction: string;
   zips: string;
   includeAudienceIds: number[];
@@ -70,7 +74,7 @@ const EMPTY_DRAFT: DraftState = {
   dailyBudget: "35", lifetimeBudget: "", endDate: "",
   landingPageId: "", templateId: "", newPageTitle: "",
   sequenceId: "", primaryText: "", headline: "", adDescription: "",
-  imageUrl: "", callToAction: "LEARN_MORE", zips: "",
+  imageUrl: "", mediaType: "image", videoUrl: "", thumbnailUrl: "", callToAction: "LEARN_MORE", zips: "",
   includeAudienceIds: [], excludeAudienceIds: [],
 };
 
@@ -104,6 +108,9 @@ function toDraftState(c: any): DraftState {
     headline: creative.headline ?? "",
     adDescription: creative.description ?? "",
     imageUrl: creative.imageUrl ?? "",
+    mediaType: creative.videoUrl ? "video" : "image",
+    videoUrl: creative.videoUrl ?? "",
+    thumbnailUrl: creative.thumbnailUrl ?? "",
     callToAction: creative.callToAction ?? "LEARN_MORE",
     zips: (c.targeting?.zips ?? []).map((z: string) => z.replace(/^US:/, "")).join(", "),
     includeAudienceIds: c.targeting?.includeAudienceIds ?? [],
@@ -125,17 +132,25 @@ function editedTargeting(existing: any, draft: Pick<DraftState, "zips" | "includ
   return Object.keys(next).length > 0 ? next : null;
 }
 
-/** Keeps the uploaded image reference unless the image address was changed. */
+/**
+ * The creative to save. Keeps what's already uploaded to Meta (image hash,
+ * video id) unless that image or video was changed. An ad is an image or a
+ * video, never both.
+ */
 function editedCreative(existing: any, draft: DraftState) {
+  const video = draft.mediaType === "video";
   const text = {
     primaryText: draft.primaryText || undefined,
     headline: draft.headline || undefined,
     description: draft.adDescription || undefined,
-    imageUrl: draft.imageUrl || undefined,
+    imageUrl: !video ? draft.imageUrl || undefined : undefined,
+    videoUrl: video ? draft.videoUrl || undefined : undefined,
+    thumbnailUrl: video ? draft.thumbnailUrl || undefined : undefined,
   };
-  if (!Object.values(text).some(Boolean) && !existing?.imageHash) return null;
-  const imageHash = (existing?.imageUrl ?? "") === draft.imageUrl ? existing?.imageHash : undefined;
-  return { ...text, imageHash, callToAction: draft.callToAction };
+  if (!Object.values(text).some(Boolean) && !existing?.imageHash && !existing?.videoId) return null;
+  const imageHash = !video && (existing?.imageUrl ?? "") === draft.imageUrl ? existing?.imageHash : undefined;
+  const videoId = video && (existing?.videoUrl ?? "") === draft.videoUrl ? existing?.videoId : undefined;
+  return { ...text, imageHash, videoId, callToAction: draft.callToAction };
 }
 
 /** Banner explaining what still has to be connected before ads can run. */
@@ -368,15 +383,7 @@ export default function Campaigns() {
         lifetimeBudget: lifetime,
         endDate: draft.endDate ? new Date(draft.endDate) : null,
         targeting: editedTargeting(null, draft) as any,
-        creative: draft.primaryText
-          ? {
-              primaryText: draft.primaryText,
-              headline: draft.headline || undefined,
-              description: draft.adDescription || undefined,
-              imageUrl: draft.imageUrl || undefined,
-              callToAction: draft.callToAction,
-            }
-          : null,
+        creative: draft.primaryText ? editedCreative(null, draft) : null,
         aiGenerated: !!aiPrompt,
         aiPrompt: aiPrompt ?? undefined,
       });
@@ -767,15 +774,14 @@ export default function Campaigns() {
                   />
                 </div>
               </div>
+              <AdMediaPicker
+                mediaType={draft.mediaType}
+                imageUrl={draft.imageUrl}
+                videoUrl={draft.videoUrl}
+                thumbnailUrl={draft.thumbnailUrl}
+                onChange={(m) => setDraft({ ...draft, ...m })}
+              />
               <div className="grid sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Image URL</Label>
-                  <Input
-                    value={draft.imageUrl}
-                    onChange={(e) => setDraft({ ...draft, imageUrl: e.target.value })}
-                    placeholder="https://…/ad-image.jpg"
-                  />
-                </div>
                 <div className="space-y-1.5">
                   <Label>Call to action</Label>
                   <Select value={draft.callToAction} onValueChange={(v) => setDraft({ ...draft, callToAction: v })}>

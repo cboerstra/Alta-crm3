@@ -13,6 +13,8 @@ import {
   createMetaAdCreative,
   createMetaAdSet,
   createMetaCampaign,
+  getAdVideoStatus,
+  uploadAdVideo,
   fetchCampaignInsights,
   extractLeadCount,
   updateAdSetBudget,
@@ -49,6 +51,47 @@ export function getPublicBaseUrl(): string {
     process.env.VITE_APP_URL ||
     "";
   return raw.replace(/\/+$/, "");
+}
+
+/** Uploaded files are stored as /uploads/…; Meta needs the full public address to download them. */
+export function absoluteMediaUrl(url: string | undefined, baseUrl: string): string | undefined {
+  if (!url) return undefined;
+  return url.startsWith("/") ? `${baseUrl}${url}` : url;
+}
+
+const VIDEO_WAIT_MS = 45_000;
+const VIDEO_POLL_MS = 5_000;
+
+/**
+ * Upload the campaign's video to Meta once and wait briefly for processing.
+ * Meta often needs a minute or two for a Reel; publishing again picks up
+ * where this left off, because the video id is saved on the campaign.
+ */
+async function ensureVideoReady(
+  campaign: AdCampaign,
+  creds: Awaited<ReturnType<typeof resolveCredentials>>,
+  baseUrl: string,
+): Promise<string> {
+  const creative = (campaign.creative ?? {}) as Partial<MetaCreative>;
+  let videoId = creative.videoId;
+  if (!videoId) {
+    videoId = await uploadAdVideo(creds, absoluteMediaUrl(creative.videoUrl, baseUrl)!, `${campaign.name} — Video`);
+    await updateAdCampaign(campaign.id, { creative: { ...creative, videoId } as any });
+  }
+  const deadline = Date.now() + VIDEO_WAIT_MS;
+  for (;;) {
+    const { status, message } = await getAdVideoStatus(creds, videoId);
+    if (status === "ready") return videoId;
+    if (status === "error") {
+      // Clear the id so the next publish uploads the video again.
+      await updateAdCampaign(campaign.id, { creative: { ...creative, videoId: undefined } as any });
+      throw new Error(`Meta couldn't process the video${message ? `: ${message}` : ""}. Check it's an MP4 or MOV under 4 GB, then publish again.`);
+    }
+    if (Date.now() >= deadline) {
+      throw new Error("Meta is still processing the video. Publish again in a minute or two; the campaign and ad set are already set up and won't be duplicated.");
+    }
+    await new Promise((resolve) => setTimeout(resolve, VIDEO_POLL_MS));
+  }
 }
 
 /**
@@ -212,14 +255,17 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
     // ── Creative ───────────────────────────────────────────────────────────
     let metaCreativeId = campaign.metaCreativeId ?? undefined;
     if (!metaCreativeId) {
+      const videoId = creativeInput.videoUrl ? await ensureVideoReady(campaign, creds, baseUrl) : undefined;
       const created = await createMetaAdCreative(creds, {
         name: `${campaign.name} — Creative`,
         creative: {
           primaryText: creativeInput.primaryText,
           headline: creativeInput.headline,
           description: creativeInput.description,
-          imageUrl: creativeInput.imageUrl,
+          imageUrl: absoluteMediaUrl(creativeInput.imageUrl, baseUrl),
           imageHash: creativeInput.imageHash,
+          videoId,
+          thumbnailUrl: absoluteMediaUrl(creativeInput.thumbnailUrl, baseUrl),
           callToAction: creativeInput.callToAction,
           destinationUrl,
         },
