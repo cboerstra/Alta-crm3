@@ -64,6 +64,16 @@ export function absoluteMediaUrl(url: string | undefined, baseUrl: string): stri
   return url.startsWith("/") ? `${baseUrl}${url}` : url;
 }
 
+/** Run one publishing step; a failure names the step, e.g. "Ad set: …". */
+async function step<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`${label}: ${message}`);
+  }
+}
+
 const VIDEO_WAIT_MS = 45_000;
 const VIDEO_POLL_MS = 5_000;
 
@@ -236,11 +246,11 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
     // ── Campaign ───────────────────────────────────────────────────────────
     let metaCampaignId = campaign.metaCampaignId ?? undefined;
     if (!metaCampaignId) {
-      const created = await createMetaCampaign(creds, {
+      const created = await step("Campaign", () => createMetaCampaign(creds, {
         name: campaign.name,
         objective: campaign.objective,
         status: "PAUSED",
-      });
+      }));
       metaCampaignId = created.id;
       await updateAdCampaign(campaignId, { metaCampaignId, metaAdAccountId: creds.adAccountId });
     }
@@ -248,9 +258,9 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
     // ── Ad set ─────────────────────────────────────────────────────────────
     let metaAdSetId = campaign.metaAdSetId ?? undefined;
     if (!metaAdSetId) {
-      const created = await createMetaAdSet(creds, {
+      const created = await step("Ad set", () => createMetaAdSet(creds, {
         name: `${campaign.name} — Ad Set`,
-        campaignId: metaCampaignId,
+        campaignId: metaCampaignId!,
         dailyBudget: campaign.dailyBudget ? Number(campaign.dailyBudget) : null,
         lifetimeBudget: campaign.lifetimeBudget ? Number(campaign.lifetimeBudget) : null,
         startTime: campaign.startDate,
@@ -260,7 +270,7 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
         pixelId: (page as any).metaPixelId || settings.pixelId,
         conversionEvent: (page as any).conversionEventName || "Lead",
         status: "PAUSED",
-      });
+      }));
       metaAdSetId = created.id;
       await updateAdCampaign(campaignId, { metaAdSetId });
     }
@@ -268,11 +278,13 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
     // ── Creative ───────────────────────────────────────────────────────────
     let metaCreativeId = campaign.metaCreativeId ?? undefined;
     if (!metaCreativeId) {
-      const videoId = creativeInput.videoUrl ? await ensureVideoReady(campaign, creds, baseUrl) : undefined;
-      const created = await createMetaAdCreative(creds, {
+      const videoId = creativeInput.videoUrl
+        ? await step("Video upload", () => ensureVideoReady(campaign, creds, baseUrl))
+        : undefined;
+      const created = await step("Ad creative", () => createMetaAdCreative(creds, {
         name: `${campaign.name} — Creative`,
         creative: {
-          primaryText: creativeInput.primaryText,
+          primaryText: creativeInput.primaryText!,
           headline: creativeInput.headline,
           description: creativeInput.description,
           imageUrl: absoluteMediaUrl(creativeInput.imageUrl, baseUrl),
@@ -282,7 +294,7 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
           callToAction: creativeInput.callToAction,
           destinationUrl,
         },
-      });
+      }));
       metaCreativeId = created.id;
       await updateAdCampaign(campaignId, { metaCreativeId });
     }
@@ -290,12 +302,12 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
     // ── Ad ─────────────────────────────────────────────────────────────────
     let metaAdId = campaign.metaAdId ?? undefined;
     if (!metaAdId) {
-      const created = await createMetaAd(creds, {
+      const created = await step("Ad", () => createMetaAd(creds, {
         name: `${campaign.name} — Ad`,
-        adSetId: metaAdSetId,
-        creativeId: metaCreativeId,
+        adSetId: metaAdSetId!,
+        creativeId: metaCreativeId!,
         status: "PAUSED",
-      });
+      }));
       metaAdId = created.id;
       await updateAdCampaign(campaignId, { metaAdId });
     }

@@ -55,6 +55,8 @@ export type GraphRequestOptions = {
   query?: Record<string, string | number | undefined>;
   /** JSON body (POST) */
   body?: Record<string, unknown>;
+  /** Multipart body (POST), for uploading file bytes. Takes the place of `body`. */
+  form?: FormData;
   timeoutMs?: number;
 };
 
@@ -69,8 +71,10 @@ export async function graphRequest<T = any>(opts: GraphRequestOptions): Promise<
   const headers: Record<string, string> = {
     Authorization: `Bearer ${opts.accessToken}`,
   };
-  let body: string | undefined;
-  if (method === "POST" && opts.body) {
+  let body: string | FormData | undefined;
+  if (method === "POST" && opts.form) {
+    body = opts.form; // fetch sets the multipart boundary itself
+  } else if (method === "POST" && opts.body) {
     headers["Content-Type"] = "application/json";
     body = JSON.stringify(opts.body);
   }

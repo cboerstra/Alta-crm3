@@ -18,7 +18,7 @@
  */
 
 import { MIN_HOUSING_RADIUS_MILES } from "../../shared/metaGeo";
-import { graphRequest } from "./graph";
+import { graphRequest, MetaApiError } from "./graph";
 
 export type MetaCredentials = {
   adAccountId: string;      // act_123456789
@@ -220,15 +220,33 @@ export async function uploadAdImage(creds: MetaCredentials, imageUrl: string): P
   return first?.hash;
 }
 
-/** Hand Meta a public video address; Meta downloads and processes it. Returns the video id. */
+/**
+ * Upload a video to the ad account. Meta is first asked to fetch it from its
+ * public address; if the app isn't allowed that call (#3) or Meta can't fetch
+ * it, the CRM downloads the file itself and sends the bytes.
+ */
 export async function uploadAdVideo(creds: MetaCredentials, videoUrl: string, name?: string): Promise<string> {
+  const path = `${normalizeAdAccountId(creds.adAccountId)}/advideos`;
+  try {
+    const res = await graphRequest<{ id: string }>({
+      path, method: "POST", accessToken: creds.accessToken, apiVersion: creds.apiVersion,
+      timeoutMs: 120_000,
+      body: { file_url: videoUrl, name },
+    });
+    return res.id;
+  } catch (err) {
+    if (!(err instanceof MetaApiError) || err.status === 0) throw err;
+    console.warn(`[Meta] advideos with file_url failed (${err.code ?? err.status}: ${err.message}); sending the file bytes instead`);
+  }
+  const file = await fetch(videoUrl);
+  if (!file.ok) throw new Error(`Couldn't read the video at ${videoUrl} (HTTP ${file.status}) to send it to Meta`);
+  const form = new FormData();
+  form.append("source", new Blob([await file.arrayBuffer()], { type: file.headers.get("content-type") || "video/mp4" }), "ad-video.mp4");
+  if (name) form.append("name", name);
   const res = await graphRequest<{ id: string }>({
-    path: `${normalizeAdAccountId(creds.adAccountId)}/advideos`,
-    method: "POST",
-    accessToken: creds.accessToken,
-    apiVersion: creds.apiVersion,
-    timeoutMs: 120_000,
-    body: { file_url: videoUrl, name },
+    path, method: "POST", accessToken: creds.accessToken, apiVersion: creds.apiVersion,
+    timeoutMs: 300_000,
+    form,
   });
   return res.id;
 }
@@ -299,7 +317,7 @@ export async function createMetaAdCreative(
     if (!cover.imageHash && !cover.imageUrl) {
       throw new Error("Meta hasn't made a cover image for the video yet. Upload a cover image or publish again in a minute.");
     }
-    return graphRequest<{ id: string }>({
+    const send = (instagramUserId?: string | null) => graphRequest<{ id: string }>({
       path: `${normalizeAdAccountId(creds.adAccountId)}/adcreatives`,
       method: "POST",
       accessToken: creds.accessToken,
@@ -307,10 +325,11 @@ export async function createMetaAdCreative(
       body: {
         name: input.name,
         object_story_spec: buildVideoStorySpec(
-          creds.pageId, input.creative as MetaCreative & { videoId: string }, cover, creds.instagramActorId,
+          creds.pageId!, input.creative as MetaCreative & { videoId: string }, cover, instagramUserId,
         ),
       },
     });
+    return withoutInstagramOnPermissionError(creds, send);
   }
 
   let imageHash = input.creative.imageHash;
@@ -334,13 +353,37 @@ export async function createMetaAdCreative(
   // Meta replaced instagram_actor_id with instagram_user_id in v22.
   if (creds.instagramActorId) objectStorySpec.instagram_user_id = creds.instagramActorId;
 
-  return graphRequest<{ id: string }>({
-    path: `${normalizeAdAccountId(creds.adAccountId)}/adcreatives`,
-    method: "POST",
-    accessToken: creds.accessToken,
-    apiVersion: creds.apiVersion,
-    body: { name: input.name, object_story_spec: objectStorySpec },
-  });
+  const send = (instagramUserId?: string | null) => {
+    const spec = { ...objectStorySpec };
+    if (instagramUserId) spec.instagram_user_id = instagramUserId; else delete spec.instagram_user_id;
+    return graphRequest<{ id: string }>({
+      path: `${normalizeAdAccountId(creds.adAccountId)}/adcreatives`,
+      method: "POST",
+      accessToken: creds.accessToken,
+      apiVersion: creds.apiVersion,
+      body: { name: input.name, object_story_spec: spec },
+    });
+  };
+  return withoutInstagramOnPermissionError(creds, send);
+}
+
+/**
+ * Create the creative with the connected Instagram account. If Meta refuses the
+ * Instagram identity for lack of permission (#3, #10, #200), create it without
+ * one: Meta then shows the ad on Instagram under the Facebook Page.
+ */
+async function withoutInstagramOnPermissionError<T>(
+  creds: MetaCredentials,
+  send: (instagramUserId?: string | null) => Promise<T>,
+): Promise<T> {
+  try {
+    return await send(creds.instagramActorId);
+  } catch (err) {
+    const permission = err instanceof MetaApiError && [3, 10, 200].includes(err.code ?? -1);
+    if (!creds.instagramActorId || !permission) throw err;
+    console.warn(`[Meta] Creative refused with the Instagram account (${(err as MetaApiError).code}); retrying without it`);
+    return send(null);
+  }
 }
 
 export async function createMetaAd(
