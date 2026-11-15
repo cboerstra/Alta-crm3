@@ -1,5 +1,7 @@
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
+import { captureAttribution, toSubmitPayload } from "@/lib/attribution";
+import { tourSuccessUrl } from "@shared/tourSuccessUrl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { useParams } from "wouter";
 import { Building2, CheckCircle, Loader2, Calendar, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import TourBookingShell from "./TourBookingShell";
 
 const TIME_SLOTS = [
   "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
@@ -14,8 +17,19 @@ const TIME_SLOTS = [
   "15:00", "15:30", "16:00", "16:30",
 ];
 
+function formatSlot(slot: string) {
+  const [h, m] = slot.split(":").map(Number);
+  return `${h % 12 || 12}:${m.toString().padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+
 export default function PublicBooking() {
   const params = useParams<{ slug: string }>();
+  // Set by the "Request a tour" button on FreeHomeSearchUtah.com listings.
+  const home = useMemo(() => (new URLSearchParams(window.location.search).get("home") ?? "").trim().slice(0, 200), []);
+  // src is the slug of the landing page that sent the visitor here.
+  const src = useMemo(() => new URLSearchParams(window.location.search).get("src") ?? "", []);
+  const attribution = useMemo(() => (home ? toSubmitPayload(captureAttribution()) : undefined), [home]);
+  const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
@@ -37,8 +51,14 @@ export default function PublicBooking() {
   });
 
   const bookMutation = trpc.scheduling.book.useMutation({
-    onSuccess: () => setSubmitted(true),
-    onError: () => setSubmitted(true),
+    onSuccess: () => {
+      setSubmitted(true);
+      // Home tours finish on FreeHomeSearchUtah.com. The confirmation below shows while that page loads.
+      if (home && selectedDate && selectedTime) {
+        window.location.assign(tourSuccessUrl(home, selectedDate, selectedTime, src || undefined));
+      }
+    },
+    onError: (err) => setError(err.message || "Something went wrong. Please call or text us instead."),
   });
 
   // Build calendar days for current month
@@ -64,6 +84,8 @@ export default function PublicBooking() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (date < today) return false;
+    // Tours need time to be confirmed, so they can't be booked online for today.
+    if (home && date.getTime() === today.getTime()) return false;
     return availData.availability.some((a) => a.dayOfWeek === dayOfWeek);
   };
 
@@ -100,6 +122,13 @@ export default function PublicBooking() {
   }, [selectedDate, availData]);
 
   if (isLoading) {
+    if (home) {
+      return (
+        <TourBookingShell>
+          <div className="fb-spinner"><Loader2 className="h-8 w-8 animate-spin" /></div>
+        </TourBookingShell>
+      );
+    }
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#2A5B3F] to-[#1F7B47]">
         <Loader2 className="h-8 w-8 text-white animate-spin" />
@@ -108,6 +137,16 @@ export default function PublicBooking() {
   }
 
   if (!availData) {
+    if (home) {
+      return (
+        <TourBookingShell>
+          <div className="fb-notfound">
+            <h1 className="text-3xl font-bold">We couldn't load the tour calendar</h1>
+            <p className="mt-2">Please call or text Scott at 801-628-9400 to schedule your tour.</p>
+          </div>
+        </TourBookingShell>
+      );
+    }
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#2A5B3F] to-[#1F7B47]">
         <div className="text-center text-white">
@@ -119,16 +158,21 @@ export default function PublicBooking() {
   }
 
   if (submitted) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#2A5B3F] to-[#1F7B47]">
-        <Card className="max-w-md w-full mx-4 border-0 shadow-2xl">
+    const confirmation = (
+        <Card className={home ? "fb-card max-w-md w-full mx-auto" : "max-w-md w-full mx-4 border-0 shadow-2xl"}>
           <CardContent className="p-8 text-center">
-            <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="h-8 w-8 text-green-600" />
-            </div>
-            <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: "Raleway, sans-serif" }}>Consultation Booked!</h2>
+            {home ? (
+              <div className="fb-check"><CheckCircle className="h-8 w-8" /></div>
+            ) : (
+              <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="h-8 w-8 text-green-600" />
+              </div>
+            )}
+            <h2 className="text-2xl font-bold mb-2" style={home ? undefined : { fontFamily: "Raleway, sans-serif" }}>{home ? "Tour Scheduled!" : "Consultation Booked!"}</h2>
             <p className="text-muted-foreground">
-              Your consultation has been confirmed. You'll receive a confirmation email shortly.
+              {home
+                ? `Thanks! ${availData.agent.name ?? "We"} will call or text within 2 hours during the day to confirm your tour of ${home}.`
+                : "Your consultation has been confirmed. You'll receive a confirmation email shortly."}
             </p>
             {selectedDate && selectedTime && (
               <div className="mt-4 p-3 rounded-lg bg-muted/30 border border-border/30">
@@ -136,36 +180,23 @@ export default function PublicBooking() {
                   <Calendar className="h-4 w-4" />
                   <span>{selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</span>
                   <Clock className="h-4 w-4 ml-2" />
-                  <span>{selectedTime}</span>
+                  <span>{formatSlot(selectedTime)}</span>
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
+    );
+    if (home) return <TourBookingShell>{confirmation}</TourBookingShell>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#2A5B3F] to-[#1F7B47]">
+        {confirmation}
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-[#2A5B3F] via-[#1F7B47] to-[#165E2E] flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <Building2 className="h-7 w-7 text-[#C9A84C]" />
-            <span className="text-white/80 text-sm font-medium tracking-widest uppercase" style={{ fontFamily: "Raleway, sans-serif" }}>
-              Clarke & Associates
-            </span>
-          </div>
-          <h1 className="text-2xl md:text-3xl font-bold text-white" style={{ fontFamily: "Raleway, sans-serif" }}>
-            Book a Consultation
-          </h1>
-          {availData.agent.name && (
-            <p className="text-white/70 mt-1">with {availData.agent.name}</p>
-          )}
-        </div>
-
-        <Card className="border-0 shadow-2xl">
+  const bookingCard = (
+        <Card className={home ? "fb-card" : "border-0 shadow-2xl"}>
           <CardContent className="p-6">
             {!selectedDate ? (
               /* Step 1: Select Date */
@@ -201,7 +232,7 @@ export default function PublicBooking() {
                       <button
                         key={day.toISOString()}
                         disabled={!available}
-                        className={`py-2 rounded-lg text-sm transition-all ${
+                        className={`tour-day py-2 rounded-lg text-sm transition-all ${
                           available
                             ? "hover:bg-brand-green/10 text-foreground cursor-pointer font-medium"
                             : "text-muted-foreground/40 cursor-not-allowed"
@@ -234,10 +265,10 @@ export default function PublicBooking() {
                       <Button
                         key={slot}
                         variant="outline"
-                        className="text-sm"
+                        className="tour-slot text-sm"
                         onClick={() => setSelectedTime(slot)}
                       >
-                        {slot}
+                        {formatSlot(slot)}
                       </Button>
                     ))}
                   </div>
@@ -254,7 +285,7 @@ export default function PublicBooking() {
                     <h3 className="text-sm font-semibold">
                       {selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                     </h3>
-                    <p className="text-xs text-muted-foreground">{selectedTime} · 30 minutes</p>
+                    <p className="text-xs text-muted-foreground">{formatSlot(selectedTime)} · 30 minutes</p>
                   </div>
                 </div>
                 <div className="space-y-4 mt-4">
@@ -267,7 +298,7 @@ export default function PublicBooking() {
                     <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-1" />
                   </div>
                   <div>
-                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone</Label>
+                    <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Phone{home ? " *" : ""}</Label>
                     <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="mt-1" />
                   </div>
                   <div>
@@ -275,10 +306,11 @@ export default function PublicBooking() {
                     <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="mt-1" rows={3} />
                   </div>
                   <Button
-                    className="w-full h-12 text-base font-semibold text-white"
-                    style={{ backgroundColor: "#2A5B3F" }}
-                    disabled={!form.name || !form.email || bookMutation.isPending}
+                    className="tour-primary w-full h-12 text-base font-semibold text-white"
+                    style={home ? undefined : { backgroundColor: "#2A5B3F" }}
+                    disabled={!form.name || !form.email || (!!home && !form.phone.trim()) || bookMutation.isPending}
                     onClick={() => {
+                      setError(null);
                       const [h, m] = selectedTime!.split(":").map(Number);
                       const scheduledAt = new Date(selectedDate!);
                       scheduledAt.setHours(h, m, 0, 0);
@@ -289,16 +321,56 @@ export default function PublicBooking() {
                         guestPhone: form.phone || undefined,
                         scheduledAt: scheduledAt.getTime(),
                         notes: form.notes || undefined,
+                        home: home || undefined,
+                        src: src || undefined,
+                        attribution,
                       });
                     }}
                   >
-                    {bookMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : "Confirm Booking"}
+                    {bookMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : home ? "Schedule Tour" : "Confirm Booking"}
                   </Button>
+                  {error && <p className="text-sm text-red-600 text-center">{error}</p>}
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
+  );
+
+  if (home) {
+    return (
+      <TourBookingShell>
+        <div className="fb-intro">
+          <p className="fb-eyebrow">Personal tour</p>
+          <h1>Schedule a Personal Tour</h1>
+          <p className="fb-home">{home}</p>
+          {availData.agent.name && <p className="fb-agent">with {availData.agent.name}</p>}
+        </div>
+        {bookingCard}
+      </TourBookingShell>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#2A5B3F] via-[#1F7B47] to-[#165E2E] flex items-center justify-center p-4">
+      <div className="max-w-2xl w-full">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <Building2 className="h-7 w-7 text-[#C9A84C]" />
+            <span className="text-white/80 text-sm font-medium tracking-widest uppercase" style={{ fontFamily: "Raleway, sans-serif" }}>
+              Clarke & Associates
+            </span>
+          </div>
+          <h1 className="text-2xl md:text-3xl font-bold text-white" style={{ fontFamily: "Raleway, sans-serif" }}>
+            Book a Consultation
+          </h1>
+          {availData.agent.name && (
+            <p className="text-white/70 mt-1">with {availData.agent.name}</p>
+          )}
+        </div>
+
+        {bookingCard}
 
         <p className="text-center text-white/40 text-xs mt-6">
           &copy; {new Date().getFullYear()} Clarke & Associates. All rights reserved.

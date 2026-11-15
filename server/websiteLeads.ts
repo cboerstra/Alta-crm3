@@ -25,6 +25,7 @@
  * { success: false, error: string }   on failure
  */
 
+import { safeEqual } from "./_core/security";
 import { Router } from "express";
 import { createLead, logActivity, notifyAdminsBySms } from "./db";
 import { notifyOwner } from "./_core/notification";
@@ -106,7 +107,7 @@ export function registerWebsiteLeadRoute(app: Router) {
         res.status(500).json({ success: false, error: "Server configuration error." });
         return;
       }
-      if (!apiKey || apiKey !== expectedKey) {
+      if (!apiKey || typeof apiKey !== "string" || !safeEqual(apiKey, expectedKey)) {
         res.status(401).json({ success: false, error: "Unauthorized: invalid API key." });
         return;
       }

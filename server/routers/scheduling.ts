@@ -3,8 +3,11 @@ import { protectedProcedure, publicProcedure, router } from "../_core/trpc";
 import {
   getAvailabilityByUser, upsertAvailability, createBooking, getBookings,
   getBookingsByDateRange, getUserBySchedulingSlug, updateUserSchedulingSlug,
-  logActivity, updateLead,
+  logActivity, updateLead, createLead, notifyAdminsBySms, getLandingPageBySlug,
 } from "../db";
+import { attributionInputSchema, clientIpFromRequest, normalizeAttribution, type AttributionInput } from "../meta/attribution";
+import { trackCapturedLead, type TrackedLandingPage } from "../meta/leadTracking";
+import { isAfterTodayInUtah, sendTourInvite, tourCampaign } from "../tourRequest";
 
 export const schedulingRouter = router({
   getMyAvailability: protectedProcedure
@@ -60,12 +63,23 @@ export const schedulingRouter = router({
       guestPhone: z.string().optional(),
       scheduledAt: z.number(),
       durationMinutes: z.number().default(30),
-      notes: z.string().optional(),
+      notes: z.string().max(2000).optional(),
       leadId: z.number().optional(),
+      // Set when the booking page was opened from a listing's "Request a tour" button.
+      home: z.string().trim().min(1).max(200).optional(),
+      // Tracking must never cost a booking, so bad values are dropped instead of rejected.
+      src: z.string().regex(/^[a-z0-9-]+$/).max(128).optional().catch(undefined),
+      attribution: attributionInputSchema.optional().catch(undefined),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const user = await getUserBySchedulingSlug(input.agentSlug);
       if (!user) throw new Error("Agent not found");
+      if (input.home) {
+        return bookTour(user, input, {
+          ip: clientIpFromRequest(ctx.req as any),
+          userAgent: ctx.req.headers["user-agent"] ?? null,
+        });
+      }
       const id = await createBooking({
         userId: user.id,
         leadId: input.leadId,
@@ -92,3 +106,73 @@ export const schedulingRouter = router({
       return { id };
     }),
 });
+
+type Agent = NonNullable<Awaited<ReturnType<typeof getUserBySchedulingSlug>>>;
+
+async function bookTour(agent: Agent, input: {
+  guestName: string; guestEmail: string; guestPhone?: string;
+  scheduledAt: number; durationMinutes: number; notes?: string; home?: string;
+  src?: string; attribution?: AttributionInput;
+}, request: { ip?: string | null; userAgent?: string | null }) {
+  const home = input.home!;
+  const phone = input.guestPhone?.trim();
+  if (!phone) throw new Error("Please add a phone number so we can confirm your tour.");
+  const [firstName, ...rest] = input.guestName.trim().split(/\s+/);
+  const start = new Date(input.scheduledAt);
+  if (!isAfterTodayInUtah(start)) throw new Error("Tours can't be booked online for today. Please call or text to arrange one.");
+  const page = input.src ? await getLandingPageBySlug(input.src) : undefined;
+
+  const leadId = await createLead({
+    firstName,
+    lastName: rest.join(" ") || "-",
+    email: input.guestEmail.trim().toLowerCase(),
+    phone,
+    source: "tour_request",
+    campaign: tourCampaign(home),
+    landingPageId: page?.id,
+    stage: "new_lead",
+  });
+  const notes = [`Tour of ${home}`, input.notes?.trim()].filter(Boolean).join("\n");
+  const id = await createBooking({
+    userId: agent.id,
+    leadId,
+    guestName: input.guestName.trim(),
+    guestEmail: input.guestEmail.trim(),
+    guestPhone: phone,
+    scheduledAt: start,
+    durationMinutes: input.durationMinutes,
+    notes,
+    status: "confirmed",
+  });
+  await logActivity({
+    leadId,
+    type: "system",
+    title: "Tour requested from website",
+    content: `${home}\n${start.toLocaleString("en-US", { timeZone: "America/Denver" })} (Mountain)${input.src ? `\nCame from: ${input.src}` : ""}${input.notes?.trim() ? `\nNotes: ${input.notes.trim()}` : ""}`,
+  });
+
+  // Only ad and landing page traffic is tracked: a tour booked straight from a
+  // listing page has nothing to attribute and shouldn't be reported to Meta.
+  const attribution = normalizeAttribution(input.attribution, request);
+  if (page || attribution.utmSource || attribution.utmCampaign || attribution.fbclid || attribution.gclid || attribution.metaAdId) {
+    await trackCapturedLead({
+      leadId,
+      page: page as TrackedLandingPage | undefined,
+      attribution,
+      eventId: input.attribution?.eventId,
+    }).catch((err) => console.error(`[Tour] Attribution failed for lead ${leadId}:`, err));
+  }
+
+  if (agent.email) {
+    sendTourInvite({
+      bookingId: id, home, guestName: input.guestName.trim(), guestEmail: input.guestEmail.trim(),
+      guestPhone: phone, notes: input.notes?.trim() || undefined, start,
+      durationMinutes: input.durationMinutes, agentName: agent.name ?? "Agent", agentEmail: agent.email,
+    }).catch((err) => console.error(`[Tour] Invite email failed for booking ${id}:`, err));
+  }
+  notifyAdminsBySms(
+    `Tour request: ${home} | ${input.guestName.trim()} ${phone} | ${start.toLocaleString("en-US", { timeZone: "America/Denver", dateStyle: "short", timeStyle: "short" })}`
+  ).catch(() => {});
+
+  return { id };
+}

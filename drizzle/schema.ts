@@ -31,6 +31,23 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
+// ─── Two-factor auth (TOTP) ──────────────────────────────────────────────────
+// secretEnc is AES-256-GCM ciphertext (see server/twoFactor.ts); backupCodeHashes
+// holds keyed hashes of the unused one-time recovery codes.
+export const userTwoFactor = mysqlTable("user_two_factor", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  secretEnc: text("secretEnc").notNull(),
+  enabled: boolean("enabled").default(false).notNull(),
+  backupCodeHashes: json("backupCodeHashes").$type<string[]>(),
+  lastUsedStep: int("lastUsedStep"),
+  enabledAt: timestamp("enabledAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type UserTwoFactor = typeof userTwoFactor.$inferSelect;
+
 // ─── Integrations (Zoom, Google Calendar) ────────────────────────────────────
 export const integrations = mysqlTable("integrations", {
   id: int("id").autoincrement().primaryKey(),

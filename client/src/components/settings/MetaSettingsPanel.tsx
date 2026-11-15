@@ -26,7 +26,7 @@ export default function MetaSettingsPanel() {
 
   const [form, setForm] = useState({
     adAccountId: "", businessId: "", pageId: "", instagramActorId: "",
-    pixelId: "", capiTestEventCode: "", apiVersion: "v21.0",
+    pixelId: "", capiTestEventCode: "", apiVersion: "v26.0",
     accessToken: "", capiAccessToken: "",
   });
   const [toggles, setToggles] = useState({ pixelEnabled: true, capiEnabled: true, publishEnabled: false });

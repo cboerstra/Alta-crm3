@@ -1,8 +1,9 @@
 import { z } from "zod";
 import bcrypt from "bcrypt";
 import { adminProcedure, router } from "../_core/trpc";
-import { getDb, createInvite, listInvites, deleteInvite } from "../db";
-import { users, pendingInvites } from "../../drizzle/schema";
+import { TRPCError } from "@trpc/server";
+import { getDb, createInvite, listInvites, deleteInvite, deleteTwoFactor } from "../db";
+import { users, pendingInvites, userTwoFactor } from "../../drizzle/schema";
 import { eq, desc, sql, like, or } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
@@ -97,6 +98,29 @@ export const userManagementRouter = router({
   // For now, we'll add an isActive concept via the role - but better to keep it simple
   // Let's just provide role management for now since the schema has admin/user roles
 
+  // Which users have 2FA turned on (for a badge in the user list)
+  twoFactorUserIds: adminProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [] as number[];
+    const rows = await db.select({ userId: userTwoFactor.userId }).from(userTwoFactor).where(eq(userTwoFactor.enabled, true));
+    return rows.map((r) => r.userId);
+  }),
+
+  // Lost phone AND backup codes: an admin can clear a user's 2FA so they can
+  // sign in with just their password and re-enroll. Re-authenticates the admin.
+  resetTwoFactor: adminProcedure
+    .input(z.object({ userId: z.number(), adminPassword: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      if (!ctx.user.passwordHash || !(await bcrypt.compare(input.adminPassword, ctx.user.passwordHash))) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Incorrect password" });
+      }
+      if (input.userId === ctx.user.id) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Use Settings → Security to disable your own two-factor authentication." });
+      }
+      await deleteTwoFactor(input.userId);
+      return { success: true };
+    }),
+
   // Get a single user's details
   getUser: adminProcedure
     .input(z.object({ userId: z.number() }))
@@ -140,7 +164,7 @@ export const userManagementRouter = router({
       };
 
       if (input.newPassword && input.newPassword.trim().length >= 6) {
-        updateData.passwordHash = await bcrypt.hash(input.newPassword, 10);
+        updateData.passwordHash = await bcrypt.hash(input.newPassword, 12);
       }
 
       await db.update(users).set(updateData as any).where(eq(users.id, input.userId));

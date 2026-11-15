@@ -14,22 +14,49 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    new URLSearchParams(window.location.search).get("error") === "2fa_password_required"
+      ? "This account uses two-factor authentication. Sign in with your email, password and code."
+      : null
+  );
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+
+  const finish = () => {
+    setLocation("/");
+    window.location.reload();
+  };
 
   const loginMutation = trpc.auth.login.useMutation({
-    onSuccess: () => {
-      setLocation("/");
-      window.location.reload();
+    onSuccess: (res) => {
+      if (res.twoFactorRequired) {
+        setPendingToken(res.pendingToken);
+        setPassword("");
+        return;
+      }
+      finish();
     },
     onError: (err) => {
       setError(err.message);
     },
   });
 
+  const verifyMutation = trpc.auth.verifyTwoFactor.useMutation({
+    onSuccess: finish,
+    onError: (err) => {
+      setError(err.message);
+      if (/expired/i.test(err.message)) setPendingToken(null);
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    loginMutation.mutate({ email, password });
+    if (pendingToken) {
+      verifyMutation.mutate({ pendingToken, code });
+    } else {
+      loginMutation.mutate({ email, password });
+    }
   };
 
   return (
@@ -56,6 +83,37 @@ export default function Login() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {pendingToken ? (
+                <div className="space-y-2">
+                  <Label htmlFor="code">Authentication code</Label>
+                  <Input
+                    id="code"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    placeholder="6-digit code or backup code"
+                    autoComplete="one-time-code"
+                    autoFocus
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Open your authenticator app, or enter one of your backup codes.
+                  </p>
+                  <Button
+                    type="submit"
+                    className="w-full bg-brand-green hover:bg-brand-green/90 text-white"
+                    disabled={verifyMutation.isPending}
+                  >
+                    {verifyMutation.isPending ? "Verifying…" : "Verify"}
+                  </Button>
+                  <button
+                    type="button"
+                    className="w-full text-xs text-muted-foreground hover:underline"
+                    onClick={() => { setPendingToken(null); setCode(""); setError(null); }}
+                  >
+                    Back to sign in
+                  </button>
+                </div>
+              ) : (<>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
@@ -105,6 +163,7 @@ export default function Login() {
               >
                 {loginMutation.isPending ? "Signing in…" : "Sign in"}
               </Button>
+              </>)}
             </form>
 
             {/* Manus OAuth option if configured */}

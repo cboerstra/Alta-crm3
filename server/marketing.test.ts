@@ -1,9 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import crypto from "crypto";
+import { DEFAULT_GRAPH_VERSION, resolveGraphVersion } from "./meta/graph";
 import { normalizeAttribution, buildFbc, describeAttribution, clientIpFromRequest } from "./meta/attribution";
 import { buildUserData, buildEventPayload, normalizePhone } from "./meta/conversionsApi";
 import { buildDestinationUrl } from "./meta/publisher";
-import { buildTargetingSpec, normalizeAdAccountId, toMinorUnits, extractLeadCount } from "./meta/marketingApi";
+import {
+  buildTargetingSpec,
+  createMetaAdCreative,
+  createMetaCampaign,
+  normalizeAdAccountId,
+  toMinorUnits,
+  extractLeadCount,
+} from "./meta/marketingApi";
 import { resolvePlaceholders } from "./automations/engine";
 import { detectPixelInMarkup, pageViewEventId } from "../client/src/lib/metaPixel";
 
@@ -191,7 +199,83 @@ describe("ad destination URL", () => {
   });
 });
 
+describe("Graph API version", () => {
+  it("ignores a stored version older than the default", () => {
+    expect(resolveGraphVersion("v21.0")).toBe(DEFAULT_GRAPH_VERSION);
+  });
+
+  it("falls back to the default when nothing usable is stored", () => {
+    expect(resolveGraphVersion(undefined)).toBe(DEFAULT_GRAPH_VERSION);
+    expect(resolveGraphVersion(null)).toBe(DEFAULT_GRAPH_VERSION);
+    expect(resolveGraphVersion("latest")).toBe(DEFAULT_GRAPH_VERSION);
+  });
+
+  it("keeps a stored version at or above the default", () => {
+    expect(resolveGraphVersion(DEFAULT_GRAPH_VERSION)).toBe(DEFAULT_GRAPH_VERSION);
+    expect(resolveGraphVersion("v99.0")).toBe("v99.0");
+  });
+});
+
+describe("Marketing API requests", () => {
+  const creds = { adAccountId: "act_1", accessToken: "test-token", apiVersion: "v21.0", pageId: "p1" };
+
+  /** Stubs fetch and returns what the code sent to Meta. */
+  function captureRequests() {
+    const sent: Array<{ url: string; body: any }> = [];
+    vi.stubGlobal("fetch", async (url: string, init: { body?: string }) => {
+      sent.push({ url, body: init.body ? JSON.parse(init.body) : null });
+      return new Response(JSON.stringify({ id: "new-id" }), { status: 200 });
+    });
+    return sent;
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("creates a housing campaign with its country and budget flag", async () => {
+    const sent = captureRequests();
+    await createMetaCampaign(creds, { name: "Grant", objective: "OUTCOME_LEADS" });
+    expect(sent[0].body.special_ad_categories).toEqual(["HOUSING"]);
+    expect(sent[0].body.special_ad_category_country).toEqual(["US"]);
+    expect(sent[0].body.is_adset_budget_sharing_enabled).toBe(false);
+  });
+
+  it("leaves the country off when no special category is declared", async () => {
+    const sent = captureRequests();
+    await createMetaCampaign(creds, { name: "Other", objective: "OUTCOME_LEADS", specialAdCategories: [] });
+    expect(sent[0].body.special_ad_category_country).toBeUndefined();
+  });
+
+  it("sends requests to the current version even when settings store an old one", async () => {
+    const sent = captureRequests();
+    await createMetaCampaign(creds, { name: "Grant", objective: "OUTCOME_LEADS" });
+    expect(sent[0].url).toContain(`graph.facebook.com/${DEFAULT_GRAPH_VERSION}/act_1/campaigns`);
+    expect(sent[0].url).not.toContain("v21.0");
+  });
+
+  it("identifies the Instagram account with instagram_user_id", async () => {
+    const sent = captureRequests();
+    await createMetaAdCreative(
+      { ...creds, instagramActorId: "ig1" },
+      { name: "Creative", creative: { primaryText: "Hi", destinationUrl: "https://c.example.com/lp/x" } }
+    );
+    const spec = sent[0].body.object_story_spec;
+    expect(spec.instagram_user_id).toBe("ig1");
+    expect(spec.instagram_actor_id).toBeUndefined();
+  });
+});
+
 describe("Marketing API helpers", () => {
+  it("defaults to the full age range housing ads require", () => {
+    const spec = buildTargetingSpec(null) as any;
+    expect(spec.age_min).toBe(18);
+    expect(spec.age_max).toBe(65);
+  });
+
+  it("states the Advantage+ audience choice in targeting", () => {
+    const spec = buildTargetingSpec(null) as any;
+    expect(spec.targeting_automation).toEqual({ advantage_audience: 0 });
+  });
+
   it("normalizes an ad account id", () => {
     expect(normalizeAdAccountId("1234567890")).toBe("act_1234567890");
     expect(normalizeAdAccountId("act_1234567890")).toBe("act_1234567890");

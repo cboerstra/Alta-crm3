@@ -12,7 +12,7 @@ import {
 } from "../marketingDb";
 import { getLeadById, getLandingPageBySlug, updateLandingPage, getLandingPageById } from "../db";
 import { verifyAdAccount, normalizeAdAccountId } from "../meta/marketingApi";
-import { tokenHint } from "../meta/graph";
+import { DEFAULT_GRAPH_VERSION, tokenHint } from "../meta/graph";
 import { sendConversionEvents, generateEventId } from "../meta/conversionsApi";
 import { reportLeadConversion } from "../meta/leadTracking";
 import { syncAllCampaignMetrics, getPublicBaseUrl } from "../meta/publisher";
@@ -30,7 +30,7 @@ export const marketingRouter = router({
       return {
         configured: false,
         adAccountId: "", businessId: "", pageId: "", instagramActorId: "",
-        pixelId: "", capiTestEventCode: "", apiVersion: "v21.0",
+        pixelId: "", capiTestEventCode: "", apiVersion: DEFAULT_GRAPH_VERSION,
         accessTokenHint: "", capiAccessTokenHint: "",
         capiEnabled: true, pixelEnabled: true, publishEnabled: false,
         lastVerifiedAt: null, lastVerifyError: null,
@@ -45,7 +45,7 @@ export const marketingRouter = router({
       instagramActorId: s.instagramActorId ?? "",
       pixelId: s.pixelId ?? "",
       capiTestEventCode: s.capiTestEventCode ?? "",
-      apiVersion: s.apiVersion ?? "v21.0",
+      apiVersion: s.apiVersion ?? DEFAULT_GRAPH_VERSION,
       // Tokens are never sent back to the browser, only a last-four hint.
       accessTokenHint: tokenHint(s.accessToken),
       capiAccessTokenHint: tokenHint(s.capiAccessToken),

@@ -12,6 +12,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { processPendingReminders } from "../emailService";
 import { processPendingSmsReminders } from "../smsReminderService";
+import { securityHeaders, sandboxUploads, rateLimit, requireSession } from "./security";
 import { registerWebsiteLeadRoute } from "../websiteLeads";
 import { registerDocumentDownloadRoute, registerMismoDownloadRoute } from "../websiteStaffApi";
 import { getIntegration, createSmsMessage, logActivity, getLeads, updateLead, migrateDefaultSmsTemplates, runAutoMigrations } from "../db";
@@ -76,6 +77,18 @@ async function startServer() {
 
   const app = express();
   const server = createServer(app);
+  // Behind Hostinger's reverse proxy: trust one hop so req.ip is the real client (rate limiting).
+  app.set("trust proxy", 1);
+  app.use(securityHeaders);
+  // Brute-force protection: 10 login attempts / 15 min per IP, 5 registrations / hour per IP.
+  // tRPC batches calls into one URL (e.g. /api/trpc/auth.me,auth.login), so match by substring.
+  const limitTrpc = (proc: string, windowMs: number, max: number): RequestHandler => {
+    const limiter = rateLimit({ windowMs, max, methods: ["POST"] });
+    return (req, res, next) => (req.path.startsWith("/api/trpc/") && req.path.includes(proc) ? limiter(req, res, next) : next());
+  };
+  app.use(limitTrpc("auth.login", 15 * 60_000, 10));
+  app.use(limitTrpc("auth.setPassword", 15 * 60_000, 5));
+  app.use(limitTrpc("auth.register", 60 * 60_000, 5));
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -220,7 +233,7 @@ async function startServer() {
   }
 
   // Serve uploaded files as static assets under /uploads/*
-  app.use("/uploads", express.static(uploadsDir, {
+  app.use("/uploads", sandboxUploads, express.static(uploadsDir, {
     maxAge: "7d",
     etag: true,
   }));
@@ -313,7 +326,7 @@ async function startServer() {
   };
 
   // POST /api/upload-pdf — authenticated PDF upload (up to 25MB)
-  app.post("/api/upload-pdf", wrapUpload(pdfUpload.single("file")), async (req, res) => {
+  app.post("/api/upload-pdf", requireSession, wrapUpload(pdfUpload.single("file")), async (req, res) => {
     try {
       const { sdk } = await import("./sdk");
       let userId: number | null = null;
@@ -332,7 +345,7 @@ async function startServer() {
   });
 
   // POST /api/upload-html — authenticated HTML upload (up to 10MB)
-  app.post("/api/upload-html", wrapUpload(htmlUpload.single("file")), async (req, res) => {
+  app.post("/api/upload-html", requireSession, wrapUpload(htmlUpload.single("file")), async (req, res) => {
     try {
       const { sdk } = await import("./sdk");
       let userId: number | null = null;
@@ -351,7 +364,7 @@ async function startServer() {
   });
 
   // POST /api/upload — authenticated multipart upload
-  app.post("/api/upload", wrapUpload(upload.single("file")), async (req, res) => {
+  app.post("/api/upload", requireSession, wrapUpload(upload.single("file")), async (req, res) => {
     try {
       const { sdk } = await import("./sdk");
       let userId: number | null = null;
@@ -511,7 +524,7 @@ async function startServer() {
   // Allow freehomesearchutah.com to load assets and call APIs cross-origin (landing page proxy)
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (origin && (origin === "https://freehomesearchutah.com" || origin === "http://freehomesearchutah.com")) {
+    if (origin && (origin === "https://freehomesearchutah.com")) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type");

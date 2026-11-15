@@ -9,7 +9,23 @@
  * an operator actually needs to see in the CRM.
  */
 
-export const DEFAULT_GRAPH_VERSION = "v21.0";
+export const DEFAULT_GRAPH_VERSION = "v26.0";
+
+/**
+ * The version a request actually uses. `meta_settings.apiVersion` keeps whatever
+ * was saved earlier (its column default is still v21.0) and the settings panel has
+ * no field to change it, so a stored value older than the default is ignored.
+ * Otherwise an existing row would stay pinned to a version Meta has expired.
+ */
+export function resolveGraphVersion(requested?: string | null): string {
+  const parse = (v: string) => {
+    const m = /^v(\d+)\.(\d+)$/.exec(v.trim());
+    return m ? Number(m[1]) * 1000 + Number(m[2]) : null;
+  };
+  const wanted = requested ? parse(requested) : null;
+  const floor = parse(DEFAULT_GRAPH_VERSION)!;
+  return wanted !== null && wanted >= floor ? requested!.trim() : DEFAULT_GRAPH_VERSION;
+}
 
 export class MetaApiError extends Error {
   readonly status: number;
@@ -43,7 +59,7 @@ export type GraphRequestOptions = {
 };
 
 export async function graphRequest<T = any>(opts: GraphRequestOptions): Promise<T> {
-  const version = opts.apiVersion || DEFAULT_GRAPH_VERSION;
+  const version = resolveGraphVersion(opts.apiVersion);
   const url = new URL(`https://graph.facebook.com/${version}/${opts.path}`);
   for (const [key, value] of Object.entries(opts.query ?? {})) {
     if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, String(value));

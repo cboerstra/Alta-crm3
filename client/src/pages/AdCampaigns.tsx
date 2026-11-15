@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,10 +15,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Megaphone, Plus, Sparkles, Loader2, AlertTriangle, CheckCircle2,
-  DollarSign, MousePointerClick, Users, TrendingUp, Settings2,
+  DollarSign, MousePointerClick, Users, TrendingUp, Settings2, Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
+import { campaignSection, canEditCampaign, type CampaignSection } from "@shared/adCampaignRules";
 
 const STATUS_STYLES: Record<string, string> = {
   draft: "bg-gray-100 text-gray-700 border-gray-200",
@@ -68,6 +69,64 @@ const EMPTY_DRAFT: DraftState = {
   sequenceId: "", primaryText: "", headline: "", adDescription: "",
   imageUrl: "", callToAction: "LEARN_MORE", zips: "",
 };
+
+const parseZips = (text: string) =>
+  text
+    .split(",")
+    .map((z) => z.trim())
+    .filter(Boolean)
+    .map((z) => (z.includes(":") ? z : `US:${z}`));
+
+const SECTIONS: { key: CampaignSection; title: string; empty: string }[] = [
+  { key: "running", title: "Running Campaigns", empty: "No campaigns are running right now." },
+  { key: "draft", title: "Draft Campaigns", empty: "" },
+  { key: "finished", title: "Finished Campaigns", empty: "No campaigns have finished yet." },
+];
+
+/** Puts a saved campaign's values into the form's fields. */
+function toDraftState(c: any): DraftState {
+  const creative = c.creative ?? {};
+  return {
+    ...EMPTY_DRAFT,
+    name: c.name ?? "",
+    description: c.description ?? "",
+    objective: c.objective ?? "OUTCOME_LEADS",
+    dailyBudget: c.dailyBudget ? String(Number(c.dailyBudget)) : "",
+    lifetimeBudget: c.lifetimeBudget ? String(Number(c.lifetimeBudget)) : "",
+    endDate: c.endDate ? new Date(c.endDate).toISOString().slice(0, 10) : "",
+    landingPageId: c.landingPageId ? String(c.landingPageId) : "",
+    sequenceId: c.sequenceId ? String(c.sequenceId) : "",
+    primaryText: creative.primaryText ?? "",
+    headline: creative.headline ?? "",
+    adDescription: creative.description ?? "",
+    imageUrl: creative.imageUrl ?? "",
+    callToAction: creative.callToAction ?? "LEARN_MORE",
+    zips: (c.targeting?.zips ?? []).map((z: string) => z.replace(/^US:/, "")).join(", "),
+  };
+}
+
+/** Keeps targeting the form doesn't show, such as cities or age range, when ZIP codes change. */
+function editedTargeting(existing: any, zipText: string) {
+  const zips = parseZips(zipText);
+  const { zips: _oldZips, ...kept } = existing ?? {};
+  if (zips.length > 0) {
+    return { ...(existing ? kept : { countries: ["US"], ageMin: 18, ageMax: 65 }), zips };
+  }
+  return Object.keys(kept).length > 0 ? kept : null;
+}
+
+/** Keeps the uploaded image reference unless the image address was changed. */
+function editedCreative(existing: any, draft: DraftState) {
+  const text = {
+    primaryText: draft.primaryText || undefined,
+    headline: draft.headline || undefined,
+    description: draft.adDescription || undefined,
+    imageUrl: draft.imageUrl || undefined,
+  };
+  if (!Object.values(text).some(Boolean) && !existing?.imageHash) return null;
+  const imageHash = (existing?.imageUrl ?? "") === draft.imageUrl ? existing?.imageHash : undefined;
+  return { ...text, imageHash, callToAction: draft.callToAction };
+}
 
 /** Banner explaining what still has to be connected before ads can run. */
 function ConnectionBanner() {
@@ -157,6 +216,15 @@ export default function Campaigns() {
   const [aiPrompt, setAiPrompt] = useState<string | null>(null);
   const [pageMode, setPageMode] = useState<"existing" | "template">("existing");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [editing, setEditing] = useState<any | null>(null);
+
+  // The campaign page's Edit button links here with ?edit=<id>.
+  const search = useSearch();
+  const editParam = Number(new URLSearchParams(search).get("edit")) || null;
+  const { data: campaignToEdit } = trpc.adCampaigns.getById.useQuery(
+    { id: editParam ?? 0 },
+    { enabled: editParam !== null }
+  );
 
   const utils = trpc.useUtils();
   const { data: campaigns, isLoading } = trpc.adCampaigns.list.useQuery(
@@ -168,8 +236,26 @@ export default function Campaigns() {
 
   const createPageFromTemplate = trpc.templates.createLandingPage.useMutation();
   const createAdCampaign = trpc.adCampaigns.create.useMutation();
+  const updateAdCampaign = trpc.adCampaigns.update.useMutation();
+
+  const openEdit = (campaign: any) => {
+    setEditing(campaign);
+    setDraft(toDraftState(campaign));
+    setAiNotes([]);
+    setAiPrompt(null);
+    setPageMode("existing");
+    setCreateOpen(true);
+  };
+
+  useEffect(() => {
+    if (!campaignToEdit) return;
+    if (canEditCampaign(campaignToEdit)) openEdit(campaignToEdit);
+    else toast.error("This campaign is already published to Meta, so only its budget can be changed.");
+    navigate("/ad-campaigns", { replace: true });
+  }, [campaignToEdit]);
 
   const resetForm = () => {
+    setEditing(null);
     setDraft(EMPTY_DRAFT);
     setAiNotes([]);
     setAiPrompt(null);
@@ -178,6 +264,7 @@ export default function Campaigns() {
 
   const applyAiDraft = (result: any) => {
     const d = result.draft;
+    setEditing(null);
     setAiPrompt(d.name);
     setAiNotes(d.notes ?? []);
     setDraft((prev) => ({
@@ -236,11 +323,32 @@ export default function Campaigns() {
         toast.success(`Landing page created at /lp/${created.slug}`);
       }
 
-      const zips = draft.zips
-        .split(",")
-        .map((z) => z.trim())
-        .filter(Boolean)
-        .map((z) => (z.includes(":") ? z : `US:${z}`));
+      if (editing) {
+        const savedCampaignId = editing.id;
+        await updateAdCampaign.mutateAsync({
+          id: savedCampaignId,
+          name: draft.name.trim(),
+          description: draft.description.trim() || null,
+          objective: draft.objective as any,
+          landingPageId,
+          sequenceId: draft.sequenceId ? Number(draft.sequenceId) : null,
+          dailyBudget: daily,
+          lifetimeBudget: lifetime,
+          endDate: draft.endDate ? new Date(draft.endDate) : null,
+          targeting: editedTargeting(editing.targeting, draft.zips),
+          creative: editedCreative(editing.creative, draft),
+        });
+        toast.success("Campaign saved");
+        utils.adCampaigns.list.invalidate();
+        utils.adCampaigns.getById.invalidate({ id: savedCampaignId });
+        utils.marketing.landingPagePicker.invalidate();
+        setCreateOpen(false);
+        resetForm();
+        navigate(`/ad-campaigns/${savedCampaignId}`);
+        return;
+      }
+
+      const zips = parseZips(draft.zips);
 
       const result = await createAdCampaign.mutateAsync({
         name: draft.name.trim(),
@@ -272,7 +380,7 @@ export default function Campaigns() {
       resetForm();
       navigate(`/ad-campaigns/${result.id}`);
     } catch (err: any) {
-      toast.error(err?.message ?? "Could not create the campaign");
+      toast.error(err?.message ?? "Could not save the campaign");
     }
   };
 
@@ -283,7 +391,7 @@ export default function Campaigns() {
         spend: acc.spend + (c.totals?.spend ?? 0),
         clicks: acc.clicks + (c.totals?.clicks ?? 0),
         leads: acc.leads + (c.totals?.reportedLeads ?? 0),
-        active: acc.active + (c.status === "active" ? 1 : 0),
+        active: acc.active + (c.status === "active" && campaignSection(c) === "running" ? 1 : 0),
       }),
       { spend: 0, clicks: 0, leads: 0, active: 0 }
     );
@@ -308,6 +416,7 @@ export default function Campaigns() {
               <SelectItem value="draft">Draft</SelectItem>
               <SelectItem value="active">Active</SelectItem>
               <SelectItem value="paused">Paused</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="archived">Archived</SelectItem>
             </SelectContent>
           </Select>
@@ -359,61 +468,88 @@ export default function Campaigns() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {campaigns.map((c) => (
-            <Card
-              key={c.id}
-              className="hover:border-brand-green/40 transition-colors cursor-pointer"
-              onClick={() => navigate(`/ad-campaigns/${c.id}`)}
-            >
-              <CardContent className="p-4">
-                <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold truncate">{c.name}</h3>
-                      <Badge variant="outline" className={STATUS_STYLES[c.status] ?? ""}>{c.status}</Badge>
-                      {c.aiGenerated && (
-                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                          <Sparkles className="h-3 w-3 mr-1" /> AI draft
-                        </Badge>
-                      )}
-                      {c.syncStatus === "error" && (
-                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                          <AlertTriangle className="h-3 w-3 mr-1" /> sync error
-                        </Badge>
-                      )}
-                      {c.syncStatus === "synced" && (
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                          <CheckCircle2 className="h-3 w-3 mr-1" /> on Meta
-                        </Badge>
-                      )}
-                    </div>
-                    {c.description && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{c.description}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {c.dailyBudget ? `${money(Number(c.dailyBudget))}/day` : null}
-                      {c.lifetimeBudget ? `${money(Number(c.lifetimeBudget))} lifetime` : null}
-                      {c.utmCampaign ? ` · utm_campaign=${c.utmCampaign}` : null}
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-4 gap-4 lg:gap-6 shrink-0">
-                    {[
-                      { label: "Spend", value: money(c.totals?.spend) },
-                      { label: "Impr.", value: (c.totals?.impressions ?? 0).toLocaleString() },
-                      { label: "Clicks", value: (c.totals?.clicks ?? 0).toLocaleString() },
-                      { label: "Leads", value: (c.totals?.reportedLeads ?? 0).toLocaleString() },
-                    ].map((m) => (
-                      <div key={m.label} className="text-right">
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{m.label}</p>
-                        <p className="text-sm font-semibold">{m.value}</p>
+        <div className="space-y-8">
+          {SECTIONS.map((section) => {
+            const items = campaigns.filter((c) => campaignSection(c) === section.key);
+            // Empty sections only explain themselves on the full list, and drafts need no placeholder.
+            if (items.length === 0 && (statusFilter !== "all" || !section.empty)) return null;
+            return (
+              <section key={section.key} className="space-y-3">
+                <h2 className="text-lg font-semibold tracking-tight">
+                  {section.title} <span className="text-muted-foreground font-normal">({items.length})</span>
+                </h2>
+                {items.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{section.empty}</p>
+                ) : items.map((c) => {
+                  const ended = section.key === "finished" && c.status !== "completed" && c.status !== "archived";
+                  return (
+                  <Card
+                    key={c.id}
+                    className="hover:border-brand-green/40 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/ad-campaigns/${c.id}`)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold truncate">{c.name}</h3>
+                            <Badge variant="outline" className={STATUS_STYLES[ended ? "completed" : c.status] ?? ""}>
+                              {ended ? "ended" : c.status}
+                            </Badge>
+                            {c.aiGenerated && (
+                              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                                <Sparkles className="h-3 w-3 mr-1" /> AI draft
+                              </Badge>
+                            )}
+                            {c.syncStatus === "error" && (
+                              <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                <AlertTriangle className="h-3 w-3 mr-1" /> sync error
+                              </Badge>
+                            )}
+                            {c.syncStatus === "synced" && (
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                <CheckCircle2 className="h-3 w-3 mr-1" /> on Meta
+                              </Badge>
+                            )}
+                          </div>
+                          {c.description && (
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{c.description}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {c.dailyBudget ? `${money(Number(c.dailyBudget))}/day` : null}
+                            {c.lifetimeBudget ? `${money(Number(c.lifetimeBudget))} lifetime` : null}
+                            {c.utmCampaign ? ` · utm_campaign=${c.utmCampaign}` : null}
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-4 gap-4 lg:gap-6 shrink-0">
+                          {[
+                            { label: "Spend", value: money(c.totals?.spend) },
+                            { label: "Impr.", value: (c.totals?.impressions ?? 0).toLocaleString() },
+                            { label: "Clicks", value: (c.totals?.clicks ?? 0).toLocaleString() },
+                            { label: "Leads", value: (c.totals?.reportedLeads ?? 0).toLocaleString() },
+                          ].map((m) => (
+                            <div key={m.label} className="text-right">
+                              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{m.label}</p>
+                              <p className="text-sm font-semibold">{m.value}</p>
+                            </div>
+                          ))}
+                        </div>
+                        {canEditCampaign(c) && (
+                          <Button
+                            variant="outline" size="sm" className="shrink-0 self-start lg:self-center"
+                            onClick={(e) => { e.stopPropagation(); openEdit(c); }}
+                          >
+                            <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
+                          </Button>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    </CardContent>
+                  </Card>
+                  );
+                })}
+              </section>
+            );
+          })}
         </div>
       )}
 
@@ -421,10 +557,11 @@ export default function Campaigns() {
       <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetForm(); }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New campaign</DialogTitle>
+            <DialogTitle>{editing ? "Edit campaign" : "New campaign"}</DialogTitle>
             <DialogDescription>
-              Everything is saved as a draft. Nothing reaches Meta until you publish it from the
-              campaign page.
+              {editing?.metaCampaignId
+                ? "An earlier publish stopped partway. Pieces already on Meta may not pick up these changes, so check them in Ads Manager."
+                : "Everything is saved as a draft. Nothing reaches Meta until you publish it from the campaign page."}
             </DialogDescription>
           </DialogHeader>
 
@@ -672,14 +809,14 @@ export default function Campaigns() {
           </Tabs>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setCreateOpen(false); resetForm(); }}>Cancel</Button>
             <Button
               onClick={submit}
-              disabled={createAdCampaign.isPending || createPageFromTemplate.isPending}
+              disabled={createAdCampaign.isPending || updateAdCampaign.isPending || createPageFromTemplate.isPending}
             >
-              {createAdCampaign.isPending || createPageFromTemplate.isPending
-                ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Creating…</>
-                : "Create campaign"}
+              {createAdCampaign.isPending || updateAdCampaign.isPending || createPageFromTemplate.isPending
+                ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Saving…</>
+                : editing ? "Save changes" : "Create campaign"}
             </Button>
           </DialogFooter>
         </DialogContent>
