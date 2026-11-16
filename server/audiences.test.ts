@@ -83,3 +83,19 @@ describe("buildTargetingSpec placements", () => {
     expect((buildTargetingSpec({}) as any).publisher_platforms).toEqual(["facebook", "instagram"]);
   });
 });
+
+import { normalizePlatforms } from "../shared/metaPlacements";
+describe("ad platforms", () => {
+  it("defaults to Facebook and Instagram", () => {
+    expect(normalizePlatforms(undefined)).toEqual(["facebook", "instagram"]);
+    expect(normalizePlatforms([])).toEqual(["facebook", "instagram"]);
+  });
+  it("adds the platform another one needs", () => {
+    expect(normalizePlatforms(["threads"])).toEqual(["instagram", "threads"]);
+    expect(normalizePlatforms(["messenger", "audience_network"])).toEqual(["facebook", "messenger", "audience_network"]);
+  });
+  it("sends the chosen platforms as publisher_platforms", () => {
+    expect((buildTargetingSpec({ platforms: ["facebook", "instagram", "threads"] }) as any).publisher_platforms)
+      .toEqual(["facebook", "instagram", "threads"]);
+  });
+});

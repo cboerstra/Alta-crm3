@@ -19,6 +19,7 @@ import {
   extractLeadCount,
   updateAdSetBudget,
   updateObjectStatus,
+  deleteMetaObject,
   type MetaCredentials,
   type MetaCreative,
   type MetaTargeting,
@@ -375,6 +376,46 @@ export async function setCampaignDelivery(
   const status = active ? "active" : "paused";
   await updateAdCampaign(campaignId, { status, syncStatus: "synced", syncError: null, lastSyncedAt: new Date() });
   return { status };
+}
+
+/**
+ * Stop a campaign for good: pause everything on Meta and move it to Finished.
+ * It can still be started again later, or deleted.
+ */
+export async function stopCampaign(campaignId: number): Promise<{ status: AdCampaign["status"] }> {
+  const campaign = await getAdCampaignById(campaignId);
+  if (!campaign) throw new CampaignPublishError("load", "Campaign not found");
+  if (campaign.metaCampaignId) {
+    const creds = await resolveCredentials();
+    try {
+      for (const id of [campaign.metaAdId, campaign.metaAdSetId, campaign.metaCampaignId]) {
+        if (id) await updateObjectStatus(creds, id, "PAUSED");
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await updateAdCampaign(campaignId, { syncStatus: "error", syncError: message });
+      throw new CampaignPublishError("status", message);
+    }
+  }
+  await updateAdCampaign(campaignId, { status: "completed", syncStatus: campaign.metaCampaignId ? "synced" : campaign.syncStatus, lastSyncedAt: new Date() });
+  return { status: "completed" };
+}
+
+/**
+ * Delete the campaign on Meta (its ad set and ad go with it). Already gone on
+ * Meta counts as done. The caller then removes it from the CRM.
+ */
+export async function deleteCampaignOnMeta(campaignId: number): Promise<void> {
+  const campaign = await getAdCampaignById(campaignId);
+  if (!campaign?.metaCampaignId) return;
+  const creds = await resolveCredentials();
+  try {
+    await deleteMetaObject(creds, campaign.metaCampaignId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (/does not exist|cannot be loaded|Unsupported delete|already been deleted/i.test(message)) return;
+    throw new CampaignPublishError("delete", `Meta didn't delete the campaign: ${message}`);
+  }
 }
 
 /** Pushes a budget change to the live ad set. */

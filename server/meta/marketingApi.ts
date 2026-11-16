@@ -18,6 +18,7 @@
  */
 
 import { MIN_HOUSING_RADIUS_MILES } from "../../shared/metaGeo";
+import { normalizePlatforms } from "../../shared/metaPlacements";
 import { graphRequest, MetaApiError } from "./graph";
 
 export type MetaCredentials = {
@@ -40,6 +41,8 @@ export type MetaTargeting = {
   ageMax?: number;
   genders?: number[];       // 1 = male, 2 = female; omit for all
   interests?: Array<{ id: string; name?: string }>;
+  /** Where the ad runs: facebook, instagram, threads, messenger, audience_network. Defaults to Facebook and Instagram. */
+  platforms?: string[];
   /** Meta Custom Audience ids to show to, and to leave out. */
   customAudiences?: string[];
   excludedCustomAudiences?: string[];
@@ -107,10 +110,10 @@ export function buildTargetingSpec(t: MetaTargeting | undefined | null): Record<
     // Housing ad sets with set targeting must state this explicitly or Meta
     // rejects them. 0 keeps delivery inside the targeting configured here.
     targeting_automation: { advantage_audience: 0 },
-    // Facebook and Instagram only, every position on each (Feed, Stories, Reels…).
-    // Left automatic, Meta adds Threads, which fails unless the ad account has
-    // been given the Threads profile (#4588023).
-    publisher_platforms: ["facebook", "instagram"],
+    // The chosen platforms, every position on each (Feed, Stories, Reels…).
+    // Never left automatic: Meta would add Threads, which fails unless the ad
+    // account has been given the Threads profile (#4588023).
+    publisher_platforms: normalizePlatforms(targeting.platforms),
   };
   if (targeting.genders?.length) spec.genders = targeting.genders;
   if (targeting.interests?.length) {
@@ -409,6 +412,11 @@ export async function createMetaAd(
 }
 
 // ─── Control + reporting ─────────────────────────────────────────────────────
+
+/** Delete a campaign on Meta; its ad sets and ads go with it. */
+export async function deleteMetaObject(creds: MetaCredentials, objectId: string): Promise<void> {
+  await graphRequest({ path: objectId, method: "DELETE", accessToken: creds.accessToken, apiVersion: creds.apiVersion });
+}
 
 export async function updateObjectStatus(
   creds: MetaCredentials,

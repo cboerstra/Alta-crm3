@@ -19,11 +19,27 @@ import {
   getPublicBaseUrl,
   publishCampaign,
   setCampaignDelivery,
+  stopCampaign,
+  deleteCampaignOnMeta,
   syncCampaignBudget,
   syncCampaignMetrics,
   CampaignPublishError,
 } from "../meta/publisher";
 import { draftCampaignWithAI } from "../marketingAi";
+import { getDb } from "../db";
+import { landingPages, mediaFolders } from "../../drizzle/schema";
+import { eq } from "drizzle-orm";
+
+/**
+ * Before a campaign is deleted: its landing pages stay, unlinked; its media
+ * folder stays as an ordinary folder so the files aren't lost.
+ */
+async function releaseCampaignReferences(campaignId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(landingPages).set({ adCampaignId: null }).where(eq(landingPages.adCampaignId, campaignId));
+  await db.update(mediaFolders).set({ kind: "custom", adCampaignId: null }).where(eq(mediaFolders.adCampaignId, campaignId));
+}
 import { canEditCampaign, lockedFieldsInUpdate } from "@shared/adCampaignRules";
 
 const objectiveEnum = z.enum([
@@ -56,6 +72,7 @@ const targetingSchema = z.object({
     longitude: z.number().min(-180).max(180),
     radius: z.number().min(15, "Housing ads need a radius of at least 15 miles").max(50),
   })).optional(),
+  platforms: z.array(z.enum(["facebook", "instagram", "threads", "messenger", "audience_network"])).optional(),
   /** CRM audience ids (meta_audiences.id), resolved to Meta ids at publish. */
   includeAudienceIds: z.array(z.number().int()).optional(),
   excludeAudienceIds: z.array(z.number().int()).optional(),
@@ -321,18 +338,34 @@ export const adCampaignsRouter = router({
       return { success: true };
     }),
 
-  delete: protectedProcedure
+  /**
+   * Delete a campaign. One that reached Meta is deleted there first (ads stop
+   * immediately). Leads it brought in stay in the CRM; its daily metrics go.
+   */
+  delete: adminProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       const campaign = await getAdCampaignById(input.id);
-      if (campaign?.metaCampaignId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "This campaign exists on Meta. Archive it instead so its spend history and attribution stay intact.",
-        });
+      if (!campaign) return { success: true };
+      try {
+        await deleteCampaignOnMeta(input.id);
+      } catch (err) {
+        throw toPublishError(err);
       }
+      await releaseCampaignReferences(input.id);
       await deleteAdCampaign(input.id);
       return { success: true };
+    }),
+
+  /** Stop for good: paused on Meta and moved to Finished. */
+  stop: adminProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      try {
+        return await stopCampaign(input.id);
+      } catch (err) {
+        throw toPublishError(err);
+      }
     }),
 
   archive: protectedProcedure
