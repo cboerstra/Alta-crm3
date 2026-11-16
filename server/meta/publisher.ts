@@ -316,8 +316,9 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
       syncStatus: "synced",
       syncError: null,
       lastSyncedAt: new Date(),
-      // Objects exist on Meta but are paused — the operator activates deliberately.
-      status: campaign.status === "draft" ? "paused" : campaign.status,
+      // The new ad set and ad are created paused, so the campaign is paused until
+      // the operator starts delivery, which switches all three on together.
+      status: campaign.status === "completed" || campaign.status === "archived" ? campaign.status : "paused",
     });
 
     return { metaCampaignId, metaAdSetId, metaCreativeId, metaAdId, destinationUrl };
@@ -338,6 +339,15 @@ export async function setCampaignDelivery(
 ): Promise<{ status: AdCampaign["status"] }> {
   const campaign = await getAdCampaignById(campaignId);
   if (!campaign) throw new CampaignPublishError("load", "Campaign not found");
+
+  // A publish that stopped partway has no ad to deliver; switching the empty
+  // campaign on makes Meta report it as not delivering.
+  if (active && campaign.metaCampaignId && !campaign.metaAdId) {
+    throw new CampaignPublishError(
+      "incomplete",
+      "Publishing to Meta didn't finish, so there's no ad to run yet. Click Finish publishing first, then Start delivery.",
+    );
+  }
 
   // Local-only campaigns just flip their CRM status.
   if (!campaign.metaCampaignId) {

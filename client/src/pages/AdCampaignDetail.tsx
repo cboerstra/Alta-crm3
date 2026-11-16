@@ -120,7 +120,10 @@ export default function CampaignDetail() {
     leads: Number(m.reportedLeads ?? 0),
   }));
 
-  const isPublished = !!campaign.metaCampaignId;
+  // Published means the ad exists on Meta. A publish that stopped partway has a
+  // Meta campaign but no ad yet: it needs finishing, not starting.
+  const isPublished = !!campaign.metaAdId;
+  const partlyPublished = !!campaign.metaCampaignId && !campaign.metaAdId;
   const isLive = campaign.status === "active";
 
   return (
@@ -137,6 +140,11 @@ export default function CampaignDetail() {
             {isPublished && (
               <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                 <CheckCircle2 className="h-3 w-3 mr-1" /> on Meta
+              </Badge>
+            )}
+            {partlyPublished && (
+              <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-200">
+                Publishing not finished
               </Badge>
             )}
           </div>
@@ -165,7 +173,7 @@ export default function CampaignDetail() {
           >
             <DollarSign className="h-3.5 w-3.5 mr-1.5" /> Budget
           </Button>
-          {isPublished && (
+          {!!campaign.metaCampaignId && (
             <Button
               variant="outline" size="sm"
               disabled={syncMetrics.isPending}
@@ -178,11 +186,19 @@ export default function CampaignDetail() {
             </Button>
           )}
           {!isPublished ? (
-            <Button size="sm" disabled={publish.isPending} onClick={() => publish.mutate({ id: campaignId })}>
-              {publish.isPending
-                ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Publishing…</>
-                : <><Upload className="h-3.5 w-3.5 mr-1.5" /> Publish to Meta</>}
-            </Button>
+            <>
+              {partlyPublished && isLive && (
+                <Button size="sm" variant="outline" disabled={setDelivery.isPending}
+                  onClick={() => setDelivery.mutate({ id: campaignId, active: false })}>
+                  <Pause className="h-3.5 w-3.5 mr-1.5" /> Pause
+                </Button>
+              )}
+              <Button size="sm" disabled={publish.isPending} onClick={() => publish.mutate({ id: campaignId })}>
+                {publish.isPending
+                  ? <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Publishing…</>
+                  : <><Upload className="h-3.5 w-3.5 mr-1.5" /> {partlyPublished ? "Finish publishing" : "Publish to Meta"}</>}
+              </Button>
+            </>
           ) : (
             <Button
               size="sm"
