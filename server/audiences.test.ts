@@ -77,3 +77,9 @@ describe("buildTargetingSpec housing geography", () => {
     expect((buildTargetingSpec({ countries: ["US"] }) as any).geo_locations).toEqual({ countries: ["US"] });
   });
 });
+
+describe("buildTargetingSpec placements", () => {
+  it("runs on Facebook and Instagram only, leaving out Threads", () => {
+    expect((buildTargetingSpec({}) as any).publisher_platforms).toEqual(["facebook", "instagram"]);
+  });
+});

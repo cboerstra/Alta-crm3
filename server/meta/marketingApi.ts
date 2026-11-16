@@ -107,6 +107,10 @@ export function buildTargetingSpec(t: MetaTargeting | undefined | null): Record<
     // Housing ad sets with set targeting must state this explicitly or Meta
     // rejects them. 0 keeps delivery inside the targeting configured here.
     targeting_automation: { advantage_audience: 0 },
+    // Facebook and Instagram only, every position on each (Feed, Stories, Reels…).
+    // Left automatic, Meta adds Threads, which fails unless the ad account has
+    // been given the Threads profile (#4588023).
+    publisher_platforms: ["facebook", "instagram"],
   };
   if (targeting.genders?.length) spec.genders = targeting.genders;
   if (targeting.interests?.length) {
