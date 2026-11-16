@@ -35,6 +35,7 @@ import { marketingRouter } from "./routers/marketing";
 import { payrollRouter } from "./routers/payroll";
 import { agentContactsRouter } from "./routers/agentContacts";
 import { bulkEmailRouter } from "./routers/bulkEmail";
+import { aiRouter } from "./routers/ai";
 import { audiencesRouter } from "./routers/audiences";
 import { campaignsRouter } from "./routers/campaigns";
 import { mortgageClientsRouter } from "./routers/mortgageClients";
@@ -203,6 +204,7 @@ export const appRouter = router({
   payroll: payrollRouter,
   agentContacts: agentContactsRouter,
   bulkEmail: bulkEmailRouter,
+  ai: aiRouter,
   audiences: audiencesRouter,
   campaigns: campaignsRouter,
   mortgageClients: mortgageClientsRouter,

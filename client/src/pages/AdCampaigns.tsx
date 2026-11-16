@@ -200,6 +200,8 @@ function ConnectionBanner() {
 /** The plain-language campaign brief → full draft flow. */
 function AiDraftPanel({ onApply }: { onApply: (draft: any) => void }) {
   const [prompt, setPrompt] = useState("");
+  const [, navigate] = useLocation();
+  const aiStatus = trpc.ai.status.useQuery();
   const draftMutation = trpc.adCampaigns.draftWithAI.useMutation({
     onSuccess: (result) => {
       onApply(result);
@@ -220,6 +222,14 @@ function AiDraftPanel({ onApply }: { onApply: (draft: any) => void }) {
           down payment grant". You get ad copy, targeting, budget, landing page copy and a follow-up
           sequence to review. Nothing is created on Meta until you publish it yourself.
         </p>
+        {aiStatus.data && !aiStatus.data.connected && (
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+            <p className="flex-1 text-xs text-amber-900">AI isn't connected yet. Add a Claude or OpenAI API key in Settings → AI.</p>
+            <Button size="sm" variant="outline" className="shrink-0" onClick={() => navigate("/settings?tab=ai")}>
+              <Settings2 className="h-3.5 w-3.5 mr-1.5" /> Connect AI
+            </Button>
+          </div>
+        )}
         <Textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}

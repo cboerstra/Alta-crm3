@@ -1,4 +1,5 @@
 import { ENV } from "./env";
+import { callProvider, getActiveAi } from "../aiProvider";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -216,7 +217,7 @@ const resolveApiUrl = () =>
 
 const assertApiKey = () => {
   if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+    throw new Error("AI isn't connected yet. An admin can add a Claude or OpenAI API key in Settings → AI.");
   }
 };
 
@@ -266,6 +267,20 @@ const normalizeResponseFormat = ({
 };
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
+  // A provider saved in Settings → AI takes precedence over the built-in one.
+  const active = await getActiveAi();
+  if (active) {
+    if (params.tools?.length) throw new Error("Tool calls aren't supported with the AI provider set in Settings.");
+    const format = normalizeResponseFormat(params);
+    const result = await callProvider(
+      active,
+      params.messages.map(normalizeMessage) as any,
+      format?.type === "json_schema" ? format : null,
+      params.maxTokens ?? params.max_tokens ?? 16000,
+    );
+    return result as InvokeResult;
+  }
+
   assertApiKey();
 
   const {
