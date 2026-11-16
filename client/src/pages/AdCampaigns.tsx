@@ -22,6 +22,9 @@ import { useLocation, useSearch } from "wouter";
 import { AudiencePicker } from "@/components/AudiencePicker";
 import { DEFAULT_TARGET_AREAS, MIN_HOUSING_RADIUS_MILES, type TargetArea } from "@shared/metaGeo";
 import { TargetAreaPicker } from "@/components/TargetAreaPicker";
+import { PlatformPicker } from "@/components/PlatformPicker";
+import { CampaignActions } from "@/components/CampaignActions";
+import { DEFAULT_PLATFORMS, normalizePlatforms } from "@shared/metaPlacements";
 import { AdMediaPicker, type AdMediaType } from "@/components/AdMediaPicker";
 import { campaignSection, canEditCampaign, type CampaignSection } from "@shared/adCampaignRules";
 
@@ -68,6 +71,7 @@ type DraftState = {
   callToAction: string;
   /** Target areas: towns from UTAH_AREAS with a radius in miles (housing ads need 15+). Meta reaches anyone in any of them. */
   areas: TargetArea[];
+  platforms: string[];
   includeAudienceIds: number[];
   excludeAudienceIds: number[];
 };
@@ -79,6 +83,7 @@ const EMPTY_DRAFT: DraftState = {
   sequenceId: "", primaryText: "", headline: "", adDescription: "",
   imageUrl: "", mediaType: "image", videoUrl: "", thumbnailUrl: "", callToAction: "LEARN_MORE",
   areas: DEFAULT_TARGET_AREAS,
+  platforms: DEFAULT_PLATFORMS,
   includeAudienceIds: [], excludeAudienceIds: [],
 };
 
@@ -120,6 +125,7 @@ function toDraftState(c: any): DraftState {
     areas: c.targeting?.customLocations?.length
       ? c.targeting.customLocations.map((l: any) => ({ name: l.name ?? "Dropped pin", latitude: l.latitude, longitude: l.longitude, radius: l.radius }))
       : DEFAULT_TARGET_AREAS,
+    platforms: normalizePlatforms(c.targeting?.platforms),
     includeAudienceIds: c.targeting?.includeAudienceIds ?? [],
     excludeAudienceIds: c.targeting?.excludeAudienceIds ?? [],
   };
@@ -130,11 +136,12 @@ function toDraftState(c: any): DraftState {
  * the target area. ZIP codes and a whole-country setting are dropped: Meta's
  * housing category forbids ZIPs, and a country would widen the area to all of it.
  */
-function editedTargeting(existing: any, draft: Pick<DraftState, "areas" | "includeAudienceIds" | "excludeAudienceIds">) {
-  const { zips: _z, countries: _c, customLocations: _l, includeAudienceIds: _i, excludeAudienceIds: _e, ...kept } = existing ?? {};
+function editedTargeting(existing: any, draft: Pick<DraftState, "areas" | "platforms" | "includeAudienceIds" | "excludeAudienceIds">) {
+  const { zips: _z, countries: _c, customLocations: _l, platforms: _p, includeAudienceIds: _i, excludeAudienceIds: _e, ...kept } = existing ?? {};
   const next: Record<string, unknown> = { ageMin: 18, ageMax: 65, ...kept };
   const areas = draft.areas.map((a) => ({ ...a, radius: Math.max(MIN_HOUSING_RADIUS_MILES, a.radius) }));
   if (areas.length) next.customLocations = areas;
+  next.platforms = normalizePlatforms(draft.platforms);
   if (draft.includeAudienceIds.length) next.includeAudienceIds = draft.includeAudienceIds;
   if (draft.excludeAudienceIds.length) next.excludeAudienceIds = draft.excludeAudienceIds;
   return next;
@@ -566,14 +573,14 @@ export default function Campaigns() {
                             </div>
                           ))}
                         </div>
-                        {canEditCampaign(c) && (
-                          <Button
-                            variant="outline" size="sm" className="shrink-0 self-start lg:self-center"
-                            onClick={(e) => { e.stopPropagation(); openEdit(c); }}
-                          >
-                            <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
-                          </Button>
-                        )}
+                        <div className="flex items-center gap-2 shrink-0 self-start lg:self-center" onClick={(e) => e.stopPropagation()}>
+                          {canEditCampaign(c) && (
+                            <Button variant="outline" size="sm" onClick={() => openEdit(c)}>
+                              <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
+                            </Button>
+                          )}
+                          <CampaignActions campaign={c} />
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -672,6 +679,7 @@ export default function Campaigns() {
                 Set one or the other. A lifetime budget requires an end date — Meta rejects it otherwise.
               </p>
               <TargetAreaPicker areas={draft.areas} onChange={(areas) => setDraft({ ...draft, areas })} />
+              <PlatformPicker value={draft.platforms} onChange={(platforms) => setDraft({ ...draft, platforms })} />
               <AudiencePicker
                 include={draft.includeAudienceIds}
                 exclude={draft.excludeAudienceIds}

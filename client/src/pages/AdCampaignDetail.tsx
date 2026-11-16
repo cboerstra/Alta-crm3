@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CampaignActions } from "@/components/CampaignActions";
 import { trpc } from "@/lib/trpc";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -159,6 +160,7 @@ export default function CampaignDetail() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <CampaignActions campaign={campaign} afterDelete="/ad-campaigns" />
           {canEditCampaign(campaign) && (
             <Button variant="outline" size="sm" onClick={() => navigate(`/ad-campaigns?edit=${campaignId}`)}>
               <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
