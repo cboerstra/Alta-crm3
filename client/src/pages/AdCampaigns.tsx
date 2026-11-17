@@ -789,6 +789,7 @@ export default function Campaigns() {
                 </div>
               </div>
               <AdMediaPicker
+                campaignId={editing?.id ?? null}
                 mediaType={draft.mediaType}
                 imageUrl={draft.imageUrl}
                 videoUrl={draft.videoUrl}

@@ -18,6 +18,7 @@ import { Plus, FileText, Copy, Trash2, Edit, Upload, Image, FileIcon, X, Eye, Ca
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { IntegrateCodeDialog } from "@/components/IntegrateCodeDialog";
+import { useWebsites } from "@/lib/websites";
 
 const ALL_FORM_FIELDS = [
   { key: "firstName", label: "First Name", required: true },
@@ -53,7 +54,7 @@ type FormState = {
   headScripts: string;
   pageType: "re_agent" | "past_mortgage" | "prospective_mortgage" | "prospective_re_client";
   purpose: "webinar" | "advertising";
-  hostSite: "altamortgagecrm" | "freehomesearchutah";
+  hostSite: string;
 };
 
 type MediaSelection = {
@@ -586,12 +587,8 @@ export default function LandingPages() {
     }));
   };
 
-  const HOST_DOMAINS: Record<string, string> = {
-    altamortgagecrm: "https://altamortgagecrm.net",
-    freehomesearchutah: "https://freehomesearchutah.com",
-  };
-
-  const getHostOrigin = (hostSite?: string) => HOST_DOMAINS[hostSite || "altamortgagecrm"] || HOST_DOMAINS.altamortgagecrm;
+  const websites = useWebsites();
+  const getHostOrigin = (hostSite?: string) => websites.origin(hostSite);
 
   const copyUrl = (slug: string, hostSite?: string) => {
     const fullUrl = `${getHostOrigin(hostSite)}/lp/${slug}`;
@@ -780,8 +777,7 @@ export default function LandingPages() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="altamortgagecrm">altamortgagecrm.net</SelectItem>
-                      <SelectItem value="freehomesearchutah">freehomesearchutah.com</SelectItem>
+                      {websites.sites.map((w) => <SelectItem key={w.siteKey} value={w.siteKey}>{w.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -805,7 +801,7 @@ export default function LandingPages() {
                 </Badge>
                 <span>/</span>
                 <Badge variant="outline" className="text-[10px]">
-                  {form.hostSite === "altamortgagecrm" ? "altamortgagecrm.net" : "freehomesearchutah.com"}
+                  {websites.label(form.hostSite)}
                 </Badge>
               </div>
             )}
@@ -940,8 +936,7 @@ export default function LandingPages() {
                     <Select value={form.hostSite} onValueChange={(v: any) => setForm(prev => ({ ...prev, hostSite: v }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="altamortgagecrm">altamortgagecrm.net</SelectItem>
-                        <SelectItem value="freehomesearchutah">freehomesearchutah.com</SelectItem>
+                        {websites.sites.map((w) => <SelectItem key={w.siteKey} value={w.siteKey}>{w.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -1860,7 +1855,7 @@ export default function LandingPages() {
                         )}
                         {(page as any).hostSite && (
                           <Badge variant="outline" className="text-[10px]">
-                            {(page as any).hostSite === "freehomesearchutah" ? "FHSU" : "Alta CRM"}
+                            {websites.label((page as any).hostSite)}
                           </Badge>
                         )}
                         {(page as any).leadCount !== undefined && (

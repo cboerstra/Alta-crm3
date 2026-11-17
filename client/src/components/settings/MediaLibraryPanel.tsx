@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
   FolderPlus, Megaphone, Star, Inbox, Layers, Pencil, Check, X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type MediaItem = {
   id: number;
@@ -102,6 +103,15 @@ export default function MediaLibraryPanel() {
   const saveItem = trpc.media.upload.useMutation({ onError });
   const updateItem = trpc.media.update.useMutation({ onSuccess: () => { toast.success("Saved"); refresh(); setEditing(null); }, onError });
   const deleteItem = trpc.media.delete.useMutation({ onSuccess: () => { toast.success("File deleted"); refresh(); }, onError });
+  const deleteMany = trpc.media.deleteMany.useMutation({
+    onSuccess: (r) => { toast.success(`${r.deleted} file${r.deleted === 1 ? "" : "s"} deleted`); setPicked([]); refresh(); },
+    onError,
+  });
+  /** Files ticked for a bulk delete. */
+  const [picked, setPicked] = useState<number[]>([]);
+  const togglePicked = (id: number, on: boolean) => setPicked((p) => (on ? [...p, id] : p.filter((x) => x !== id)));
+  // A bulk delete only ever covers files on screen.
+  useEffect(() => { setPicked([]); }, [selected, filterType]);
   const createFolder = trpc.media.createFolder.useMutation({
     onSuccess: ({ id }) => { setNewFolder(null); refresh(); setSelected(id); }, onError,
   });
@@ -256,6 +266,30 @@ export default function MediaLibraryPanel() {
               <span className="text-xs text-muted-foreground ml-auto">{shown.length} item{shown.length !== 1 ? "s" : ""}</span>
             </div>
 
+            {shown.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2 rounded-md bg-muted/40 px-3 py-2 text-sm">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={picked.length > 0 && shown.every((i) => picked.includes(i.id))}
+                    onCheckedChange={(v) => setPicked(v === true ? shown.map((i) => i.id) : [])}
+                    aria-label="Select all files shown"
+                  />
+                  Select all
+                </label>
+                {picked.length > 0 && (
+                  <>
+                    <span className="text-muted-foreground">{picked.length} selected</span>
+                    <Button size="sm" variant="outline" className="ml-auto text-destructive hover:text-destructive" disabled={deleteMany.isPending}
+                      onClick={() => { if (window.confirm(`Delete ${picked.length} file${picked.length === 1 ? "" : "s"}? This can't be undone.`)) deleteMany.mutate({ ids: picked }); }}>
+                      {deleteMany.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-1" />}
+                      Delete selected
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setPicked([])}>Clear</Button>
+                  </>
+                )}
+              </div>
+            )}
+
             {progress && (
               <div className="space-y-1">
                 <Progress value={progress.pct} />
@@ -291,24 +325,17 @@ export default function MediaLibraryPanel() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {shown.map((item) => (
-                  <div key={item.id} className="group relative rounded-lg border overflow-hidden hover:shadow-md transition-shadow bg-white">
+                  <div key={item.id} className={`group relative rounded-lg border overflow-hidden hover:shadow-md transition-shadow bg-white ${picked.includes(item.id) ? "ring-2 ring-brand-green" : ""}`}>
+                    <div className="absolute left-2 top-2 z-10 rounded bg-white/90 p-0.5 shadow-sm">
+                      <Checkbox checked={picked.includes(item.id)} onCheckedChange={(v) => togglePicked(item.id, v === true)}
+                        aria-label={`Select ${item.label || item.fileName}`} />
+                    </div>
                     <div className="aspect-square bg-[#f8f8f8] flex items-center justify-center p-2">
                       {isVideoItem(item) ? (
                         <video src={item.fileUrl} muted playsInline preload="metadata" className="max-w-full max-h-full object-contain bg-black rounded" />
                       ) : (
                         <img src={item.fileUrl} alt={item.label || item.fileName} className="max-w-full max-h-full object-contain" />
                       )}
-                    </div>
-                    <div className="absolute inset-x-0 top-0 aspect-square bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
-                      <Button size="sm" variant="secondary" className="h-8 w-8 p-0" aria-label={`Edit ${item.label || item.fileName}`} onClick={() => openEdit(item)}>
-                        <Edit className="h-3.5 w-3.5" />
-                      </Button>
-                      <a href={item.fileUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open ${item.label || item.fileName}`}
-                        className="inline-flex h-8 items-center rounded-md bg-secondary px-2 text-xs font-medium">Open</a>
-                      <Button size="sm" variant="secondary" className="h-8 w-8 p-0 text-destructive" aria-label={`Delete ${item.label || item.fileName}`}
-                        onClick={() => { if (window.confirm(`Delete "${item.label || item.fileName}"?`)) deleteItem.mutate({ id: item.id }); }}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
                     </div>
                     <div className="p-2 border-t">
                       <p className="text-xs font-medium truncate" title={item.label || item.fileName}>{item.label || item.fileName}</p>
@@ -323,6 +350,17 @@ export default function MediaLibraryPanel() {
                           {folders.find((f) => f.id === item.folderId)?.name ?? "Unfiled"}
                         </p>
                       )}
+                      <div className="mt-2 flex items-center gap-1 border-t pt-2">
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => openEdit(item)} aria-label={`Edit or move ${item.label || item.fileName}`}>
+                          <Edit className="h-3.5 w-3.5 mr-1" /> Edit
+                        </Button>
+                        <a href={item.fileUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open ${item.label || item.fileName}`}
+                          className="inline-flex h-7 items-center rounded-md px-2 text-xs font-medium hover:bg-muted">Open</a>
+                        <Button size="sm" variant="ghost" className="ml-auto h-7 w-7 p-0 text-destructive hover:text-destructive" aria-label={`Delete ${item.label || item.fileName}`}
+                          onClick={() => { if (window.confirm(`Delete "${item.label || item.fileName}"?`)) deleteItem.mutate({ id: item.id }); }}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -216,15 +216,27 @@ export async function createMetaAdSet(
 
 /** Uploads an image by URL and returns Meta's image hash. */
 export async function uploadAdImage(creds: MetaCredentials, imageUrl: string): Promise<string | undefined> {
-  const res = await graphRequest<{ images?: Record<string, { hash?: string }> }>({
-    path: `${normalizeAdAccountId(creds.adAccountId)}/adimages`,
-    method: "POST",
-    accessToken: creds.accessToken,
-    apiVersion: creds.apiVersion,
-    body: { url: imageUrl },
-  });
-  const first = res?.images ? Object.values(res.images)[0] : undefined;
-  return first?.hash;
+  const path = `${normalizeAdAccountId(creds.adAccountId)}/adimages`;
+  const hashOf = (res: { images?: Record<string, { hash?: string }> }) =>
+    res?.images ? Object.values(res.images)[0]?.hash : undefined;
+  try {
+    return hashOf(await graphRequest({
+      path, method: "POST", accessToken: creds.accessToken, apiVersion: creds.apiVersion,
+      body: { url: imageUrl },
+    }));
+  } catch (err) {
+    if (!(err instanceof MetaApiError) || err.status === 0) throw err;
+    console.warn(`[Meta] adimages with url failed (${err.code ?? err.status}: ${err.message}); sending the image bytes instead`);
+  }
+  // Same fallback as videos: the app may not be allowed to have Meta fetch a URL.
+  const file = await fetch(imageUrl);
+  if (!file.ok) throw new Error(`Couldn't read the image at ${imageUrl} (HTTP ${file.status}) to send it to Meta`);
+  const bytes = Buffer.from(await file.arrayBuffer()).toString("base64");
+  return hashOf(await graphRequest({
+    path, method: "POST", accessToken: creds.accessToken, apiVersion: creds.apiVersion,
+    timeoutMs: 60_000,
+    body: { bytes },
+  }));
 }
 
 /**
@@ -319,7 +331,13 @@ export async function createMetaAdCreative(
 
   if (input.creative.videoId) {
     let cover: { imageUrl?: string; imageHash?: string } = {};
-    if (input.creative.thumbnailUrl) cover.imageHash = await uploadAdImage(creds, input.creative.thumbnailUrl);
+    if (input.creative.thumbnailUrl) {
+      // A cover that won't upload isn't worth failing the ad over: Meta's own frame is used instead.
+      cover.imageHash = await uploadAdImage(creds, input.creative.thumbnailUrl).catch((err) => {
+        console.warn(`[Meta] Cover image upload failed, using Meta's thumbnail: ${err instanceof Error ? err.message : err}`);
+        return undefined;
+      });
+    }
     if (!cover.imageHash) cover = { imageUrl: await getAdVideoThumbnail(creds, input.creative.videoId) };
     if (!cover.imageHash && !cover.imageUrl) {
       throw new Error("Meta hasn't made a cover image for the video yet. Upload a cover image or publish again in a minute.");
@@ -341,7 +359,9 @@ export async function createMetaAdCreative(
 
   let imageHash = input.creative.imageHash;
   if (!imageHash && input.creative.imageUrl) {
-    imageHash = await uploadAdImage(creds, input.creative.imageUrl);
+    imageHash = await uploadAdImage(creds, input.creative.imageUrl).catch((err) => {
+      throw new Error(`Image upload: ${err instanceof Error ? err.message : String(err)}`);
+    });
   }
 
   const linkData: Record<string, unknown> = {

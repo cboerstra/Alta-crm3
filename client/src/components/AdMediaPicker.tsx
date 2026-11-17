@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Film, Image as ImageIcon, Upload, X } from "lucide-react";
+import { Film, FolderOpen, Image as ImageIcon, Upload, X } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { MediaLibraryPicker, type LibraryKind } from "@/components/MediaLibraryPicker";
 import { toast } from "sonner";
 
 export type AdMediaType = "image" | "video";
@@ -14,6 +16,8 @@ type Props = {
   videoUrl: string;
   thumbnailUrl: string;
   onChange: (next: { mediaType: AdMediaType; imageUrl: string; videoUrl: string; thumbnailUrl: string }) => void;
+  /** The campaign being edited: the library opens on its folder, and uploads are filed there. */
+  campaignId?: number | null;
 };
 
 const MAX_VIDEO_MB = 250;
@@ -40,13 +44,26 @@ function uploadWithProgress(endpoint: string, file: File, onProgress: (pct: numb
 }
 
 /** Image or video (Reel) for an ad, uploaded to the CRM or given as a public address. */
-export function AdMediaPicker({ mediaType, imageUrl, videoUrl, thumbnailUrl, onChange }: Props) {
+export function AdMediaPicker({ mediaType, imageUrl, videoUrl, thumbnailUrl, onChange, campaignId }: Props) {
   const videoInput = useRef<HTMLInputElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
   const coverInput = useRef<HTMLInputElement>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [videoShape, setVideoShape] = useState<string | null>(null);
   const value = { mediaType, imageUrl, videoUrl, thumbnailUrl };
+  const [library, setLibrary] = useState<{ kind: LibraryKind; field: "imageUrl" | "videoUrl" | "thumbnailUrl" } | null>(null);
+  const { data: folderData } = trpc.media.folders.useQuery(undefined, { staleTime: 60_000 });
+  const campaignFolderId = campaignId
+    ? folderData?.folders.find((f) => f.kind === "campaign" && f.adCampaignId === campaignId)?.id ?? null
+    : null;
+  const saveToLibrary = trpc.media.upload.useMutation();
+  const utils = trpc.useUtils();
+  const libraryButton = (kind: LibraryKind, field: "imageUrl" | "videoUrl" | "thumbnailUrl") => (
+    <Button type="button" variant="outline" disabled={progress !== null} onClick={() => setLibrary({ kind, field })}
+      aria-label={`Choose ${kind === "video" ? "a video" : "an image"} from the Media Library`}>
+      <FolderOpen className="h-4 w-4 sm:mr-1" /><span className="hidden sm:inline">Library</span>
+    </Button>
+  );
 
   const upload = async (file: File, endpoint: string, field: "imageUrl" | "videoUrl" | "thumbnailUrl") => {
     if (field === "videoUrl" && file.size > MAX_VIDEO_MB * 1024 * 1024) {
@@ -57,6 +74,17 @@ export function AdMediaPicker({ mediaType, imageUrl, videoUrl, thumbnailUrl, onC
     try {
       const url = await uploadWithProgress(endpoint, file, setProgress);
       onChange({ ...value, [field]: url });
+      // File it in the Media Library too (the campaign's folder when there is one), so it can be reused.
+      saveToLibrary.mutate({
+        fileUrl: url,
+        fileKey: url.replace(/^\/uploads\//, ""),
+        fileName: file.name,
+        contentType: file.type || (field === "videoUrl" ? "video/mp4" : "image/jpeg"),
+        fileSize: file.size,
+        fileType: field === "videoUrl" ? "video" : "image",
+        label: file.name.replace(/\.[^.]+$/, ""),
+        folderId: campaignFolderId,
+      }, { onSuccess: () => { utils.media.list.invalidate(); utils.media.folders.invalidate(); } });
       if (field === "videoUrl") setVideoShape(null);
       toast.success(field === "videoUrl" ? "Video uploaded" : "Image uploaded");
     } catch (err) {
@@ -89,9 +117,10 @@ export function AdMediaPicker({ mediaType, imageUrl, videoUrl, thumbnailUrl, onC
           <Label>Image</Label>
           <div className="flex gap-2">
             <Input value={imageUrl} onChange={(e) => onChange({ ...value, imageUrl: e.target.value })} placeholder="https://…/ad-image.jpg or upload" />
-            <Button type="button" variant="outline" disabled={progress !== null} onClick={() => imageInput.current?.click()}>
+            <Button type="button" variant="outline" disabled={progress !== null} onClick={() => imageInput.current?.click()} aria-label="Upload an image">
               <Upload className="h-4 w-4" />
             </Button>
+            {libraryButton("image", "imageUrl")}
           </div>
           {imageUrl && <img src={imageUrl} alt="Ad image preview" className="mt-2 max-h-48 rounded-md border object-contain" />}
           <input ref={imageInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
@@ -134,6 +163,11 @@ export function AdMediaPicker({ mediaType, imageUrl, videoUrl, thumbnailUrl, onC
                 Upload an MP4 or MOV (up to {MAX_VIDEO_MB} MB)
               </button>
             )}
+            {!videoUrl && (
+              <Button type="button" variant="outline" size="sm" disabled={progress !== null} onClick={() => setLibrary({ kind: "video", field: "videoUrl" })}>
+                <FolderOpen className="h-4 w-4 mr-1" /> Choose a video from the Media Library
+              </Button>
+            )}
             <input ref={videoInput} type="file" accept="video/mp4,video/quicktime,.mp4,.mov,.m4v" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) upload(f, "/api/upload-video", "videoUrl"); }} />
             <p className="text-xs text-muted-foreground">
@@ -146,15 +180,23 @@ export function AdMediaPicker({ mediaType, imageUrl, videoUrl, thumbnailUrl, onC
             <Label>Cover image (optional)</Label>
             <div className="flex gap-2">
               <Input value={thumbnailUrl} onChange={(e) => onChange({ ...value, thumbnailUrl: e.target.value })} placeholder="Meta picks a frame if left blank" />
-              <Button type="button" variant="outline" disabled={progress !== null} onClick={() => coverInput.current?.click()}>
+              <Button type="button" variant="outline" disabled={progress !== null} onClick={() => coverInput.current?.click()} aria-label="Upload a cover image">
                 <Upload className="h-4 w-4" />
               </Button>
+              {libraryButton("image", "thumbnailUrl")}
             </div>
             <input ref={coverInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) upload(f, "/api/upload", "thumbnailUrl"); }} />
           </div>
         </div>
       )}
+      <MediaLibraryPicker
+        open={library !== null}
+        onClose={() => setLibrary(null)}
+        kind={library?.kind ?? "image"}
+        campaignId={campaignId}
+        onPick={(url) => library && onChange({ ...value, [library.field]: url })}
+      />
     </div>
   );
 }
