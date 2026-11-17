@@ -37,6 +37,7 @@ import { agentContactsRouter } from "./routers/agentContacts";
 import { bulkEmailRouter } from "./routers/bulkEmail";
 import { aiRouter } from "./routers/ai";
 import { audiencesRouter } from "./routers/audiences";
+import { websitesRouter } from "./routers/websites";
 import { campaignsRouter } from "./routers/campaigns";
 import { mortgageClientsRouter } from "./routers/mortgageClients";
 
@@ -206,6 +207,7 @@ export const appRouter = router({
   bulkEmail: bulkEmailRouter,
   ai: aiRouter,
   audiences: audiencesRouter,
+  websites: websitesRouter,
   campaigns: campaignsRouter,
   mortgageClients: mortgageClientsRouter,
 });

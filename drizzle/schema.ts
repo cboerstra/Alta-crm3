@@ -214,7 +214,8 @@ export const landingPages = mysqlTable("landing_pages", {
   // Purpose: webinar registration or advertising/lead capture
   purpose: mysqlEnum("purpose", ["webinar", "advertising"]).default("advertising").notNull(),
   // Which domain hosts this page
-  hostSite: mysqlEnum("hostSite", ["altamortgagecrm", "freehomesearchutah"]).default("altamortgagecrm").notNull(),
+  /** websites.siteKey of the domain this page is served on. */
+  hostSite: varchar("hostSite", { length: 64 }).default("altamortgagecrm").notNull(),
   headline: text("headline"),
   subheadline: text("subheadline"),
   ctaText: varchar("ctaText", { length: 256 }),
@@ -1064,3 +1065,19 @@ export const payrollDeposits = mysqlTable("payroll_deposits", {
 });
 export type PayrollDeposit = typeof payrollDeposits.$inferSelect;
 export type InsertPayrollDeposit = typeof payrollDeposits.$inferInsert;
+
+// ─── Websites ────────────────────────────────────────────────────────────────
+/**
+ * Domains landing pages are served on. Ads link to the page's site, and only
+ * these origins may load landing pages and post leads to the CRM. Each domain
+ * forwards /lp/ (and /schedule/ for tours) to the CRM.
+ */
+export const websites = mysqlTable("websites", {
+  id: int("id").autoincrement().primaryKey(),
+  siteKey: varchar("siteKey", { length: 64 }).notNull().unique(),
+  name: varchar("name", { length: 128 }).notNull(),
+  baseUrl: varchar("baseUrl", { length: 255 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Website = typeof websites.$inferSelect;

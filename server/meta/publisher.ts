@@ -8,6 +8,7 @@
  * exact ad that produced each lead without any manual URL bookkeeping.
  */
 
+import { listWebsites } from "../websites";
 import {
   createMetaAd,
   createMetaAdCreative,
@@ -54,8 +55,18 @@ export function getPublicBaseUrl(): string {
   return raw.replace(/\/+$/, "");
 }
 
-/** Pages hosted on FreeHomeSearchUtah.com are served there, so ads must link there too. */
-export function landingPageSiteUrl(hostSite: string | null | undefined, crmBaseUrl: string): string {
+/**
+ * Pages hosted on another website (Settings → Websites) are served there, so ads
+ * must link there too. Unknown or CRM-hosted pages use the CRM's own address.
+ */
+export function landingPageSiteUrl(
+  hostSite: string | null | undefined,
+  crmBaseUrl: string,
+  sites: { siteKey: string; baseUrl: string }[] = [],
+): string {
+  if (!hostSite || hostSite === "altamortgagecrm") return crmBaseUrl;
+  const site = sites.find((w) => w.siteKey === hostSite);
+  if (site) return site.baseUrl;
   return hostSite === "freehomesearchutah" ? "https://freehomesearchutah.com" : crmBaseUrl;
 }
 
@@ -203,7 +214,7 @@ export async function publishCampaign(campaignId: number): Promise<PublishResult
   }
 
   const destinationUrl = buildDestinationUrl({
-    baseUrl: landingPageSiteUrl((page as any).hostSite, baseUrl),
+    baseUrl: landingPageSiteUrl((page as any).hostSite, baseUrl, await listWebsites()),
     slug: page.slug,
     utmSource: campaign.utmSource,
     utmMedium: campaign.utmMedium,

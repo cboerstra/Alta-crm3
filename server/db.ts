@@ -1739,6 +1739,16 @@ export async function runAutoMigrations(): Promise<void> {
   // next restart without a manual migration step.
   const marketingTables: { name: string; sql: string }[] = [
     {
+      name: "websites",
+      sql: `CREATE TABLE IF NOT EXISTS websites (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        siteKey VARCHAR(64) NOT NULL UNIQUE,
+        name VARCHAR(128) NOT NULL,
+        baseUrl VARCHAR(255) NOT NULL,
+        createdAt TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+    },
+    {
       name: "media_folders",
       sql: `CREATE TABLE IF NOT EXISTS media_folders (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -2052,6 +2062,14 @@ export async function runAutoMigrations(): Promise<void> {
     await (db as any).execute("ALTER TABLE `media_library` MODIFY COLUMN `fileType` ENUM('logo','image','background','other','video') NOT NULL DEFAULT 'image'");
   } catch (err) {
     console.error("[Auto-Migration] media_library.fileType:", err instanceof Error ? err.message : String(err));
+  }
+
+  // Landing pages may be hosted on any website in the websites table, not two fixed ones.
+  try {
+    await (db as any).execute("ALTER TABLE `landing_pages` MODIFY COLUMN `hostSite` VARCHAR(64) NOT NULL DEFAULT 'altamortgagecrm'");
+    await (db as any).execute("INSERT IGNORE INTO websites (siteKey, name, baseUrl) VALUES ('altamortgagecrm', 'altamortgagecrm.net', 'https://altamortgagecrm.net'), ('freehomesearchutah', 'freehomesearchutah.com', 'https://freehomesearchutah.com')");
+  } catch (err) {
+    console.error("[Auto-Migration] websites:", err instanceof Error ? err.message : String(err));
   }
 
   // Create sms_reminders table if it doesn't exist (Hostinger migration)

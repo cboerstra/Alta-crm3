@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { WebsitesPanel } from "@/components/settings/WebsitesPanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -263,26 +264,7 @@ export default function MetaSettingsPanel() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="p-4 space-y-2">
-          <h3 className="font-semibold">Public site URL</h3>
-          <p className="text-xs text-muted-foreground">
-            Ads link to landing pages on this domain. Set the <code>PUBLIC_BASE_URL</code> environment
-            variable and restart — it cannot be changed from here, because a wrong value would send
-            live ad traffic to a dead link.
-          </p>
-          <div className="rounded-md border bg-muted/30 p-2.5 flex items-center gap-2">
-            <code className="text-xs flex-1 break-all">
-              {settings?.publicBaseUrl || "not set"}
-            </code>
-            {settings?.publicBaseUrl && (
-              <a href={settings.publicBaseUrl} target="_blank" rel="noreferrer">
-                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-              </a>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <WebsitesPanel />
     </div>
   );
 }

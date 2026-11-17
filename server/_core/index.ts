@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { isWebsiteOrigin } from "../websites";
 import express, { type RequestHandler } from "express";
 import { createServer } from "http";
 import net from "net";
@@ -544,10 +545,14 @@ async function startServer() {
     ));
   });
 
-  // Allow freehomesearchutah.com to load assets and call APIs cross-origin (landing page proxy)
-  app.use((req, res, next) => {
+  // Websites in Settings → Websites proxy landing pages to the CRM, so they may load assets and call APIs cross-origin.
+  app.use(async (req, res, next) => {
     const origin = req.headers.origin;
-    if (origin && (origin === "https://freehomesearchutah.com")) {
+    let allowed = false;
+    if (origin && origin.startsWith("https://")) {
+      try { allowed = await isWebsiteOrigin(origin); } catch { allowed = origin === "https://freehomesearchutah.com"; }
+    }
+    if (origin && allowed) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
       res.setHeader("Access-Control-Allow-Headers", "Content-Type");
