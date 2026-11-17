@@ -45,3 +45,20 @@ describe("Meta permission fallbacks", () => {
     })).rejects.toThrow("Invalid parameter");
   });
 });
+
+import { uploadAdImage } from "./meta/marketingApi";
+describe("image upload fallback", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("sends the image bytes when Meta won't fetch the image address", async () => {
+    const calls: { url: string; body?: string }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), body: init?.body as string | undefined });
+      if (calls.length === 1) return json(400, { error: { message: "(#3) Application does not have the capability to make this API call.", code: 3 } });
+      if (String(url).endsWith("cover.jpg")) return new Response(new Uint8Array([9, 8, 7]));
+      return json(200, { images: { "cover.jpg": { hash: "h123" } } });
+    }));
+    await expect(uploadAdImage(creds, "https://crm.example/uploads/cover.jpg")).resolves.toBe("h123");
+    expect(JSON.parse(calls[0].body!)).toEqual({ url: "https://crm.example/uploads/cover.jpg" });
+    expect(JSON.parse(calls[2].body!)).toEqual({ bytes: Buffer.from([9, 8, 7]).toString("base64") });
+  });
+});
