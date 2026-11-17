@@ -1,0 +1,20 @@
+{
+  "name": "Plain City - Tour Reel",
+  "internalNotes": "Reel -> plain-city-tour split (A/B) -> tour calendar",
+  "objective": "leads",
+  "dailyBudget": 20,
+  "lifetimeBudget": null,
+  "endDate": "2026-12-17",
+  "targetAreas": [{ "name": "Ogden", "radiusMiles": 25 }, { "name": "Brigham City", "radiusMiles": 25 }],
+  "platforms": ["facebook", "instagram"],
+  "audience": { "include": [], "exclude": ["Converted - leave out"] },
+  "landingPage": { "title": "3380 W 3275 N Plain City Tour (Split)", "url": "https://freehomesearchutah.com/lp/plain-city-tour" },
+  "primaryText": "Mountain views and no backyard neighbors in Plain City. 🏡\n\n3380 W 3275 N is a 2022-built home on a corner lot: 3 bedrooms, 2.5 baths, 1,949 sq ft, an open kitchen, a modern fireplace, a 3-car garage and RV parking. Offered at $519,900.\n\nPick a time that works for you and I'll show you around in person.\n\nScott Boerstra, Equity Real Estate · Lic# 5452345-SA00",
+  "headline": "Schedule a Personal Tour",
+  "linkDescription": "Equity Real Estate · EHO",
+  "mediaType": "video",
+  "reel": "path/to/plain-city-tour-reel-v6.mp4",
+  "image": "path/to/plain-city-tour-cover-v2.jpg",
+  "callToAction": "LEARN_MORE",
+  "followUp": null
+}
