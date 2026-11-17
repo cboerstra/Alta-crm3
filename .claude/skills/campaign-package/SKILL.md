@@ -69,11 +69,28 @@ any warnings; fix every warning before handing it over.
 
 ## Process
 
-1. Gather facts: property or offer, landing page, budget, dates, areas. Ask only
-   for what you can't find in the CRM repo or earlier conversation.
-2. Make or locate the Reel and cover image. Check the Reel with ffprobe (1080x1920,
+1. Gather facts: property or offer, landing page, budget, dates, areas. Fill what you
+   can from the user's request, the CRM repo and earlier conversation.
+2. **Offer choices for anything you don't know.** Use `AskUserQuestion` (up to 4
+   questions per call, 2-4 options each, recommended option first and marked
+   "(Recommended)"; the user can always type their own answer). Group related
+   fields into one call. Typical choices:
+   - Objective: Leads (Recommended for tours and sign-ups) / Traffic / Awareness
+   - Budget: $15/day / $20/day / $30/day / Lifetime $500
+   - End date: 14 days / 30 days (Recommended) / 60 days
+   - Target areas: Ogden 25 mi + Brigham City 25 mi / Salt Lake City 25 mi / Weber County towns 15 mi
+   - Platforms: Facebook + Instagram (Recommended) / + Threads / + Messenger
+   - Audience: Leave out Converted (Recommended) / Show to a saved audience / Everyone
+   - Landing page: the existing pages that match (list them by title) / Create a new page
+   - Headline, Primary text, Link description: write 2-3 versions and let the user pick
+   - Call to action: Learn More / Sign Up / Contact Us / Get Quote
+   - Follow-up: the existing nurture sequences by name / None
+   Don't ask about anything already given or obvious; don't ask more than two rounds.
+   If the user skips a question, use the recommended option and say so in the sheet's
+   Internal notes.
+3. Make or locate the Reel and cover image. Check the Reel with ffprobe (1080x1920,
    H.264/AAC, under 60 s, under 100 MB).
-3. Write `campaign.json`, run `make_package.py`, fix warnings.
-4. Deliver the folder (see "Where it goes") and list the next steps: upload the Reel
+4. Write `campaign.json`, run `make_package.py`, fix warnings.
+5. Deliver the folder (see "Where it goes") and list the next steps: upload the Reel
    and cover from the folder in the Ad creative tab, paste the fields, Publish, then
    Start delivery once Meta approves.
