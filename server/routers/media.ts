@@ -177,6 +177,17 @@ export const mediaRouter = router({
       return { success: true };
     }),
 
+  /** Delete several files at once (e.g. a campaign's old files). */
+  deleteMany: adminProcedure
+    .input(z.object({ ids: z.array(z.number()).min(1).max(500) }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("Database not available");
+      await db.delete(landingPageMedia).where(inArray(landingPageMedia.mediaId, input.ids));
+      await db.delete(mediaLibrary).where(inArray(mediaLibrary.id, input.ids));
+      return { deleted: input.ids.length };
+    }),
+
   // ─── Landing Page Media Associations ───
   // Get media items for a landing page
   getForLandingPage: publicProcedure
